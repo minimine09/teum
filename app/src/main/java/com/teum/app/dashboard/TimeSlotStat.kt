@@ -2,8 +2,10 @@ package com.teum.app.dashboard
 
 data class TimeSlotStat(
     val hourSlot: Int,
+    val openCount: Int,
     val sessionCount: Int,
     val overrunCount: Int,
+    val extensionCount: Int,
     val fastReopenCount: Int,
     val purposeDriftCount: Int,
     val overrunRate: Double,

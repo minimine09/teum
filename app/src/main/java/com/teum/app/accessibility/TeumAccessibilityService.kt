@@ -88,6 +88,10 @@ class TeumAccessibilityService : AccessibilityService() {
         if (targetAppRepository.isTargetPackage(packageName)) {
             Log.d(TAG, "target app entered: $packageName")
             val entryTimeMillis = System.currentTimeMillis()
+            saveAppOpenEvent(
+                packageName = packageName,
+                detectedAtMillis = entryTimeMillis
+            )
             val reopenCheckResult = SessionManager.checkFastReopen(
                 packageName = packageName,
                 currentEntryTimeMillis = entryTimeMillis
@@ -168,11 +172,11 @@ class TeumAccessibilityService : AccessibilityService() {
 
         val session = SessionManager.getCurrentSession() ?: return
         val elapsedMillis = SessionManager.getElapsedMillis()
-        val delayMillis = (session.targetDurationMillis - elapsedMillis).coerceAtLeast(0L)
+        val delayMillis = (session.currentLimitDurationMillis - elapsedMillis).coerceAtLeast(0L)
 
         Log.d(
             TAG,
-            "brake scheduled package=${session.packageName} delay=$delayMillis target=${session.targetDurationMillis}"
+            "brake scheduled package=${session.packageName} delay=$delayMillis currentLimit=${session.currentLimitDurationMillis}"
         )
         brakeHandler.postDelayed(brakeRunnable, delayMillis)
     }
@@ -202,7 +206,7 @@ class TeumAccessibilityService : AccessibilityService() {
         overlayController.showSessionBrake(
             packageName = session.packageName,
             elapsedMillis = SessionManager.getElapsedMillis(),
-            targetDurationMillis = session.targetDurationMillis,
+            targetDurationMillis = session.currentLimitDurationMillis,
             onBrakeChoice = { choice ->
                 handleBrakeChoice(choice, session.packageName)
             }
@@ -254,6 +258,26 @@ class TeumAccessibilityService : AccessibilityService() {
                 }
             } catch (exception: RuntimeException) {
                 Log.e(DB_TAG, "failed to save session package=${session.packageName}", exception)
+            }
+        }
+    }
+
+    private fun saveAppOpenEvent(
+        packageName: String,
+        detectedAtMillis: Long
+    ) {
+        serviceScope.launch {
+            try {
+                val id = sessionLogRepository.saveAppOpenEvent(
+                    packageName = packageName,
+                    detectedAtMillis = detectedAtMillis
+                )
+                Log.d(
+                    DB_TAG,
+                    "app open event saved id=$id package=$packageName detectedAt=$detectedAtMillis"
+                )
+            } catch (exception: RuntimeException) {
+                Log.e(DB_TAG, "failed to save app open event package=$packageName", exception)
             }
         }
     }

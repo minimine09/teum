@@ -5,28 +5,24 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.core.util.PermissionUtils
-import com.teum.app.data.repository.SessionLogRepository
 import com.teum.app.data.repository.TargetAppRepository
-import com.teum.app.dashboard.DashboardStats
 import com.teum.app.dashboard.DashboardScreen
-import com.teum.app.dashboard.VulnerabilityAnalyzer
+import com.teum.app.dashboard.DashboardViewModel
 import com.teum.app.ui.theme.TeumTheme
 
 class MainActivity : ComponentActivity() {
     private val targetAppRepository by lazy {
         TargetAppRepository(this)
     }
-    private val sessionLogRepository by lazy {
-        SessionLogRepository(this)
-    }
+    private val dashboardViewModel: DashboardViewModel by viewModels()
 
     private var permissionStatus by mutableStateOf(
         PermissionStatus(
@@ -43,37 +39,20 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TeumTheme {
-                val recentSessions by sessionLogRepository.observeRecentSessions()
-                    .collectAsState(initial = emptyList())
-                val todaySessionCount by sessionLogRepository.observeTodaySessionCount()
-                    .collectAsState(initial = 0)
-                val todayOverrunCount by sessionLogRepository.observeTodayOverrunCount()
-                    .collectAsState(initial = 0)
-                val todayFastReopenCount by sessionLogRepository.observeTodayFastReopenCount()
-                    .collectAsState(initial = 0)
-                val todayPurposeDriftCount by sessionLogRepository.observeTodayPurposeDriftCount()
-                    .collectAsState(initial = 0)
-                val lastSevenDaysSessions by sessionLogRepository.observeSessionsForLastSevenDays()
-                    .collectAsState(initial = emptyList())
-                val timeSlotStats = remember(lastSevenDaysSessions) {
-                    VulnerabilityAnalyzer.calculateTimeSlotStats(lastSevenDaysSessions)
-                }
+                val dashboardUiState by dashboardViewModel.uiState.collectAsState()
 
                 DashboardScreen(
                     permissionStatus = permissionStatus,
                     targetPackages = targetPackages,
-                    dashboardStats = DashboardStats(
-                        todaySessionCount = todaySessionCount,
-                        todayOverrunCount = todayOverrunCount,
-                        todayFastReopenCount = todayFastReopenCount,
-                        todayPurposeDriftCount = todayPurposeDriftCount
-                    ),
-                    recentSessions = recentSessions,
-                    timeSlotStats = timeSlotStats,
+                    dashboardStats = dashboardUiState.dashboardStats,
+                    recentSessions = dashboardUiState.recentSessions,
+                    timeSlotStats = dashboardUiState.timeSlotStats,
+                    weeklyReportStats = dashboardUiState.weeklyReportStats,
                     onOpenAccessibilitySettings = ::openAccessibilitySettings,
                     onOpenOverlaySettings = ::openOverlaySettings,
                     onAddTargetPackage = ::addTargetPackage,
-                    onRemoveTargetPackage = ::removeTargetPackage
+                    onRemoveTargetPackage = ::removeTargetPackage,
+                    onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs
                 )
             }
         }
