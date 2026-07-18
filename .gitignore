@@ -1,0 +1,46 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Kotlin
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Local machine configuration
+local.properties
+**/local.properties
+
+# Android generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# APK / app bundle outputs
+*.apk
+*.ap_
+*.aab
+
+# Signing keys and secrets
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Codex local workspace metadata
+.agents/
+.codex/

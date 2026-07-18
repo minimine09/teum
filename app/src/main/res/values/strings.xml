@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">틈</string>
+    <string name="accessibility_service_description">관리 대상 앱 진입 감지를 위한 접근성 서비스입니다.</string>
+</resources>
