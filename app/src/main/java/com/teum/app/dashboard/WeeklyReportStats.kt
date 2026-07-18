@@ -13,7 +13,9 @@ data class WeeklyReportStats(
     val overrunRate: Double = 0.0,
     val extensionCount: Int = 0,
     val fastReopenCount: Int = 0,
+    val outcomeResponseCount: Int = 0,
     val purposeDriftRate: Double = 0.0,
+    val closedAfterInterventionCount: Int = 0,
     val averageReopenGapMillis: Long? = null,
     val mostVulnerableHourSlot: Int? = null,
     val dailyOverrunStats: List<DailyOverrunStat> = emptyList()

@@ -82,6 +82,32 @@ class SessionLogRepository(context: Context) {
         }
     }
 
+    suspend fun updateSessionOutcome(
+        sessionId: Long,
+        outcomeType: String,
+        achieved: Boolean,
+        drifted: Boolean,
+        respondedAtMillis: Long = System.currentTimeMillis()
+    ): Boolean {
+        return sessionLogDao.updateOutcome(
+            sessionId = sessionId,
+            outcomeType = outcomeType,
+            respondedAtMillis = respondedAtMillis,
+            achieved = achieved,
+            drifted = drifted
+        ) == 1
+    }
+
+    suspend fun confirmExitAfterIntervention(
+        sessionId: Long,
+        confirmedAtMillis: Long = System.currentTimeMillis()
+    ): Boolean {
+        return sessionLogDao.confirmExitAfterIntervention(
+            sessionId = sessionId,
+            confirmedAtMillis = confirmedAtMillis
+        ) == 1
+    }
+
     companion object {
         fun startOfTodayMillis(): Long {
             return Calendar.getInstance().apply {

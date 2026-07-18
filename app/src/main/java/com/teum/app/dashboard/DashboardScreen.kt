@@ -432,7 +432,11 @@ private fun WeeklyReportCard(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "연장 ${stats.extensionCount}회 / 빠른 재진입 ${stats.fastReopenCount}회 / 목적 이탈 ${formatPercent(stats.purposeDriftRate)}",
+                text = "연장 ${stats.extensionCount}회 / 빠른 재진입 ${stats.fastReopenCount}회 / 목적 이탈 ${formatPercent(stats.purposeDriftRate)} (응답 ${stats.outcomeResponseCount}회)",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "개입 후 실제 종료 ${stats.closedAfterInterventionCount}회",
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(

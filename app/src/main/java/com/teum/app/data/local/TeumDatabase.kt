@@ -13,7 +13,7 @@ import com.teum.app.data.local.entity.SessionLogEntity
 
 @Database(
     entities = [SessionLogEntity::class, AppOpenEventEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class TeumDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class TeumDatabase : RoomDatabase() {
                     context.applicationContext,
                     TeumDatabase::class.java,
                     "teum.db"
-                ).addMigrations(MIGRATION_1_2)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { database ->
                     instance = database
@@ -48,6 +48,26 @@ abstract class TeumDatabase : RoomDatabase() {
                         detectedAtMillis INTEGER NOT NULL
                     )
                     """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN outcomeRespondedAtMillis INTEGER"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN outcomeAchieved INTEGER"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN purposeDrifted INTEGER"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN closedAfterIntervention INTEGER"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN interventionExitConfirmedAtMillis INTEGER"
                 )
             }
         }

@@ -23,7 +23,7 @@ interface SessionLogDao {
     @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis AND isFastReopen = 1")
     fun observeTodayFastReopenCount(startOfDayMillis: Long): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis AND outcomeType = 'PURPOSE_DRIFT'")
+    @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis AND purposeDrifted = 1")
     fun observeTodayPurposeDriftCount(startOfDayMillis: Long): Flow<Int>
 
     @Query("SELECT * FROM session_logs WHERE startedAtMillis >= :sinceMillis ORDER BY startedAtMillis DESC")
@@ -31,4 +31,35 @@ interface SessionLogDao {
 
     @Query("DELETE FROM session_logs")
     suspend fun deleteAllSessionLogs()
+
+    @Query(
+        """
+        UPDATE session_logs
+        SET outcomeType = :outcomeType,
+            outcomeRespondedAtMillis = :respondedAtMillis,
+            outcomeAchieved = :achieved,
+            purposeDrifted = :drifted
+        WHERE id = :sessionId
+        """
+    )
+    suspend fun updateOutcome(
+        sessionId: Long,
+        outcomeType: String,
+        respondedAtMillis: Long,
+        achieved: Boolean,
+        drifted: Boolean
+    ): Int
+
+    @Query(
+        """
+        UPDATE session_logs
+        SET closedAfterIntervention = 1,
+            interventionExitConfirmedAtMillis = :confirmedAtMillis
+        WHERE id = :sessionId
+        """
+    )
+    suspend fun confirmExitAfterIntervention(
+        sessionId: Long,
+        confirmedAtMillis: Long
+    ): Int
 }

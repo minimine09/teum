@@ -10,7 +10,11 @@ object WeeklyReportAnalyzer {
     ): WeeklyReportStats {
         val totalSessionCount = sessions.size
         val overrunCount = sessions.count { it.overrun }
-        val purposeDriftCount = sessions.count { it.outcomeType == PURPOSE_DRIFT }
+        val purposeOutcomeSessions = sessions.filter { session ->
+            session.intentChoice == CLEAR_PURPOSE &&
+                session.outcomeRespondedAtMillis != null
+        }
+        val purposeDriftCount = purposeOutcomeSessions.count { it.purposeDrifted == true }
         val reopenGaps = sessions.mapNotNull { it.reopenGapMillis }
         val mostVulnerableHourSlot = timeSlotStats
             .filter { it.sessionCount > 0 }
@@ -26,7 +30,9 @@ object WeeklyReportAnalyzer {
             overrunRate = rate(overrunCount, totalSessionCount),
             extensionCount = sessions.sumOf { it.extensionCount },
             fastReopenCount = sessions.count { it.isFastReopen },
-            purposeDriftRate = rate(purposeDriftCount, totalSessionCount),
+            outcomeResponseCount = purposeOutcomeSessions.size,
+            purposeDriftRate = rate(purposeDriftCount, purposeOutcomeSessions.size),
+            closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
             averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
             mostVulnerableHourSlot = mostVulnerableHourSlot,
             dailyOverrunStats = calculateDailyOverrunStats(sessions)
@@ -57,7 +63,7 @@ object WeeklyReportAnalyzer {
         return if (total == 0) 0.0 else count.toDouble() / total.toDouble()
     }
 
-    private const val PURPOSE_DRIFT = "PURPOSE_DRIFT"
+    private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
     private val DAYS = listOf(
         Calendar.MONDAY to "월",
         Calendar.TUESDAY to "화",
