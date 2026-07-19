@@ -51,20 +51,20 @@ class SessionLogRepository(context: Context) {
         return sessionLogDao.observeRecentSessions(limit)
     }
 
-    fun observeTodaySessionCount(): Flow<Int> {
-        return sessionLogDao.observeTodaySessionCount(startOfTodayMillis())
+    fun observeTodaySessionCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodaySessionCount(startOfDayMillis)
     }
 
-    fun observeTodayOverrunCount(): Flow<Int> {
-        return sessionLogDao.observeTodayOverrunCount(startOfTodayMillis())
+    fun observeTodayOverrunCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayOverrunCount(startOfDayMillis)
     }
 
-    fun observeTodayFastReopenCount(): Flow<Int> {
-        return sessionLogDao.observeTodayFastReopenCount(startOfTodayMillis())
+    fun observeTodayFastReopenCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayFastReopenCount(startOfDayMillis)
     }
 
-    fun observeTodayPurposeDriftCount(): Flow<Int> {
-        return sessionLogDao.observeTodayPurposeDriftCount(startOfTodayMillis())
+    fun observeTodayPurposeDriftCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayPurposeDriftCount(startOfDayMillis)
     }
 
     fun observeSessionsForLastSevenDays(): Flow<List<SessionLogEntity>> {
@@ -73,6 +73,14 @@ class SessionLogRepository(context: Context) {
 
     fun observeOpenEventsForLastSevenDays(): Flow<List<AppOpenEventEntity>> {
         return appOpenEventDao.observeOpenEventsSince(lastSevenDaysSinceMillis())
+    }
+
+    fun observeSessionsSince(sinceMillis: Long): Flow<List<SessionLogEntity>> {
+        return sessionLogDao.observeSessionsSince(sinceMillis)
+    }
+
+    fun observeOpenEventsSince(sinceMillis: Long): Flow<List<AppOpenEventEntity>> {
+        return appOpenEventDao.observeOpenEventsSince(sinceMillis)
     }
 
     suspend fun deleteAllSessionLogs() {
