@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
             TeumTheme {
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val displayedPackages = targetPackages +
+                    dashboardUiState.availablePackages +
                     dashboardUiState.recentSessions.map { it.packageName }
                 val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
 
@@ -54,11 +55,14 @@ class MainActivity : ComponentActivity() {
                     recentSessions = dashboardUiState.recentSessions,
                     timeSlotStats = dashboardUiState.timeSlotStats,
                     weeklyReportStats = dashboardUiState.weeklyReportStats,
+                    availablePackages = dashboardUiState.availablePackages,
+                    selectedPackageName = dashboardUiState.selectedPackageName,
                     onOpenAccessibilitySettings = ::openAccessibilitySettings,
                     onOpenOverlaySettings = ::openOverlaySettings,
                     onAddTargetPackage = ::addTargetPackage,
                     onRemoveTargetPackage = ::removeTargetPackage,
-                    onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs
+                    onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
+                    onSelectPackage = dashboardViewModel::selectPackage
                 )
             }
         }

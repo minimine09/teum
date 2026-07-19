@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -50,11 +52,14 @@ fun DashboardScreen(
     recentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
     weeklyReportStats: WeeklyReportStats,
+    availablePackages: Set<String>,
+    selectedPackageName: String?,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onAddTargetPackage: (String) -> Unit,
     onRemoveTargetPackage: (String) -> Unit,
     onDeleteAllSessionLogs: () -> Unit,
+    onSelectPackage: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -108,6 +113,12 @@ fun DashboardScreen(
                     appDisplayNames = appDisplayNames,
                     onAddTargetPackage = onAddTargetPackage,
                     onRemoveTargetPackage = onRemoveTargetPackage
+                )
+                AppStatisticsFilterCard(
+                    packages = targetPackages + availablePackages,
+                    selectedPackageName = selectedPackageName,
+                    appDisplayNames = appDisplayNames,
+                    onSelectPackage = onSelectPackage
                 )
                 TodayStatsCard(dashboardStats)
                 WeeklyReportCard(
@@ -333,6 +344,55 @@ private fun TargetPackageList(
     }
 }
 
+@Composable
+private fun AppStatisticsFilterCard(
+    packages: Set<String>,
+    selectedPackageName: String?,
+    appDisplayNames: Map<String, String>,
+    onSelectPackage: (String?) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "통계 앱 선택",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "선택한 앱의 오늘 통계와 최근 7일 분석을 보여드려요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedPackageName == null,
+                    onClick = { onSelectPackage(null) },
+                    label = { Text("전체") }
+                )
+                packages.sortedBy { appDisplayNames[it] ?: it }.forEach { packageName ->
+                    FilterChip(
+                        selected = selectedPackageName == packageName,
+                        onClick = { onSelectPackage(packageName) },
+                        label = { Text(appDisplayNames[packageName] ?: packageName) }
+                    )
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun TodayStatsCard(stats: DashboardStats) {
     Card(
@@ -645,11 +705,14 @@ private fun DashboardScreenPreview() {
             recentSessions = emptyList(),
             timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(emptyList()),
             weeklyReportStats = WeeklyReportStats(),
+            availablePackages = setOf("com.google.android.youtube"),
+            selectedPackageName = null,
             onOpenAccessibilitySettings = {},
             onOpenOverlaySettings = {},
             onAddTargetPackage = {},
             onRemoveTargetPackage = {},
-            onDeleteAllSessionLogs = {}
+            onDeleteAllSessionLogs = {},
+            onSelectPackage = {}
         )
     }
 }

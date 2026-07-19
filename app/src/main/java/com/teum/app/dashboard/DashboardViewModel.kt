@@ -3,11 +3,12 @@ package com.teum.app.dashboard
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.repository.SessionLogRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,20 +21,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SessionLogRepository(application)
-
-    private fun observeTodayStats(startOfTodayMillis: Long): Flow<DashboardStats> = combine(
-        repository.observeTodaySessionCount(startOfTodayMillis),
-        repository.observeTodayOverrunCount(startOfTodayMillis),
-        repository.observeTodayFastReopenCount(startOfTodayMillis),
-        repository.observeTodayPurposeDriftCount(startOfTodayMillis)
-    ) { sessionCount, overrunCount, fastReopenCount, purposeDriftCount ->
-        DashboardStats(
-            todaySessionCount = sessionCount,
-            todayOverrunCount = overrunCount,
-            todayFastReopenCount = fastReopenCount,
-            todayPurposeDriftCount = purposeDriftCount
-        )
-    }
+    private val selectedPackageName = MutableStateFlow<String?>(null)
 
     private val dateRange = flow {
         while (currentCoroutineContext().isActive) {
@@ -43,25 +31,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    val uiState: StateFlow<DashboardUiState> = dateRange.flatMapLatest { range ->
+    val uiState: StateFlow<DashboardUiState> = combine(
+        dateRange,
+        selectedPackageName
+    ) { range, selectedPackage ->
+        range to selectedPackage
+    }.flatMapLatest { (range, selectedPackage) ->
         combine(
-            observeTodayStats(range.startOfTodayMillis),
-            repository.observeRecentSessions(),
             repository.observeSessionsSince(range.startOfSevenDayPeriodMillis),
             repository.observeOpenEventsSince(range.startOfSevenDayPeriodMillis)
-        ) { dashboardStats, recentSessions, lastSevenDaysSessions, openEvents ->
+        ) { allSessions, allOpenEvents ->
+            val sessions = DashboardDataFilter.sessions(allSessions, selectedPackage)
+            val openEvents = DashboardDataFilter.openEvents(allOpenEvents, selectedPackage)
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
-                sessions = lastSevenDaysSessions,
+                sessions = sessions,
                 openEvents = openEvents
             )
+
             DashboardUiState(
-                dashboardStats = dashboardStats,
-                recentSessions = recentSessions,
+                dashboardStats = DashboardDataFilter.todayStats(sessions, range.startOfTodayMillis),
+                recentSessions = sessions.sortedByDescending { it.endedAtMillis }.take(10),
                 timeSlotStats = timeSlotStats,
                 weeklyReportStats = WeeklyReportAnalyzer.calculate(
-                    sessions = lastSevenDaysSessions,
+                    sessions = sessions,
                     timeSlotStats = timeSlotStats
-                )
+                ),
+                availablePackages = (allSessions.map { it.packageName } +
+                    allOpenEvents.map { it.packageName }).toSet(),
+                selectedPackageName = selectedPackage
             )
         }
     }.stateIn(
@@ -70,9 +67,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         initialValue = DashboardUiState()
     )
 
+    fun selectPackage(packageName: String?) {
+        selectedPackageName.value = packageName
+    }
+
     fun deleteAllSessionLogs() {
         viewModelScope.launch {
             repository.deleteAllSessionLogs()
         }
     }
+
 }
