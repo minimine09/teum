@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.teum.app.core.model.PermissionStatus
-import com.teum.app.core.util.TeumConstants
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.ui.theme.TeumTheme
 
@@ -117,7 +116,6 @@ fun DashboardScreen(
                 )
                 VulnerabilityPatternCard(timeSlotStats)
                 RecentSessionsCard(recentSessions, appDisplayNames)
-                MvpFlowCard(TeumConstants.mvpFlow)
             }
         }
     }
@@ -523,7 +521,7 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
             )
             topStats.forEach { stat ->
                 Text(
-                    text = "${stat.hourSlot}\uC2DC: score ${formatScore(stat.vulnerabilityScore)} / \uCD08\uACFC\uC728 ${formatPercent(stat.overrunRate)} / \uC7AC\uC9C4\uC785 ${stat.fastReopenCount}\uD68C${lowDataSuffix(stat)}",
+                    text = "${stat.hourSlot}시: 취약도 ${formatScore(stat.vulnerabilityScore)} / 초과율 ${formatPercent(stat.overrunRate)} / 빠른 재진입 ${stat.fastReopenCount}회${lowDataSuffix(stat)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -537,7 +535,7 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
             )
             activeStats.sortedBy { it.hourSlot }.forEach { stat ->
                 Text(
-                    text = "${stat.hourSlot}\uC2DC: open=${stat.openCount}, overrun=${formatPercent(stat.overrunRate)}, extension=${stat.extensionCount}, reopen=${stat.fastReopenCount}, drift=${stat.purposeDriftCount}, score=${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}",
+                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 빠른 재진입 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회 / 취약도 ${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -551,6 +549,8 @@ private fun RecentSessionItem(
     session: SessionLogEntity,
     appDisplayName: String
 ) {
+    val overrunMillis = (session.durationMillis - session.targetDurationMillis).coerceAtLeast(0L)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -561,56 +561,48 @@ private fun RecentSessionItem(
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "사용 ${formatDuration(session.durationMillis)} / 목표 ${formatDuration(session.targetDurationMillis)}",
+            text = "${formatDuration(session.durationMillis)} 사용 · 목표 ${formatDuration(session.targetDurationMillis)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "intent=${session.intentChoice} outcome=${session.outcomeType ?: "-"} overrun=${session.overrun}",
+            text = "사용 목적: ${SessionDisplayText.intent(session.intentChoice)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        val reopenText = if (session.reopenGapMillis != null) {
-            "fastReopen=${session.isFastReopen} gap=${formatDuration(session.reopenGapMillis)}"
-        } else {
-            "fastReopen=${session.isFastReopen}"
-        }
         Text(
-            text = reopenText,
+            text = "사용 결과: ${SessionDisplayText.outcome(session.outcomeType, session.outcomeAchieved, session.purposeDrifted)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-private fun MvpFlowCard(flowItems: List<String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        Text(
+            text = if (session.overrun) {
+                "목표 시간을 ${formatDuration(overrunMillis)} 초과했어요"
+            } else {
+                "목표 시간 안에 종료했어요"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        if (session.extensionCount > 0) {
             Text(
-                text = "MVP 흐름",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                text = "사용 시간을 ${session.extensionCount}회 연장했어요",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            flowItems.forEachIndexed { index, item ->
-                Text(
-                    text = "${index + 1}. $item",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
+        Text(
+            text = if (session.isFastReopen) {
+                session.reopenGapMillis?.let { "${formatDuration(it)} 만에 다시 열었어요" }
+                    ?: "앱을 빠르게 다시 열었어요"
+            } else {
+                "빠른 재진입 없이 시작했어요"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
-
 private fun formatDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
     val minutes = totalSeconds / 60L
