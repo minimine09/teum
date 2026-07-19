@@ -46,6 +46,7 @@ data class DashboardStats(
 fun DashboardScreen(
     permissionStatus: PermissionStatus,
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
     recentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
@@ -105,6 +106,7 @@ fun DashboardScreen(
                 TargetAppCard(
                     permissionStatus = permissionStatus,
                     targetPackages = targetPackages,
+                    appDisplayNames = appDisplayNames,
                     onAddTargetPackage = onAddTargetPackage,
                     onRemoveTargetPackage = onRemoveTargetPackage
                 )
@@ -114,7 +116,7 @@ fun DashboardScreen(
                     onDeleteAllSessionLogs = { showDeleteConfirmation = true }
                 )
                 VulnerabilityPatternCard(timeSlotStats)
-                RecentSessionsCard(recentSessions)
+                RecentSessionsCard(recentSessions, appDisplayNames)
                 MvpFlowCard(TeumConstants.mvpFlow)
             }
         }
@@ -211,6 +213,7 @@ private fun PermissionStatusRow(
 private fun TargetAppCard(
     permissionStatus: PermissionStatus,
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     onAddTargetPackage: (String) -> Unit,
     onRemoveTargetPackage: (String) -> Unit
 ) {
@@ -286,6 +289,7 @@ private fun TargetAppCard(
             }
             TargetPackageList(
                 targetPackages = targetPackages,
+                appDisplayNames = appDisplayNames,
                 onRemoveTargetPackage = onRemoveTargetPackage
             )
         }
@@ -295,6 +299,7 @@ private fun TargetAppCard(
 @Composable
 private fun TargetPackageList(
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     onRemoveTargetPackage: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -318,7 +323,7 @@ private fun TargetPackageList(
                 ) {
                     Text(
                         modifier = Modifier.weight(1f),
-                        text = packageName,
+                        text = appDisplayNames[packageName] ?: packageName,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     TextButton(onClick = { onRemoveTargetPackage(packageName) }) {
@@ -376,7 +381,10 @@ private fun StatRow(label: String, value: String) {
 }
 
 @Composable
-private fun RecentSessionsCard(recentSessions: List<SessionLogEntity>) {
+private fun RecentSessionsCard(
+    recentSessions: List<SessionLogEntity>,
+    appDisplayNames: Map<String, String>
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -400,7 +408,10 @@ private fun RecentSessionsCard(recentSessions: List<SessionLogEntity>) {
                 )
             } else {
                 recentSessions.forEach { session ->
-                    RecentSessionItem(session)
+                    RecentSessionItem(
+                        session = session,
+                        appDisplayName = appDisplayNames[session.packageName] ?: session.packageName
+                    )
                 }
             }
         }
@@ -536,13 +547,16 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
 }
 
 @Composable
-private fun RecentSessionItem(session: SessionLogEntity) {
+private fun RecentSessionItem(
+    session: SessionLogEntity,
+    appDisplayName: String
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = session.packageName,
+            text = appDisplayName,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
@@ -634,6 +648,7 @@ private fun DashboardScreenPreview() {
                 canDrawOverlays = false
             ),
             targetPackages = setOf("com.google.android.youtube"),
+            appDisplayNames = mapOf("com.google.android.youtube" to "YouTube"),
             dashboardStats = DashboardStats(),
             recentSessions = emptyList(),
             timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(emptyList()),

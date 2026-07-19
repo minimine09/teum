@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.core.util.PermissionUtils
 import com.teum.app.data.repository.TargetAppRepository
+import com.teum.app.dashboard.AppDisplayNameResolver
 import com.teum.app.dashboard.DashboardScreen
 import com.teum.app.dashboard.DashboardViewModel
 import com.teum.app.ui.theme.TeumTheme
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
         TargetAppRepository(this)
     }
     private val dashboardViewModel: DashboardViewModel by viewModels()
+    private val appDisplayNameResolver by lazy { AppDisplayNameResolver(this) }
 
     private var permissionStatus by mutableStateOf(
         PermissionStatus(
@@ -40,10 +42,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             TeumTheme {
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+                val displayedPackages = targetPackages +
+                    dashboardUiState.recentSessions.map { it.packageName }
+                val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
 
                 DashboardScreen(
                     permissionStatus = permissionStatus,
                     targetPackages = targetPackages,
+                    appDisplayNames = appDisplayNames,
                     dashboardStats = dashboardUiState.dashboardStats,
                     recentSessions = dashboardUiState.recentSessions,
                     timeSlotStats = dashboardUiState.timeSlotStats,
