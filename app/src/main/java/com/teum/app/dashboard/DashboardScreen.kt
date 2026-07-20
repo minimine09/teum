@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -30,7 +33,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.teum.app.core.model.PermissionStatus
-import com.teum.app.core.util.TeumConstants
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.ui.theme.TeumTheme
 
@@ -45,15 +47,46 @@ data class DashboardStats(
 fun DashboardScreen(
     permissionStatus: PermissionStatus,
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
     recentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
+    weeklyReportStats: WeeklyReportStats,
+    availablePackages: Set<String>,
+    selectedPackageName: String?,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onAddTargetPackage: (String) -> Unit,
     onRemoveTargetPackage: (String) -> Unit,
+    onDeleteAllSessionLogs: () -> Unit,
+    onSelectPackage: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("사용 기록을 삭제할까요?") },
+            text = { Text("저장된 세션과 대시보드 통계가 모두 삭제되며 복구할 수 없습니다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onDeleteAllSessionLogs()
+                    }
+                ) {
+                    Text("삭제")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
         Surface(
             modifier = Modifier
@@ -77,13 +110,23 @@ fun DashboardScreen(
                 TargetAppCard(
                     permissionStatus = permissionStatus,
                     targetPackages = targetPackages,
+                    appDisplayNames = appDisplayNames,
                     onAddTargetPackage = onAddTargetPackage,
                     onRemoveTargetPackage = onRemoveTargetPackage
                 )
+                AppStatisticsFilterCard(
+                    packages = targetPackages + availablePackages,
+                    selectedPackageName = selectedPackageName,
+                    appDisplayNames = appDisplayNames,
+                    onSelectPackage = onSelectPackage
+                )
                 TodayStatsCard(dashboardStats)
+                WeeklyReportCard(
+                    stats = weeklyReportStats,
+                    onDeleteAllSessionLogs = { showDeleteConfirmation = true }
+                )
                 VulnerabilityPatternCard(timeSlotStats)
-                RecentSessionsCard(recentSessions)
-                MvpFlowCard(TeumConstants.mvpFlow)
+                RecentSessionsCard(recentSessions, appDisplayNames)
             }
         }
     }
@@ -179,6 +222,7 @@ private fun PermissionStatusRow(
 private fun TargetAppCard(
     permissionStatus: PermissionStatus,
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     onAddTargetPackage: (String) -> Unit,
     onRemoveTargetPackage: (String) -> Unit
 ) {
@@ -254,6 +298,7 @@ private fun TargetAppCard(
             }
             TargetPackageList(
                 targetPackages = targetPackages,
+                appDisplayNames = appDisplayNames,
                 onRemoveTargetPackage = onRemoveTargetPackage
             )
         }
@@ -263,6 +308,7 @@ private fun TargetAppCard(
 @Composable
 private fun TargetPackageList(
     targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
     onRemoveTargetPackage: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -286,7 +332,7 @@ private fun TargetPackageList(
                 ) {
                     Text(
                         modifier = Modifier.weight(1f),
-                        text = packageName,
+                        text = appDisplayNames[packageName] ?: packageName,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     TextButton(onClick = { onRemoveTargetPackage(packageName) }) {
@@ -298,6 +344,55 @@ private fun TargetPackageList(
     }
 }
 
+@Composable
+private fun AppStatisticsFilterCard(
+    packages: Set<String>,
+    selectedPackageName: String?,
+    appDisplayNames: Map<String, String>,
+    onSelectPackage: (String?) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "통계 앱 선택",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "선택한 앱의 오늘 통계와 최근 7일 분석을 보여드려요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedPackageName == null,
+                    onClick = { onSelectPackage(null) },
+                    label = { Text("전체") }
+                )
+                packages.sortedBy { appDisplayNames[it] ?: it }.forEach { packageName ->
+                    FilterChip(
+                        selected = selectedPackageName == packageName,
+                        onClick = { onSelectPackage(packageName) },
+                        label = { Text(appDisplayNames[packageName] ?: packageName) }
+                    )
+                }
+            }
+        }
+    }
+}
 @Composable
 private fun TodayStatsCard(stats: DashboardStats) {
     Card(
@@ -344,7 +439,10 @@ private fun StatRow(label: String, value: String) {
 }
 
 @Composable
-private fun RecentSessionsCard(recentSessions: List<SessionLogEntity>) {
+private fun RecentSessionsCard(
+    recentSessions: List<SessionLogEntity>,
+    appDisplayNames: Map<String, String>
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -368,7 +466,10 @@ private fun RecentSessionsCard(recentSessions: List<SessionLogEntity>) {
                 )
             } else {
                 recentSessions.forEach { session ->
-                    RecentSessionItem(session)
+                    RecentSessionItem(
+                        session = session,
+                        appDisplayName = appDisplayNames[session.packageName] ?: session.packageName
+                    )
                 }
             }
         }
@@ -376,12 +477,75 @@ private fun RecentSessionsCard(recentSessions: List<SessionLogEntity>) {
 }
 
 @Composable
+private fun WeeklyReportCard(
+    stats: WeeklyReportStats,
+    onDeleteAllSessionLogs: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "최근 7일 리포트",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "세션 ${stats.totalSessionCount}회 / 초과 ${stats.overrunCount}회 (${formatPercent(stats.overrunRate)})",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "연장 ${stats.extensionCount}회 / 빠른 재진입 ${stats.fastReopenCount}회 / 목적 이탈 ${formatPercent(stats.purposeDriftRate)} (응답 ${stats.outcomeResponseCount}회)",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "개입 후 실제 종료 ${stats.closedAfterInterventionCount}회",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = stats.averageReopenGapMillis?.let { gapMillis ->
+                    "평균 재진입 간격 ${formatDuration(gapMillis)}"
+                } ?: "평균 재진입 간격: 데이터 없음",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = stats.mostVulnerableHourSlot?.let { hourSlot ->
+                    "가장 취약한 시간대: ${hourSlot}시"
+                } ?: "가장 취약한 시간대: 데이터 없음",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val activeDays = stats.dailyOverrunStats.filter { it.sessionCount > 0 }
+            if (activeDays.isNotEmpty()) {
+                Text(
+                    text = activeDays.joinToString(separator = " · ") { day ->
+                        "${day.label} ${day.overrunCount}/${day.sessionCount}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onDeleteAllSessionLogs) {
+                Text("전체 사용 기록 삭제")
+            }
+        }
+    }
+}
+
+@Composable
 private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
-    val activeStats = timeSlotStats.filter { it.sessionCount > 0 }
+    val activeStats = timeSlotStats.filter { it.openCount > 0 || it.sessionCount > 0 }
     val topStats = activeStats
         .sortedWith(
             compareByDescending<TimeSlotStat> { it.vulnerabilityScore }
-                .thenByDescending { it.sessionCount }
+                .thenByDescending { it.openCount }
         )
         .take(3)
 
@@ -417,7 +581,7 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
             )
             topStats.forEach { stat ->
                 Text(
-                    text = "${stat.hourSlot}\uC2DC: score ${formatScore(stat.vulnerabilityScore)} / \uCD08\uACFC\uC728 ${formatPercent(stat.overrunRate)} / \uC7AC\uC9C4\uC785 ${stat.fastReopenCount}\uD68C${lowDataSuffix(stat)}",
+                    text = "${stat.hourSlot}시: 취약도 ${formatScore(stat.vulnerabilityScore)} / 초과율 ${formatPercent(stat.overrunRate)} / 빠른 재진입 ${stat.fastReopenCount}회${lowDataSuffix(stat)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -431,7 +595,7 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
             )
             activeStats.sortedBy { it.hourSlot }.forEach { stat ->
                 Text(
-                    text = "${stat.hourSlot}\uC2DC: sessions=${stat.sessionCount}, overrun=${formatPercent(stat.overrunRate)}, fastReopen=${stat.fastReopenCount}, drift=${stat.purposeDriftCount}, score=${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}",
+                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 빠른 재진입 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회 / 취약도 ${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -441,67 +605,64 @@ private fun VulnerabilityPatternCard(timeSlotStats: List<TimeSlotStat>) {
 }
 
 @Composable
-private fun RecentSessionItem(session: SessionLogEntity) {
+private fun RecentSessionItem(
+    session: SessionLogEntity,
+    appDisplayName: String
+) {
+    val overrunMillis = (session.durationMillis - session.targetDurationMillis).coerceAtLeast(0L)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = session.packageName,
+            text = appDisplayName,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "사용 ${formatDuration(session.durationMillis)} / 목표 ${formatDuration(session.targetDurationMillis)}",
+            text = "${formatDuration(session.durationMillis)} 사용 · 목표 ${formatDuration(session.targetDurationMillis)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "intent=${session.intentChoice} outcome=${session.outcomeType ?: "-"} overrun=${session.overrun}",
+            text = "사용 목적: ${SessionDisplayText.intent(session.intentChoice)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        val reopenText = if (session.reopenGapMillis != null) {
-            "fastReopen=${session.isFastReopen} gap=${formatDuration(session.reopenGapMillis)}"
-        } else {
-            "fastReopen=${session.isFastReopen}"
-        }
         Text(
-            text = reopenText,
+            text = "사용 결과: ${SessionDisplayText.outcome(session.outcomeType, session.outcomeAchieved, session.purposeDrifted)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-private fun MvpFlowCard(flowItems: List<String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        Text(
+            text = if (session.overrun) {
+                "목표 시간을 ${formatDuration(overrunMillis)} 초과했어요"
+            } else {
+                "목표 시간 안에 종료했어요"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        if (session.extensionCount > 0) {
             Text(
-                text = "MVP 흐름",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                text = "사용 시간을 ${session.extensionCount}회 연장했어요",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            flowItems.forEachIndexed { index, item ->
-                Text(
-                    text = "${index + 1}. $item",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
+        Text(
+            text = if (session.isFastReopen) {
+                session.reopenGapMillis?.let { "${formatDuration(it)} 만에 다시 열었어요" }
+                    ?: "앱을 빠르게 다시 열었어요"
+            } else {
+                "빠른 재진입 없이 시작했어요"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
-
 private fun formatDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
     val minutes = totalSeconds / 60L
@@ -539,13 +700,19 @@ private fun DashboardScreenPreview() {
                 canDrawOverlays = false
             ),
             targetPackages = setOf("com.google.android.youtube"),
+            appDisplayNames = mapOf("com.google.android.youtube" to "YouTube"),
             dashboardStats = DashboardStats(),
             recentSessions = emptyList(),
             timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(emptyList()),
+            weeklyReportStats = WeeklyReportStats(),
+            availablePackages = setOf("com.google.android.youtube"),
+            selectedPackageName = null,
             onOpenAccessibilitySettings = {},
             onOpenOverlaySettings = {},
             onAddTargetPackage = {},
-            onRemoveTargetPackage = {}
+            onRemoveTargetPackage = {},
+            onDeleteAllSessionLogs = {},
+            onSelectPackage = {}
         )
     }
 }

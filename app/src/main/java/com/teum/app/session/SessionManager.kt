@@ -120,7 +120,7 @@ object SessionManager {
 
     fun isCurrentSessionOverrun(nowMillis: Long = System.currentTimeMillis()): Boolean {
         val session = state.currentSession ?: return false
-        return getElapsedMillis(nowMillis) >= session.targetDurationMillis
+        return getElapsedMillis(nowMillis) >= session.currentLimitDurationMillis
     }
 
     fun getElapsedMillis(nowMillis: Long = System.currentTimeMillis()): Long {
@@ -131,7 +131,7 @@ object SessionManager {
     fun extendCurrentSession(extraMillis: Long) {
         val session = state.currentSession ?: return
         val updatedSession = session.copy(
-            targetDurationMillis = session.targetDurationMillis + extraMillis,
+            currentLimitDurationMillis = session.currentLimitDurationMillis + extraMillis,
             extensionCount = session.extensionCount + 1,
             outcomeType = OutcomeType.EXTENDED
         )
@@ -139,7 +139,8 @@ object SessionManager {
 
         Log.d(
             TAG,
-            "session extended package=${updatedSession.packageName} extensionCount=${updatedSession.extensionCount} newTarget=${updatedSession.targetDurationMillis}"
+            "session extended package=${updatedSession.packageName} extensionCount=${updatedSession.extensionCount} " +
+                "originalTarget=${updatedSession.targetDurationMillis} currentLimit=${updatedSession.currentLimitDurationMillis}"
         )
         TeumLogger.session(
             debugSessionId = updatedSession.debugSessionId,

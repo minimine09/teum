@@ -1,14 +1,30 @@
 package com.teum.app.data.repository
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
+import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.session.AppSession
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
 class SessionLogRepository(context: Context) {
-    private val sessionLogDao = TeumDatabase.getInstance(context).sessionLogDao()
+    private val database = TeumDatabase.getInstance(context)
+    private val sessionLogDao = database.sessionLogDao()
+    private val appOpenEventDao = database.appOpenEventDao()
+
+    suspend fun saveAppOpenEvent(
+        packageName: String,
+        detectedAtMillis: Long
+    ): Long {
+        return appOpenEventDao.insertAppOpenEvent(
+            AppOpenEventEntity(
+                packageName = packageName,
+                detectedAtMillis = detectedAtMillis
+            )
+        )
+    }
 
     suspend fun saveEndedSession(session: AppSession): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
@@ -35,24 +51,69 @@ class SessionLogRepository(context: Context) {
         return sessionLogDao.observeRecentSessions(limit)
     }
 
-    fun observeTodaySessionCount(): Flow<Int> {
-        return sessionLogDao.observeTodaySessionCount(startOfTodayMillis())
+    fun observeTodaySessionCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodaySessionCount(startOfDayMillis)
     }
 
-    fun observeTodayOverrunCount(): Flow<Int> {
-        return sessionLogDao.observeTodayOverrunCount(startOfTodayMillis())
+    fun observeTodayOverrunCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayOverrunCount(startOfDayMillis)
     }
 
-    fun observeTodayFastReopenCount(): Flow<Int> {
-        return sessionLogDao.observeTodayFastReopenCount(startOfTodayMillis())
+    fun observeTodayFastReopenCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayFastReopenCount(startOfDayMillis)
     }
 
-    fun observeTodayPurposeDriftCount(): Flow<Int> {
-        return sessionLogDao.observeTodayPurposeDriftCount(startOfTodayMillis())
+    fun observeTodayPurposeDriftCount(startOfDayMillis: Long = startOfTodayMillis()): Flow<Int> {
+        return sessionLogDao.observeTodayPurposeDriftCount(startOfDayMillis)
     }
 
     fun observeSessionsForLastSevenDays(): Flow<List<SessionLogEntity>> {
         return sessionLogDao.observeSessionsSince(lastSevenDaysSinceMillis())
+    }
+
+    fun observeOpenEventsForLastSevenDays(): Flow<List<AppOpenEventEntity>> {
+        return appOpenEventDao.observeOpenEventsSince(lastSevenDaysSinceMillis())
+    }
+
+    fun observeSessionsSince(sinceMillis: Long): Flow<List<SessionLogEntity>> {
+        return sessionLogDao.observeSessionsSince(sinceMillis)
+    }
+
+    fun observeOpenEventsSince(sinceMillis: Long): Flow<List<AppOpenEventEntity>> {
+        return appOpenEventDao.observeOpenEventsSince(sinceMillis)
+    }
+
+    suspend fun deleteAllSessionLogs() {
+        database.withTransaction {
+            sessionLogDao.deleteAllSessionLogs()
+            appOpenEventDao.deleteAllAppOpenEvents()
+        }
+    }
+
+    suspend fun updateSessionOutcome(
+        sessionId: Long,
+        outcomeType: String,
+        achieved: Boolean,
+        drifted: Boolean,
+        respondedAtMillis: Long = System.currentTimeMillis()
+    ): Boolean {
+        return sessionLogDao.updateOutcome(
+            sessionId = sessionId,
+            outcomeType = outcomeType,
+            respondedAtMillis = respondedAtMillis,
+            achieved = achieved,
+            drifted = drifted
+        ) == 1
+    }
+
+    suspend fun confirmExitAfterIntervention(
+        sessionId: Long,
+        confirmedAtMillis: Long = System.currentTimeMillis()
+    ): Boolean {
+        return sessionLogDao.confirmExitAfterIntervention(
+            sessionId = sessionId,
+            confirmedAtMillis = confirmedAtMillis
+        ) == 1
     }
 
     companion object {

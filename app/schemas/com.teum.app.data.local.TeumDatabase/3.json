@@ -1,0 +1,174 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "be747e1d393cd340f7d459e6cc792bdd",
+    "entities": [
+      {
+        "tableName": "session_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `entryDetectedAtMillis` INTEGER NOT NULL, `startedAtMillis` INTEGER NOT NULL, `endedAtMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `targetDurationMillis` INTEGER NOT NULL, `intentChoice` TEXT NOT NULL, `outcomeType` TEXT, `outcomeRespondedAtMillis` INTEGER, `outcomeAchieved` INTEGER, `purposeDrifted` INTEGER, `closedAfterIntervention` INTEGER, `interventionExitConfirmedAtMillis` INTEGER, `overrun` INTEGER NOT NULL, `extensionCount` INTEGER NOT NULL, `isFastReopen` INTEGER NOT NULL, `reopenGapMillis` INTEGER, `createdAtMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entryDetectedAtMillis",
+            "columnName": "entryDetectedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtMillis",
+            "columnName": "startedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAtMillis",
+            "columnName": "endedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMillis",
+            "columnName": "durationMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetDurationMillis",
+            "columnName": "targetDurationMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intentChoice",
+            "columnName": "intentChoice",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcomeType",
+            "columnName": "outcomeType",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "outcomeRespondedAtMillis",
+            "columnName": "outcomeRespondedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "outcomeAchieved",
+            "columnName": "outcomeAchieved",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "purposeDrifted",
+            "columnName": "purposeDrifted",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "closedAfterIntervention",
+            "columnName": "closedAfterIntervention",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "interventionExitConfirmedAtMillis",
+            "columnName": "interventionExitConfirmedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "overrun",
+            "columnName": "overrun",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extensionCount",
+            "columnName": "extensionCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFastReopen",
+            "columnName": "isFastReopen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reopenGapMillis",
+            "columnName": "reopenGapMillis",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtMillis",
+            "columnName": "createdAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "app_open_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `detectedAtMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detectedAtMillis",
+            "columnName": "detectedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'be747e1d393cd340f7d459e6cc792bdd')"
+    ]
+  }
+}
