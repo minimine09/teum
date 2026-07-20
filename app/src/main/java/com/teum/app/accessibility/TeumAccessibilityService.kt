@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.teum.app.debug.TeumLogger
 import com.teum.app.data.repository.SessionLogRepository
 import com.teum.app.data.repository.TargetAppRepository
 import com.teum.app.overlay.BrakeChoice
@@ -42,6 +43,7 @@ class TeumAccessibilityService : AccessibilityService() {
     private var brakeSuppressedForCurrentSession: Boolean = false
     private var currentEntryTimeMillis: Long? = null
     private var currentReopenCheckResult: ReopenCheckResult? = null
+    private var currentDebugSessionId: Long? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val accessibilityEvent = event ?: return
@@ -78,6 +80,7 @@ class TeumAccessibilityService : AccessibilityService() {
 
         if (previousPackage != null && targetAppRepository.isTargetPackage(previousPackage)) {
             Log.d(TAG, "target app exited: $previousPackage")
+            TeumLogger.access("EXIT", previousPackage)
             cancelBrakeSchedule()
             if (SessionManager.hasActiveSessionFor(previousPackage)) {
                 saveEndedSession(SessionManager.endSession(previousPackage))
@@ -87,6 +90,7 @@ class TeumAccessibilityService : AccessibilityService() {
 
         if (targetAppRepository.isTargetPackage(packageName)) {
             Log.d(TAG, "target app entered: $packageName")
+            TeumLogger.access("ENTER", packageName)
             val entryTimeMillis = System.currentTimeMillis()
             val reopenCheckResult = SessionManager.checkFastReopen(
                 packageName = packageName,
@@ -110,6 +114,14 @@ class TeumAccessibilityService : AccessibilityService() {
         activeTargetPackage = packageName
         currentEntryTimeMillis = entryTimeMillis
         currentReopenCheckResult = reopenCheckResult
+        currentDebugSessionId = SessionManager.createDebugSessionId()
+        currentDebugSessionId?.let { debugSessionId ->
+            TeumLogger.session(
+                debugSessionId = debugSessionId,
+                event = "ENTER",
+                detail = "package=$packageName mode=${if (reopenCheckResult.isFastReopen) IntentCheckMode.FAST_REOPEN else IntentCheckMode.NORMAL}"
+            )
+        }
         sessionNeedsIntentCheck = true
         intentCheckedForCurrentSession = false
         brakeSuppressedForCurrentSession = false
@@ -134,6 +146,7 @@ class TeumAccessibilityService : AccessibilityService() {
                 IntentCheckMode.NORMAL
             },
             reopenGapMillis = currentReopenCheckResult?.gapMillis,
+            debugSessionId = currentDebugSessionId,
             onIntentConfirmed = { intentChoice, targetDurationMillis ->
                 val entryTimeMillis = currentEntryTimeMillis ?: System.currentTimeMillis()
                 val reopenCheckResult = currentReopenCheckResult
@@ -143,7 +156,8 @@ class TeumAccessibilityService : AccessibilityService() {
                     targetDurationMillis = targetDurationMillis,
                     entryDetectedAtMillis = entryTimeMillis,
                     isFastReopen = reopenCheckResult?.isFastReopen == true,
-                    reopenGapMillis = reopenCheckResult?.gapMillis
+                    reopenGapMillis = reopenCheckResult?.gapMillis,
+                    debugSessionId = currentDebugSessionId ?: SessionManager.createDebugSessionId()
                 )
                 intentCheckedForCurrentSession = true
                 sessionNeedsIntentCheck = false
@@ -174,6 +188,11 @@ class TeumAccessibilityService : AccessibilityService() {
             TAG,
             "brake scheduled package=${session.packageName} delay=$delayMillis target=${session.targetDurationMillis}"
         )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "BRAKE_SCHEDULED",
+            detail = "delay=$delayMillis"
+        )
         brakeHandler.postDelayed(brakeRunnable, delayMillis)
     }
 
@@ -203,9 +222,16 @@ class TeumAccessibilityService : AccessibilityService() {
             packageName = session.packageName,
             elapsedMillis = SessionManager.getElapsedMillis(),
             targetDurationMillis = session.targetDurationMillis,
+            debugSessionId = session.debugSessionId,
             onBrakeChoice = { choice ->
                 handleBrakeChoice(choice, session.packageName)
             }
+        )
+        val elapsedMillis = SessionManager.getElapsedMillis()
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "BRAKE_SHOWN",
+            detail = "elapsed=$elapsedMillis target=${session.targetDurationMillis} overrun=${elapsedMillis >= session.targetDurationMillis}"
         )
     }
 
@@ -240,6 +266,7 @@ class TeumAccessibilityService : AccessibilityService() {
 
     private fun saveEndedSession(session: com.teum.app.session.AppSession?) {
         if (session == null) return
+        TeumLogger.session(session.debugSessionId, "DB_SAVE_REQUESTED")
 
         serviceScope.launch {
             try {
@@ -251,6 +278,7 @@ class TeumAccessibilityService : AccessibilityService() {
                         DB_TAG,
                         "session saved id=$id package=${session.packageName} duration=$durationMillis overrun=$overrun fastReopen=${session.isFastReopen}"
                     )
+                    TeumLogger.session(session.debugSessionId, "DB_SAVED", "id=$id")
                 }
             } catch (exception: RuntimeException) {
                 Log.e(DB_TAG, "failed to save session package=${session.packageName}", exception)
@@ -262,6 +290,7 @@ class TeumAccessibilityService : AccessibilityService() {
         activeTargetPackage = null
         currentEntryTimeMillis = null
         currentReopenCheckResult = null
+        currentDebugSessionId = null
         sessionNeedsIntentCheck = false
         intentCheckedForCurrentSession = false
         brakeSuppressedForCurrentSession = false

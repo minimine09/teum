@@ -1,6 +1,7 @@
 package com.teum.app.session
 
 import android.util.Log
+import com.teum.app.debug.TeumLogger
 import com.teum.app.overlay.IntentChoice
 
 object SessionManager {
@@ -8,7 +9,12 @@ object SessionManager {
     private const val REOPEN_TAG = "TeumReopen"
 
     private var state = SessionState()
+    private var nextDebugSessionId = 1L
     private val lastEndedSessionByPackage = mutableMapOf<String, AppSession>()
+
+    fun createDebugSessionId(): Long {
+        return nextDebugSessionId++
+    }
 
     fun startSession(
         packageName: String,
@@ -16,9 +22,11 @@ object SessionManager {
         targetDurationMillis: Long,
         entryDetectedAtMillis: Long = System.currentTimeMillis(),
         isFastReopen: Boolean = false,
-        reopenGapMillis: Long? = null
+        reopenGapMillis: Long? = null,
+        debugSessionId: Long = createDebugSessionId()
     ) {
         val session = AppSession(
+            debugSessionId = debugSessionId,
             packageName = packageName,
             entryDetectedAtMillis = entryDetectedAtMillis,
             startedAtMillis = System.currentTimeMillis(),
@@ -34,6 +42,11 @@ object SessionManager {
             TAG,
             "session started package=$packageName intent=${intentChoice.name} target=$targetDurationMillis fastReopen=$isFastReopen gap=$reopenGapMillis"
         )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "START",
+            detail = "package=$packageName intent=${intentChoice.name} target=$targetDurationMillis fastReopen=$isFastReopen gap=$reopenGapMillis"
+        )
     }
 
     fun checkFastReopen(
@@ -46,6 +59,7 @@ object SessionManager {
 
         if (previousEndTimeMillis == null) {
             Log.d(REOPEN_TAG, "normal entry package=$packageName no previous session")
+            TeumLogger.reopen("NORMAL package=$packageName reason=no_previous_session")
             return ReopenCheckResult(
                 isFastReopen = false,
                 gapMillis = null,
@@ -58,8 +72,10 @@ object SessionManager {
 
         if (isFastReopen) {
             Log.d(REOPEN_TAG, "fast reopen detected package=$packageName gap=$gapMillis threshold=$thresholdMillis")
+            TeumLogger.reopen("FAST package=$packageName gap=$gapMillis threshold=$thresholdMillis")
         } else {
             Log.d(REOPEN_TAG, "normal entry package=$packageName gap=$gapMillis threshold=$thresholdMillis")
+            TeumLogger.reopen("NORMAL package=$packageName gap=$gapMillis threshold=$thresholdMillis")
         }
 
         return ReopenCheckResult(
@@ -80,6 +96,11 @@ object SessionManager {
         Log.d(
             TAG,
             "session ended package=$packageName duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
+        )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "END",
+            detail = "duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
         )
 
         val endedSession = session.copy(endedAtMillis = endedAtMillis)
@@ -120,6 +141,11 @@ object SessionManager {
             TAG,
             "session extended package=${updatedSession.packageName} extensionCount=${updatedSession.extensionCount} newTarget=${updatedSession.targetDurationMillis}"
         )
+        TeumLogger.session(
+            debugSessionId = updatedSession.debugSessionId,
+            event = "EXTEND",
+            detail = "extensionCount=${updatedSession.extensionCount} newTarget=${updatedSession.targetDurationMillis}"
+        )
     }
 
     fun markCurrentSessionOutcome(outcomeType: OutcomeType) {
@@ -129,6 +155,11 @@ object SessionManager {
         Log.d(
             TAG,
             "session outcome marked package=${session.packageName} outcome=$outcomeType"
+        )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "OUTCOME",
+            detail = "outcome=$outcomeType"
         )
     }
 
