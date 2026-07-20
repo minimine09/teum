@@ -2,6 +2,7 @@ package com.teum.app.ui.target
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -24,6 +27,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,6 +51,18 @@ fun TargetAppSelectionScreen(
     onCompleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val appItems = remember(primaryColor, mutedColor) {
+        defaultTargetApps(primaryColor = primaryColor, mutedColor = mutedColor)
+    }
+    val checkedStates = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            appItems.forEach { item -> put(item.name, item.initiallyChecked) }
+        }
+    }
+    val selectedCount = checkedStates.values.count { it }
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -64,76 +81,45 @@ fun TargetAppSelectionScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "목적 확인을 적용할 앱을 고르세요",
+                text = "목적 확인을 적용할 앱을 고르세요 · ${selectedCount}개 선택됨",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
 
             Spacer(modifier = Modifier.height(26.dp))
 
-            Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                TargetAppRow(
-                    initial = "Y",
-                    name = "YouTube",
-                    description = "Shorts 포함 영상 앱",
-                    duration = "5분",
-                    checked = true,
-                    iconColor = Color(0xFFF05D5E),
-                    iconContainerColor = YouTubeTint
-                )
-                TargetAppRow(
-                    initial = "I",
-                    name = "Instagram",
-                    description = "릴스·피드·DM",
-                    duration = "5분",
-                    checked = true,
-                    iconColor = Color(0xFFFF9F43),
-                    iconContainerColor = InstagramTint
-                )
-                TargetAppRow(
-                    initial = "T",
-                    name = "TikTok",
-                    description = "숏폼 추천 피드",
-                    duration = "3분",
-                    checked = true,
-                    iconColor = MaterialTheme.colorScheme.primary,
-                    iconContainerColor = TikTokTint
-                )
-                TargetAppRow(
-                    initial = "X",
-                    name = "X",
-                    description = "피드·알림 확인",
-                    duration = "5분",
-                    checked = false,
-                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconContainerColor = NeutralTint
-                )
-                TargetAppRow(
-                    initial = "W",
-                    name = "웹 브라우저",
-                    description = "뉴스·검색·커뮤니티",
-                    duration = "10분",
-                    checked = false,
-                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    iconContainerColor = NeutralTint
-                )
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                items(appItems, key = { it.name }) { item ->
+                    val checked = checkedStates[item.name] == true
+                    TargetAppRow(
+                        item = item,
+                        checked = checked,
+                        onCheckedChange = { checkedStates[item.name] = it }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(33.dp))
 
             GuideCard()
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = onCompleteClick,
+                enabled = selectedCount > 0,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = Color(0xFFCDD2E0),
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(
@@ -148,22 +134,22 @@ fun TargetAppSelectionScreen(
 
 @Composable
 private fun TargetAppRow(
-    initial: String,
-    name: String,
-    description: String,
-    duration: String,
+    item: TargetAppUi,
     checked: Boolean,
-    iconColor: Color,
-    iconContainerColor: Color,
+    onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(82.dp),
+            .height(82.dp)
+            .clickable { onCheckedChange(!checked) },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, TargetBorder)
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (checked) MaterialTheme.colorScheme.primary else TargetBorder
+        )
     ) {
         Row(
             modifier = Modifier
@@ -174,12 +160,12 @@ private fun TargetAppRow(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(iconContainerColor, CircleShape),
+                    .background(item.iconContainerColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = initial,
-                    color = iconColor,
+                    text = item.initial,
+                    color = item.iconColor,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -192,23 +178,23 @@ private fun TargetAppRow(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = name,
+                    text = item.name,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = description,
+                    text = item.description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
 
-            DurationPill(duration)
+            DurationPill(item.duration)
             Spacer(modifier = Modifier.size(10.dp))
             Switch(
                 checked = checked,
-                onCheckedChange = null,
+                onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.surface,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
@@ -262,6 +248,85 @@ private fun GuideCard(modifier: Modifier = Modifier) {
         )
     }
 }
+
+private data class TargetAppUi(
+    val initial: String,
+    val name: String,
+    val description: String,
+    val duration: String,
+    val initiallyChecked: Boolean,
+    val iconColor: Color,
+    val iconContainerColor: Color
+)
+
+private fun defaultTargetApps(
+    primaryColor: Color,
+    mutedColor: Color
+): List<TargetAppUi> = listOf(
+    TargetAppUi(
+        initial = "Y",
+        name = "YouTube",
+        description = "Shorts 포함 영상 앱",
+        duration = "5분",
+        initiallyChecked = true,
+        iconColor = Color(0xFFF05D5E),
+        iconContainerColor = YouTubeTint
+    ),
+    TargetAppUi(
+        initial = "I",
+        name = "Instagram",
+        description = "릴스·피드·DM",
+        duration = "5분",
+        initiallyChecked = true,
+        iconColor = Color(0xFFFF9F43),
+        iconContainerColor = InstagramTint
+    ),
+    TargetAppUi(
+        initial = "T",
+        name = "TikTok",
+        description = "숏폼 추천 피드",
+        duration = "3분",
+        initiallyChecked = true,
+        iconColor = primaryColor,
+        iconContainerColor = TikTokTint
+    ),
+    TargetAppUi(
+        initial = "X",
+        name = "X",
+        description = "피드·알림 확인",
+        duration = "5분",
+        initiallyChecked = false,
+        iconColor = mutedColor,
+        iconContainerColor = NeutralTint
+    ),
+    TargetAppUi(
+        initial = "W",
+        name = "웹 브라우저",
+        description = "뉴스·검색·커뮤니티",
+        duration = "10분",
+        initiallyChecked = false,
+        iconColor = mutedColor,
+        iconContainerColor = NeutralTint
+    ),
+    TargetAppUi(
+        initial = "N",
+        name = "Netflix",
+        description = "영상 시청 앱",
+        duration = "10분",
+        initiallyChecked = false,
+        iconColor = Color(0xFFF05D5E),
+        iconContainerColor = YouTubeTint
+    ),
+    TargetAppUi(
+        initial = "G",
+        name = "게임",
+        description = "짧게 시작해 길어지는 앱",
+        duration = "5분",
+        initiallyChecked = false,
+        iconColor = primaryColor,
+        iconContainerColor = TikTokTint
+    )
+)
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

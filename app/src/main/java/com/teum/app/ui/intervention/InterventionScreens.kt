@@ -2,6 +2,7 @@ package com.teum.app.ui.intervention
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,9 +22,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teum.app.ui.theme.TeumTheme
+import kotlin.math.roundToInt
 
 private val InterventionBackground = Color(0xFFECEEFF)
 private val BrakeBackground = Color(0xFFFFF8F2)
@@ -131,6 +139,8 @@ fun SessionBrakeContent(
     onExtendClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var durationMinutes by remember { mutableFloatStateOf(0.5f) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -165,7 +175,10 @@ fun SessionBrakeContent(
         Spacer(modifier = Modifier.height(27.dp))
         TeumFilledButton("연장하기", onExtendClick, MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(32.dp))
-        DurationSelector()
+        DurationSelector(
+            durationMinutes = durationMinutes,
+            onDurationChange = { durationMinutes = it }
+        )
     }
 }
 
@@ -174,6 +187,14 @@ fun OutcomeCheckScreen(
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var selectedOutcomeIndex by remember { mutableStateOf<Int?>(null) }
+    val outcomeOptions = listOf(
+        OutcomeOptionUi("목적 달성함", "필요한 사용 또는 계획된 휴식", MintChoice, Success),
+        OutcomeOptionUi("목적과 다른 사용으로 이어짐", "릴스·추천 피드 등으로 이동", DangerChoice, Danger),
+        OutcomeOptionUi("시간을 초과했지만 필요했음", "자료 확인, 연락 등 예외 처리", BlueChoice, MaterialTheme.colorScheme.primary),
+        OutcomeOptionUi("계속 스크롤하게 됨", "세션 과몰입으로 기록", OrangeChoice, Warning)
+    )
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -202,13 +223,22 @@ fun OutcomeCheckScreen(
             )
             Spacer(modifier = Modifier.height(39.dp))
             Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                OutcomeOption("목적 달성함", "필요한 사용 또는 계획된 휴식", MintChoice, Success)
-                OutcomeOption("목적과 다른 사용으로 이어짐", "릴스·추천 피드 등으로 이동", DangerChoice, Danger)
-                OutcomeOption("시간을 초과했지만 필요했음", "자료 확인, 연락 등 예외 처리", BlueChoice, MaterialTheme.colorScheme.primary)
-                OutcomeOption("계속 스크롤하게 됨", "세션 과몰입으로 기록", OrangeChoice, Warning)
+                outcomeOptions.forEachIndexed { index, option ->
+                    OutcomeOption(
+                        option = option,
+                        selected = selectedOutcomeIndex == index,
+                        onClick = { selectedOutcomeIndex = index }
+                    )
+                }
             }
             Spacer(modifier = Modifier.weight(1f))
-            TeumFilledButton("기록 저장", onSaveClick, MaterialTheme.colorScheme.primary, height = 49)
+            TeumFilledButton(
+                text = "기록 저장",
+                onClick = onSaveClick,
+                color = MaterialTheme.colorScheme.primary,
+                height = 49,
+                enabled = selectedOutcomeIndex != null
+            )
         }
     }
 }
@@ -283,6 +313,9 @@ private fun CheckModal(
     onStartClick: () -> Unit,
     onCloseClick: () -> Unit
 ) {
+    var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
+    var durationMinutes by remember { mutableFloatStateOf(0.5f) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -309,12 +342,19 @@ private fun CheckModal(
         )
         Spacer(modifier = Modifier.height(48.dp))
         Column(verticalArrangement = Arrangement.spacedBy(23.dp)) {
-            options.forEach { option ->
-                ChoiceRow(option)
+            options.forEachIndexed { index, option ->
+                ChoiceRow(
+                    option = option,
+                    selected = selectedOptionIndex == index,
+                    onClick = { selectedOptionIndex = index }
+                )
             }
         }
         Spacer(modifier = Modifier.height(35.dp))
-        DurationSelector()
+        DurationSelector(
+            durationMinutes = durationMinutes,
+            onDurationChange = { durationMinutes = it }
+        )
         Spacer(modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TeumFilledButton(
@@ -322,7 +362,8 @@ private fun CheckModal(
                 onClick = onStartClick,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
-                height = 44
+                height = 44,
+                enabled = selectedOptionIndex != null
             )
             OutlinedButton(
                 onClick = onCloseClick,
@@ -361,33 +402,52 @@ private fun AlertBubble(symbol: String, size: Int) {
 }
 
 @Composable
-private fun ChoiceRow(option: InterventionOption) {
-    Row(
+private fun ChoiceRow(
+    option: InterventionOption,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(61.dp)
-            .background(option.containerColor, RoundedCornerShape(18.dp))
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = option.containerColor),
+        border = if (selected) BorderStroke(1.dp, option.dotColor) else null
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(20.dp)
-                .background(option.dotColor, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Text(
-            text = option.text,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
-        )
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(if (selected) option.dotColor else Color.White, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = option.text,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
 @Composable
-private fun DurationSelector() {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun DurationSelector(
+    durationMinutes: Float,
+    onDurationChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "예상 사용 시간",
@@ -397,37 +457,20 @@ private fun DurationSelector() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "00:30",
+                text = formatDuration(durationMinutes),
                 color = Color.Black,
                 fontSize = 12.sp
             )
         }
-        Box(
+        Slider(
+            value = durationMinutes,
+            onValueChange = onDurationChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(23.dp)
-                .background(Color.Transparent, RoundedCornerShape(5.dp))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Transparent, RoundedCornerShape(5.dp))
-                    .padding(0.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .width(78.dp)
-                    .height(23.dp)
-                    .background(Color(0xFFCCCDFF), RoundedCornerShape(5.dp))
-            )
-            Box(
-                modifier = Modifier
-                    .padding(start = 67.dp)
-                    .width(11.dp)
-                    .height(23.dp)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp))
-            )
-        }
+                .height(23.dp),
+            valueRange = 0.5f..30f,
+            steps = 58
+        )
     }
 }
 
@@ -437,17 +480,21 @@ private fun TeumFilledButton(
     onClick: () -> Unit,
     color: Color,
     modifier: Modifier = Modifier,
-    height: Int = 50
+    height: Int = 50,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .height(height.dp),
         shape = RoundedCornerShape(18.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
-            contentColor = Color.White
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFFCDD2E0),
+            disabledContentColor = Color.White
         )
     ) {
         Text(
@@ -506,37 +553,44 @@ private fun SummaryRow(label: String, value: String, valueColor: Color) {
 
 @Composable
 private fun OutcomeOption(
-    title: String,
-    description: String,
-    containerColor: Color,
-    dotColor: Color
+    option: OutcomeOptionUi,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(67.dp)
-            .background(containerColor, RoundedCornerShape(18.dp))
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = option.containerColor),
+        border = if (selected) BorderStroke(1.dp, option.dotColor) else null
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(24.dp)
-                .background(dotColor, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(if (selected) option.dotColor else Color.White, CircleShape)
             )
-            Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp
-            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    text = option.title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = option.description,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }
@@ -546,6 +600,20 @@ private data class InterventionOption(
     val containerColor: Color,
     val dotColor: Color
 )
+
+private data class OutcomeOptionUi(
+    val title: String,
+    val description: String,
+    val containerColor: Color,
+    val dotColor: Color
+)
+
+private fun formatDuration(minutesValue: Float): String {
+    val totalSeconds = (minutesValue * 60).roundToInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
+}
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

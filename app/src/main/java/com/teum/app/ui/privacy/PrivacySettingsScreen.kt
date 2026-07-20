@@ -2,6 +2,7 @@ package com.teum.app.ui.privacy
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -190,6 +195,9 @@ private fun InfoCard(
 
 @Composable
 private fun ModeCard(modifier: Modifier = Modifier) {
+    var selectedMode by remember { mutableStateOf("보통") }
+    val modes = listOf("약함", "보통", "강함")
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -220,26 +228,40 @@ private fun ModeCard(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                ModePill("약함")
-                ModePill("보통")
-                ModePill("강함")
+                modes.forEach { mode ->
+                    ModePill(
+                        text = mode,
+                        selected = selectedMode == mode,
+                        onClick = { selectedMode = mode }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ModePill(text: String, modifier: Modifier = Modifier) {
+private fun ModePill(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
         modifier = modifier
             .size(width = 66.dp, height = 34.dp)
-            .background(PrivacyPill, RoundedCornerShape(17.dp)),
+            .background(
+                color = if (selected) MaterialTheme.colorScheme.primary else PrivacyPill,
+                shape = RoundedCornerShape(17.dp)
+            )
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
