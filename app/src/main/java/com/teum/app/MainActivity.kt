@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.core.util.PermissionUtils
@@ -17,6 +18,7 @@ import com.teum.app.data.repository.TargetAppRepository
 import com.teum.app.dashboard.AppDisplayNameResolver
 import com.teum.app.dashboard.DashboardScreen
 import com.teum.app.dashboard.DashboardViewModel
+import com.teum.app.ui.onboarding.OnboardingScreen
 import com.teum.app.ui.theme.TeumTheme
 
 class MainActivity : ComponentActivity() {
@@ -41,29 +43,36 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TeumTheme {
+                var showOnboarding by remember { mutableStateOf(true) }
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val displayedPackages = targetPackages +
                     dashboardUiState.availablePackages +
                     dashboardUiState.recentSessions.map { it.packageName }
                 val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
 
-                DashboardScreen(
-                    permissionStatus = permissionStatus,
-                    targetPackages = targetPackages,
-                    appDisplayNames = appDisplayNames,
-                    dashboardStats = dashboardUiState.dashboardStats,
-                    recentSessions = dashboardUiState.recentSessions,
-                    timeSlotStats = dashboardUiState.timeSlotStats,
-                    weeklyReportStats = dashboardUiState.weeklyReportStats,
-                    availablePackages = dashboardUiState.availablePackages,
-                    selectedPackageName = dashboardUiState.selectedPackageName,
-                    onOpenAccessibilitySettings = ::openAccessibilitySettings,
-                    onOpenOverlaySettings = ::openOverlaySettings,
-                    onAddTargetPackage = ::addTargetPackage,
-                    onRemoveTargetPackage = ::removeTargetPackage,
-                    onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
-                    onSelectPackage = dashboardViewModel::selectPackage
-                )
+                if (showOnboarding) {
+                    OnboardingScreen(
+                        onStartClick = { showOnboarding = false }
+                    )
+                } else {
+                    DashboardScreen(
+                        permissionStatus = permissionStatus,
+                        targetPackages = targetPackages,
+                        appDisplayNames = appDisplayNames,
+                        dashboardStats = dashboardUiState.dashboardStats,
+                        recentSessions = dashboardUiState.recentSessions,
+                        timeSlotStats = dashboardUiState.timeSlotStats,
+                        weeklyReportStats = dashboardUiState.weeklyReportStats,
+                        availablePackages = dashboardUiState.availablePackages,
+                        selectedPackageName = dashboardUiState.selectedPackageName,
+                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
+                        onOpenOverlaySettings = ::openOverlaySettings,
+                        onAddTargetPackage = ::addTargetPackage,
+                        onRemoveTargetPackage = ::removeTargetPackage,
+                        onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
+                        onSelectPackage = dashboardViewModel::selectPackage
+                    )
+                }
             }
         }
     }

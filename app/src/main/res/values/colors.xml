@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core brand -->
+    <color name="teum_primary">#5B5FEA</color>
+    <color name="teum_primary_alt">#7F5BEA</color>
+    <color name="teum_accent_mint">#2FC6A8</color>
+
+    <!-- Surfaces -->
+    <color name="teum_background">#F4F6FA</color>
+    <color name="teum_background_warm">#FFF8F2</color>
+    <color name="teum_surface">#FFFFFF</color>
+    <color name="teum_surface_tint">#ECEEFF</color>
+    <color name="teum_border">#DDE2EC</color>
+
+    <!-- Text -->
+    <color name="teum_text_primary">#1F2430</color>
+    <color name="teum_text_secondary">#778092</color>
+    <color name="teum_text_muted">#A3ABBA</color>
+
+    <!-- Semantic states -->
+    <color name="teum_success">#34C6A8</color>
+    <color name="teum_warning">#FF9B3D</color>
+    <color name="teum_danger">#FF5D5D</color>
+    <color name="teum_info">#5B5FEA</color>
+
+    <!-- Soft semantic backgrounds -->
+    <color name="teum_success_container">#E7F8F3</color>
+    <color name="teum_warning_container">#FFF2DF</color>
+    <color name="teum_danger_container">#FDEBED</color>
+    <color name="teum_info_container">#EAF2FF</color>
+    <color name="teum_choice_container">#F7DFFF</color>
+</resources>
