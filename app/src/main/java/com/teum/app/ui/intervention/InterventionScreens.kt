@@ -117,43 +117,55 @@ fun SessionBrakeScreen(
                 .padding(horizontal = 17.dp)
                 .padding(top = 129.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(540.dp)
-                    .background(InterventionBackground, RoundedCornerShape(34.dp))
-                    .padding(horizontal = 31.dp, vertical = 40.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AlertBubble(symbol = "!", size = 90)
-                Spacer(modifier = Modifier.height(30.dp))
-                Text(
-                    text = "약속한 시간이 됐어요",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "처음 목적은 ‘인지된 휴식’이었습니다.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(5.dp))
-                Text(
-                    text = "현재 사용 시간: 4분",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.height(34.dp))
-                TeumFilledButton("종료하기", onEndClick, MaterialTheme.colorScheme.secondary)
-                Spacer(modifier = Modifier.height(27.dp))
-                TeumFilledButton("연장하기", onExtendClick, MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(32.dp))
-                DurationSelector()
-            }
+            SessionBrakeContent(
+                onEndClick = onEndClick,
+                onExtendClick = onExtendClick
+            )
         }
+    }
+}
+
+@Composable
+fun SessionBrakeContent(
+    onEndClick: () -> Unit,
+    onExtendClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(540.dp)
+            .background(InterventionBackground, RoundedCornerShape(34.dp))
+            .padding(horizontal = 31.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AlertBubble(symbol = "!", size = 90)
+        Spacer(modifier = Modifier.height(30.dp))
+        Text(
+            text = "약속한 시간이 됐어요",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "처음 목적은 ‘인지된 휴식’이었습니다.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            text = "현재 사용 시간: 4분",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp
+        )
+        Spacer(modifier = Modifier.height(34.dp))
+        TeumFilledButton("종료하기", onEndClick, MaterialTheme.colorScheme.secondary)
+        Spacer(modifier = Modifier.height(27.dp))
+        TeumFilledButton("연장하기", onExtendClick, MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(32.dp))
+        DurationSelector()
     }
 }
 
