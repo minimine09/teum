@@ -15,20 +15,26 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.teum.app.debug.TeumLogger
+import com.teum.app.session.OutcomeType
 
 class OverlayController(context: Context) {
     private val overlayContext = context
     private val windowManager = overlayContext.getSystemService(WindowManager::class.java)
     private var overlayView: View? = null
+    private var currentOverlayType: OverlayType? = null
 
     val overlayShowing: Boolean
         get() = overlayView?.isAttachedToWindow == true
+
+    val currentOverlayName: String
+        get() = currentOverlayType?.name ?: "NONE"
 
     fun showIntentCheck(
         packageName: String,
         mode: IntentCheckMode = IntentCheckMode.NORMAL,
         reopenGapMillis: Long? = null,
         debugSessionId: Long? = null,
+        source: String = "target_enter",
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
         onCloseNowSelected: () -> Unit,
         onDismissed: () -> Unit
@@ -52,8 +58,8 @@ class OverlayController(context: Context) {
             }
         )
 
-        addOverlayView(view, "intent check")
-        TeumLogger.overlay("SHOW_INTENT", "package=$packageName mode=$mode")
+        addOverlayView(view, "intent check", OverlayType.INTENT_CHECK)
+        TeumLogger.overlay("SHOW_INTENT", "package=$packageName mode=$mode source=$source")
     }
 
     fun showSessionBrake(
@@ -61,6 +67,7 @@ class OverlayController(context: Context) {
         elapsedMillis: Long,
         targetDurationMillis: Long,
         debugSessionId: Long? = null,
+        source: String = "session_brake",
         onBrakeChoice: (BrakeChoice) -> Unit
     ) {
         removeOverlayIfAttached()
@@ -77,11 +84,48 @@ class OverlayController(context: Context) {
             }
         )
 
-        addOverlayView(view, "session brake")
-        TeumLogger.overlay("SHOW_BRAKE", "package=$packageName")
+        addOverlayView(view, "session brake", OverlayType.SESSION_BRAKE)
+        TeumLogger.overlay("SHOW_BRAKE", "package=$packageName source=$source")
         Log.d(
             BRAKE_TAG,
             "brake shown package=$packageName elapsed=$elapsedMillis target=$targetDurationMillis"
+        )
+    }
+
+    fun showOutcomeCheck(
+        packageName: String,
+        debugSessionId: Long,
+        durationMillis: Long,
+        intentChoice: IntentChoice,
+        source: String = "target_exit",
+        onOutcomeSelected: (OutcomeType) -> Unit,
+        onDismissedWithoutChoice: () -> Unit
+    ) {
+        removeOverlayIfAttached()
+
+        val view = createOutcomeCheckView(
+            packageName = packageName,
+            durationMillis = durationMillis,
+            onOutcomeSelected = { outcomeType ->
+                try {
+                    onOutcomeSelected(outcomeType)
+                } finally {
+                    dismiss(reason = "outcome_selected")
+                }
+            },
+            onDismissedWithoutChoice = {
+                try {
+                    onDismissedWithoutChoice()
+                } finally {
+                    dismiss(reason = "outcome_dismissed")
+                }
+            }
+        )
+
+        addOverlayView(view, "outcome check", OverlayType.OUTCOME_CHECK)
+        TeumLogger.overlay(
+            event = "SHOW_OUTCOME",
+            detail = "package=$packageName source=$source session=S#$debugSessionId duration=$durationMillis intent=${intentChoice.name}"
         )
     }
 
@@ -105,10 +149,11 @@ class OverlayController(context: Context) {
             Log.w(TAG, "failed to remove overlay", exception)
         } finally {
             overlayView = null
+            currentOverlayType = null
         }
     }
 
-    private fun addOverlayView(view: View, overlayName: String) {
+    private fun addOverlayView(view: View, overlayName: String, overlayType: OverlayType) {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -121,9 +166,11 @@ class OverlayController(context: Context) {
 
         try {
             overlayView = view
+            currentOverlayType = overlayType
             windowManager.addView(view, params)
         } catch (exception: RuntimeException) {
             overlayView = null
+            currentOverlayType = null
             Log.e(TAG, "failed to show $overlayName overlay", exception)
         }
     }
@@ -355,6 +402,88 @@ class OverlayController(context: Context) {
         return createOverlayRoot(card)
     }
 
+    private fun createOutcomeCheckView(
+        packageName: String,
+        durationMillis: Long,
+        onOutcomeSelected: (OutcomeType) -> Unit,
+        onDismissedWithoutChoice: () -> Unit
+    ): View {
+        val card = createCardContent()
+
+        card.addView(
+            textView(
+                text = "\uD2C8",
+                textSize = 28f,
+                textColor = Color.rgb(30, 38, 35),
+                style = android.graphics.Typeface.BOLD
+            )
+        )
+        card.addView(
+            textView(
+                text = "\uC774\uBC88 \uC0AC\uC6A9\uC740 \uC5B4\uB560\uB098\uC694?",
+                textSize = 20f,
+                textColor = Color.rgb(30, 38, 35),
+                topMargin = 18
+            )
+        )
+        card.addView(
+            textView(
+                text = "\uCC98\uC74C \uC758\uB3C4\uD55C \uBAA9\uC801\uC744 \uB2EC\uC131\uD588\uB098\uC694?",
+                textSize = 16f,
+                textColor = Color.rgb(63, 73, 69),
+                topMargin = 10
+            )
+        )
+        card.addView(
+            textView(
+                text = "\uBC29\uAE08 \uC0AC\uC6A9\uC744 \uC9E7\uAC8C \uC815\uB9AC\uD574\uB450\uBA74 \uB2E4\uC74C \uC2E4\uD589\uC744 \uB9C9\uC744 \uC218 \uC788\uC5B4\uC694.",
+                textSize = 13f,
+                textColor = Color.rgb(89, 98, 94),
+                topMargin = 10
+            )
+        )
+        card.addView(
+            textView(
+                text = "\uAC10\uC9C0\uB41C \uC571: $packageName / \uC0AC\uC6A9 ${formatDuration(durationMillis)}",
+                textSize = 13f,
+                textColor = Color.rgb(89, 98, 94),
+                topMargin = 10
+            )
+        )
+
+        card.addView(sectionLabel(text = "\uACB0\uACFC \uC120\uD0DD", topMargin = 18))
+
+        card.addView(outcomeButton("\uBAA9\uC801 \uB2EC\uC131") {
+            onOutcomeSelected(OutcomeType.NECESSARY_USE)
+        })
+        card.addView(outcomeButton("\uD544\uC694\uD55C \uC0AC\uC6A9\uC774\uC5C8\uC74C") {
+            onOutcomeSelected(OutcomeType.NECESSARY_USE)
+        })
+        card.addView(outcomeButton("\uBAA9\uC801\uC5D0\uC11C \uBC97\uC5B4\uB0AC\uB2E4") {
+            onOutcomeSelected(OutcomeType.PURPOSE_DRIFT)
+        })
+        card.addView(outcomeButton("\uADF8\uB0E5 \uC885\uB8CC") {
+            onOutcomeSelected(OutcomeType.ENDED)
+        })
+
+        val dismissButton = choiceButton(text = "\uB2EB\uAE30").apply {
+            setOnClickListener {
+                onDismissedWithoutChoice()
+            }
+        }
+        card.addView(dismissButton)
+
+        return createOverlayRoot(card)
+    }
+
+    private fun outcomeButton(text: String, onClick: () -> Unit): Button {
+        return choiceButton(text = text).apply {
+            setOnClickListener {
+                onClick()
+            }
+        }
+    }
+
     private fun createOverlayRoot(card: LinearLayout): View {
         val root = LinearLayout(overlayContext).apply {
             orientation = LinearLayout.VERTICAL
@@ -515,5 +644,11 @@ class OverlayController(context: Context) {
     companion object {
         private const val TAG = "TeumOverlay"
         private const val BRAKE_TAG = "TeumBrake"
+    }
+
+    private enum class OverlayType {
+        INTENT_CHECK,
+        SESSION_BRAKE,
+        OUTCOME_CHECK
     }
 }
