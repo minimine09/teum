@@ -439,7 +439,7 @@ private fun ChoiceRow(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = option.containerColor),
-        border = if (selected) BorderStroke(1.dp, option.dotColor) else null
+        border = if (selected) BorderStroke(1.4.dp, option.dotColor) else null
     ) {
         Row(
             modifier = Modifier
@@ -447,10 +447,10 @@ private fun ChoiceRow(
                 .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(if (selected) option.dotColor else Color.White, CircleShape)
+            SelectionDot(
+                color = option.dotColor,
+                selected = selected,
+                size = 20
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
@@ -458,6 +458,29 @@ private fun ChoiceRow(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun SelectionDot(
+    color: Color,
+    selected: Boolean,
+    size: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(size.dp)
+            .background(if (selected) color else Color.White, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .size((size * 0.36f).dp)
+                    .background(Color.White, CircleShape)
             )
         }
     }
@@ -660,7 +683,7 @@ private fun OutcomeOption(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = option.containerColor),
-        border = if (selected) BorderStroke(1.dp, option.dotColor) else null
+        border = if (selected) BorderStroke(1.4.dp, option.dotColor) else null
     ) {
         Row(
             modifier = Modifier
@@ -668,10 +691,10 @@ private fun OutcomeOption(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(if (selected) option.dotColor else Color.White, CircleShape)
+            SelectionDot(
+                color = option.dotColor,
+                selected = selected,
+                size = 24
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
