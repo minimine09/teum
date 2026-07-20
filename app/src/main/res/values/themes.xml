@@ -1,3 +1,9 @@
 <resources>
-    <style name="Theme.Teum" parent="android:style/Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Teum" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/teum_background</item>
+        <item name="android:statusBarColor">@color/teum_background</item>
+        <item name="android:navigationBarColor">@color/teum_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>
