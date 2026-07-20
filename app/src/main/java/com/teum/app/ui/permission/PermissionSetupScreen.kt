@@ -72,7 +72,7 @@ fun PermissionSetupScreen(
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 PermissionCard(
                     title = "사용 기록 접근",
-                    description = "관리 대상 앱의 foreground 사용 구간만 확인",
+                    description = "관리 앱이 실제로 열린 시간만 확인",
                     badgeText = "필수",
                     color = PermissionBlue,
                     containerColor = PermissionBlueContainer
@@ -86,7 +86,7 @@ fun PermissionSetupScreen(
                 )
                 PermissionCard(
                     title = "로컬 저장",
-                    description = "Room DB에 세션 메타데이터만 저장",
+                    description = "사용 기록의 기본 정보만 기기에 저장",
                     badgeText = "자동",
                     color = PermissionOrange,
                     containerColor = PermissionOrangeContainer

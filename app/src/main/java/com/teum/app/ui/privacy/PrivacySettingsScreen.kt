@@ -60,7 +60,7 @@ fun PrivacySettingsScreen(
             Spacer(modifier = Modifier.height(18.dp))
             InfoCard(
                 title = "수집 데이터",
-                body = "앱 이름 · 시작/종료 시각 · 세션 길이\n목적 선택값 · 결과 응답 · gap time"
+                body = "앱 이름 · 시작/종료 시각 · 사용 시간\n목적 선택값 · 결과 응답 · 다시 열기까지 걸린 시간"
             )
             Spacer(modifier = Modifier.height(16.dp))
             InfoCard(
@@ -146,7 +146,7 @@ private fun ServerCard(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "앱 사용 세션 메타데이터만 Room DB에 저장하고\n기기 내부에서 통계 지표를 계산합니다.",
+            text = "앱 사용 기록의 기본 정보만 기기에 저장하고\n기기 내부에서 통계 지표를 계산합니다.",
             color = PrivacyDarkText,
             fontSize = 12.sp,
             lineHeight = 17.sp
