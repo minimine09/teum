@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.teum.app.debug.TeumLogger
 
 class OverlayController(context: Context) {
     private val overlayContext = context
@@ -27,6 +28,7 @@ class OverlayController(context: Context) {
         packageName: String,
         mode: IntentCheckMode = IntentCheckMode.NORMAL,
         reopenGapMillis: Long? = null,
+        debugSessionId: Long? = null,
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
         onCloseNowSelected: () -> Unit,
         onDismissed: () -> Unit
@@ -37,25 +39,28 @@ class OverlayController(context: Context) {
             packageName = packageName,
             mode = mode,
             reopenGapMillis = reopenGapMillis,
+            debugSessionId = debugSessionId,
             onIntentConfirmed = { choice, targetDurationMillis ->
                 Log.d(TAG, "intent selected: ${choice.name} target=$targetDurationMillis for $packageName")
                 onIntentConfirmed(choice, targetDurationMillis)
-                dismiss(onDismissed)
+                dismiss(onDismissed = onDismissed, reason = "intent_confirmed")
             },
             onCloseNowSelected = {
                 Log.d(TAG, "close now selected for $packageName")
                 onCloseNowSelected()
-                dismiss(onDismissed)
+                dismiss(onDismissed = onDismissed, reason = "close_now")
             }
         )
 
         addOverlayView(view, "intent check")
+        TeumLogger.overlay("SHOW_INTENT", "package=$packageName mode=$mode")
     }
 
     fun showSessionBrake(
         packageName: String,
         elapsedMillis: Long,
         targetDurationMillis: Long,
+        debugSessionId: Long? = null,
         onBrakeChoice: (BrakeChoice) -> Unit
     ) {
         removeOverlayIfAttached()
@@ -64,25 +69,28 @@ class OverlayController(context: Context) {
             packageName = packageName,
             elapsedMillis = elapsedMillis,
             targetDurationMillis = targetDurationMillis,
+            debugSessionId = debugSessionId,
             onBrakeChoice = { choice ->
                 Log.d(BRAKE_TAG, "choice selected ${choice.name} package=$packageName")
                 onBrakeChoice(choice)
-                dismiss()
+                dismiss(reason = "brake_choice")
             }
         )
 
         addOverlayView(view, "session brake")
+        TeumLogger.overlay("SHOW_BRAKE", "package=$packageName")
         Log.d(
             BRAKE_TAG,
             "brake shown package=$packageName elapsed=$elapsedMillis target=$targetDurationMillis"
         )
     }
 
-    fun dismiss(onDismissed: () -> Unit = {}) {
+    fun dismiss(onDismissed: () -> Unit = {}, reason: String = "unspecified") {
         val hadOverlay = overlayView != null
         removeOverlayIfAttached()
         if (hadOverlay) {
             Log.d(TAG, "overlay dismissed")
+            TeumLogger.overlay("DISMISS", "reason=$reason")
             onDismissed()
         }
     }
@@ -124,6 +132,7 @@ class OverlayController(context: Context) {
         packageName: String,
         mode: IntentCheckMode,
         reopenGapMillis: Long?,
+        debugSessionId: Long?,
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
         onCloseNowSelected: () -> Unit
     ): View {
@@ -219,6 +228,13 @@ class OverlayController(context: Context) {
             button.setOnClickListener {
                 selectedIntentChoice = choice
                 Log.d(TAG, "intent choice selected: ${choice.name}")
+                debugSessionId?.let {
+                    TeumLogger.session(
+                        debugSessionId = it,
+                        event = "INTENT_SELECTED",
+                        detail = "intent=${choice.name}"
+                    )
+                }
                 updateSelectionButtons(intentButtons, selectedIntentChoice)
                 refreshStartButton()
             }
@@ -227,6 +243,13 @@ class OverlayController(context: Context) {
             button.setOnClickListener {
                 selectedDurationChoice = choice
                 Log.d(TAG, "target duration selected: ${choice.durationMillis}")
+                debugSessionId?.let {
+                    TeumLogger.session(
+                        debugSessionId = it,
+                        event = "TARGET_SELECTED",
+                        detail = "target=${choice.durationMillis}"
+                    )
+                }
                 updateSelectionButtons(durationButtons, selectedDurationChoice)
                 refreshStartButton()
             }
@@ -262,6 +285,7 @@ class OverlayController(context: Context) {
         packageName: String,
         elapsedMillis: Long,
         targetDurationMillis: Long,
+        debugSessionId: Long?,
         onBrakeChoice: (BrakeChoice) -> Unit
     ): View {
         val card = createCardContent()
@@ -316,6 +340,13 @@ class OverlayController(context: Context) {
                 choiceButton(text = choice.label)
             }
             button.setOnClickListener {
+                debugSessionId?.let {
+                    TeumLogger.session(
+                        debugSessionId = it,
+                        event = "BRAKE_CHOICE",
+                        detail = "choice=${choice.name}"
+                    )
+                }
                 onBrakeChoice(choice)
             }
             card.addView(button)

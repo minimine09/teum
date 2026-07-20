@@ -3,6 +3,7 @@ package com.teum.app.session
 import com.teum.app.overlay.IntentChoice
 
 data class AppSession(
+    val debugSessionId: Long,
     val packageName: String,
     val entryDetectedAtMillis: Long,
     val startedAtMillis: Long,

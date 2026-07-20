@@ -83,6 +83,7 @@ class OutcomeAnalyticsInstrumentedTest {
 
     private fun sessionEndingAt(endedAtMillis: Long): AppSession {
         return AppSession(
+            debugSessionId = endedAtMillis,
             packageName = "com.google.android.youtube",
             entryDetectedAtMillis = endedAtMillis - 20_000L,
             startedAtMillis = endedAtMillis - 10_000L,
