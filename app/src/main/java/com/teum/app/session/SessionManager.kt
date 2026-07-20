@@ -85,7 +85,7 @@ object SessionManager {
         )
     }
 
-    fun endSession(packageName: String): AppSession? {
+    fun endSession(packageName: String, reason: String = "unknown"): AppSession? {
         val session = state.currentSession ?: return null
         if (session.packageName != packageName) return null
 
@@ -100,7 +100,7 @@ object SessionManager {
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
             event = "END",
-            detail = "duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
+            detail = "reason=$reason duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
         )
 
         val endedSession = session.copy(endedAtMillis = endedAtMillis)
