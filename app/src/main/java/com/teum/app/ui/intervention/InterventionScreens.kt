@@ -1,8 +1,10 @@
 package com.teum.app.ui.intervention
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +24,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,10 +34,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teum.app.ui.theme.TeumTheme
@@ -277,12 +286,7 @@ private fun ScreenHeader(title: String, subtitle: String?) {
                 .background(MaterialTheme.colorScheme.surface, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "‹",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
-            )
+            BackChevron()
         }
         Spacer(modifier = Modifier.width(9.dp))
         Column {
@@ -301,6 +305,27 @@ private fun ScreenHeader(title: String, subtitle: String?) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BackChevron(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurface
+    Canvas(modifier = modifier.size(width = 8.dp, height = 14.dp)) {
+        drawLine(
+            color = color,
+            start = Offset(size.width, 0f),
+            end = Offset(0f, size.height / 2f),
+            strokeWidth = 2.4.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(0f, size.height / 2f),
+            end = Offset(size.width, size.height),
+            strokeWidth = 2.4.dp.toPx(),
+            cap = StrokeCap.Round
+        )
     }
 }
 
@@ -462,7 +487,7 @@ private fun DurationSelector(
                 fontSize = 12.sp
             )
         }
-        Slider(
+        TeumDurationSlider(
             value = durationMinutes,
             onValueChange = onDurationChange,
             modifier = Modifier
@@ -471,6 +496,77 @@ private fun DurationSelector(
             valueRange = 0.5f..30f,
             steps = 58
         )
+    }
+}
+
+@Composable
+private fun TeumDurationSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0.5f..30f,
+    steps: Int = 58
+) {
+    var sliderSize by remember { mutableStateOf(IntSize.Zero) }
+    val start = valueRange.start
+    val end = valueRange.endInclusive
+    val progress = ((value - start) / (end - start)).coerceIn(0f, 1f)
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    fun updateValue(positionX: Float) {
+        val width = sliderSize.width.toFloat().coerceAtLeast(1f)
+        val rawProgress = (positionX / width).coerceIn(0f, 1f)
+        val rawValue = start + (end - start) * rawProgress
+        val stepSize = (end - start) / (steps + 1)
+        val steppedValue = start + ((rawValue - start) / stepSize).roundToInt() * stepSize
+        onValueChange(steppedValue.coerceIn(start, end))
+    }
+
+    Box(
+        modifier = modifier
+            .onSizeChanged { sliderSize = it }
+            .pointerInput(valueRange, steps) {
+                detectDragGestures(
+                    onDragStart = { offset -> updateValue(offset.x) },
+                    onDrag = { change, _ -> updateValue(change.position.x) }
+                )
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val trackHeight = size.height
+            val trackWidth = size.width
+            val corner = 5.dp.toPx()
+            val handleWidth = 11.dp.toPx()
+            val progressWidth = (trackWidth * progress).coerceAtLeast(handleWidth / 2f)
+            val handleLeft = (trackWidth * progress - handleWidth / 2f)
+                .coerceIn(0f, trackWidth - handleWidth)
+
+            drawRoundRect(
+                color = Color.White,
+                topLeft = Offset.Zero,
+                size = Size(trackWidth, trackHeight),
+                cornerRadius = CornerRadius(corner, corner)
+            )
+            drawRoundRect(
+                color = Color(0xFFCCCDFF),
+                topLeft = Offset.Zero,
+                size = Size(progressWidth, trackHeight),
+                cornerRadius = CornerRadius(corner, corner)
+            )
+            drawRoundRect(
+                color = Color(0xFF9FA5FF),
+                topLeft = Offset.Zero,
+                size = Size(trackWidth, trackHeight),
+                cornerRadius = CornerRadius(corner, corner),
+                style = Stroke(width = 1.dp.toPx())
+            )
+            drawRoundRect(
+                color = primaryColor,
+                topLeft = Offset(handleLeft, 0f),
+                size = Size(handleWidth, trackHeight),
+                cornerRadius = CornerRadius(corner, corner)
+            )
+        }
     }
 }
 
