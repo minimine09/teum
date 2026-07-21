@@ -46,17 +46,20 @@ private val PrivacyPill = Color(0xFFF1F3F7)
 @Composable
 fun PrivacySettingsScreen(
     onDeleteAllClick: () -> Unit,
+    showBottomNav: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
+        val bottomPadding = if (showBottomNav) 16.dp else 96.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 50.dp, bottom = 16.dp)
+                .padding(top = 50.dp, bottom = bottomPadding)
         ) {
             Header()
             Spacer(modifier = Modifier.height(20.dp))
@@ -94,8 +97,12 @@ fun PrivacySettingsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-            PrivacyBottomNav()
+            if (showBottomNav) {
+                Spacer(modifier = Modifier.weight(1f))
+                PrivacyBottomNav()
+            } else {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
