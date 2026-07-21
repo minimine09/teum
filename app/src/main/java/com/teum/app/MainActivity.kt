@@ -19,7 +19,16 @@ import com.teum.app.dashboard.AppDisplayNameResolver
 import com.teum.app.dashboard.DashboardScreen
 import com.teum.app.dashboard.DashboardViewModel
 import com.teum.app.ui.onboarding.OnboardingScreen
+import com.teum.app.ui.permission.PermissionSetupScreen
+import com.teum.app.ui.target.TargetAppSelectionScreen
 import com.teum.app.ui.theme.TeumTheme
+
+private enum class LaunchFlowStep {
+    Onboarding,
+    PermissionSetup,
+    TargetAppSelection,
+    Dashboard
+}
 
 class MainActivity : ComponentActivity() {
     private val targetAppRepository by lazy {
@@ -43,35 +52,51 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TeumTheme {
-                var showOnboarding by remember { mutableStateOf(true) }
+                var launchFlowStep by remember { mutableStateOf(LaunchFlowStep.Onboarding) }
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val displayedPackages = targetPackages +
                     dashboardUiState.availablePackages +
                     dashboardUiState.recentSessions.map { it.packageName }
                 val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
 
-                if (showOnboarding) {
-                    OnboardingScreen(
-                        onStartClick = { showOnboarding = false }
-                    )
-                } else {
-                    DashboardScreen(
-                        permissionStatus = permissionStatus,
-                        targetPackages = targetPackages,
-                        appDisplayNames = appDisplayNames,
-                        dashboardStats = dashboardUiState.dashboardStats,
-                        recentSessions = dashboardUiState.recentSessions,
-                        timeSlotStats = dashboardUiState.timeSlotStats,
-                        weeklyReportStats = dashboardUiState.weeklyReportStats,
-                        availablePackages = dashboardUiState.availablePackages,
-                        selectedPackageName = dashboardUiState.selectedPackageName,
-                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
-                        onOpenOverlaySettings = ::openOverlaySettings,
-                        onAddTargetPackage = ::addTargetPackage,
-                        onRemoveTargetPackage = ::removeTargetPackage,
-                        onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
-                        onSelectPackage = dashboardViewModel::selectPackage
-                    )
+                when (launchFlowStep) {
+                    LaunchFlowStep.Onboarding -> {
+                        OnboardingScreen(
+                            onStartClick = { launchFlowStep = LaunchFlowStep.PermissionSetup }
+                        )
+                    }
+
+                    LaunchFlowStep.PermissionSetup -> {
+                        PermissionSetupScreen(
+                            onContinueClick = { launchFlowStep = LaunchFlowStep.TargetAppSelection }
+                        )
+                    }
+
+                    LaunchFlowStep.TargetAppSelection -> {
+                        TargetAppSelectionScreen(
+                            onCompleteClick = { launchFlowStep = LaunchFlowStep.Dashboard }
+                        )
+                    }
+
+                    LaunchFlowStep.Dashboard -> {
+                        DashboardScreen(
+                            permissionStatus = permissionStatus,
+                            targetPackages = targetPackages,
+                            appDisplayNames = appDisplayNames,
+                            dashboardStats = dashboardUiState.dashboardStats,
+                            recentSessions = dashboardUiState.recentSessions,
+                            timeSlotStats = dashboardUiState.timeSlotStats,
+                            weeklyReportStats = dashboardUiState.weeklyReportStats,
+                            availablePackages = dashboardUiState.availablePackages,
+                            selectedPackageName = dashboardUiState.selectedPackageName,
+                            onOpenAccessibilitySettings = ::openAccessibilitySettings,
+                            onOpenOverlaySettings = ::openOverlaySettings,
+                            onAddTargetPackage = ::addTargetPackage,
+                            onRemoveTargetPackage = ::removeTargetPackage,
+                            onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
+                            onSelectPackage = dashboardViewModel::selectPackage
+                        )
+                    }
                 }
             }
         }
