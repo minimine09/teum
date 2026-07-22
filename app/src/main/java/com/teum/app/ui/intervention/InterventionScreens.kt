@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.overlay.TargetDurationChoice
+import com.teum.app.session.OutcomeType
 import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
@@ -856,6 +857,186 @@ private fun OutcomeOption(
     }
 }
 
+@Composable
+fun OutcomeCheckScreen(
+    sessionData: OutcomeSessionUi,
+    onSaveClick: (OutcomeType) -> Unit,
+    onDismissClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedOutcomeType by remember { mutableStateOf<OutcomeType?>(null) }
+    val outcomeOptions = listOf(
+        OutcomeSelectionOptionUi(
+            ui = OutcomeOptionUi(
+                title = "목적 달성",
+                description = "처음 목적대로 필요한 사용을 마쳤어요.",
+                containerColor = MintChoice,
+                dotColor = Success
+            ),
+            outcomeType = OutcomeType.NECESSARY_USE
+        ),
+        OutcomeSelectionOptionUi(
+            ui = OutcomeOptionUi(
+                title = "필요한 사용",
+                description = "예상보다 길었지만 실제로 필요한 사용이었어요.",
+                containerColor = BlueChoice,
+                dotColor = MaterialTheme.colorScheme.primary
+            ),
+            outcomeType = OutcomeType.NECESSARY_USE
+        ),
+        OutcomeSelectionOptionUi(
+            ui = OutcomeOptionUi(
+                title = "목적 이탈",
+                description = "릴스·추천 피드 등 목적과 다른 사용으로 이어졌어요.",
+                containerColor = DangerChoice,
+                dotColor = Danger
+            ),
+            outcomeType = OutcomeType.PURPOSE_DRIFT
+        ),
+        OutcomeSelectionOptionUi(
+            ui = OutcomeOptionUi(
+                title = "계속 스크롤",
+                description = "무의식적으로 이어진 사용으로 기록해요.",
+                containerColor = OrangeChoice,
+                dotColor = Warning
+            ),
+            outcomeType = OutcomeType.ENDED
+        )
+    )
+
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .padding(top = 50.dp, bottom = 79.dp)
+        ) {
+            ScreenHeader(title = "Outcome Check", subtitle = "목적과 실제 결과 연결")
+            Spacer(modifier = Modifier.height(23.dp))
+            OutcomeSessionSummaryCard(sessionData = sessionData)
+            Spacer(modifier = Modifier.height(38.dp))
+            Text(
+                text = "처음 목적을 달성했나요?",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "결과 응답은 다음 리포트와 개입 강도에 반영됩니다.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(39.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                outcomeOptions.forEach { option ->
+                    OutcomeOption(
+                        option = option.ui,
+                        selected = selectedOutcomeType == option.outcomeType,
+                        onClick = { selectedOutcomeType = option.outcomeType }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            OutlinedButton(
+                onClick = onDismissClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(49.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("지금은 닫기")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            TeumFilledButton(
+                text = "기록 저장",
+                onClick = { selectedOutcomeType?.let(onSaveClick) },
+                color = MaterialTheme.colorScheme.primary,
+                height = 49,
+                enabled = selectedOutcomeType != null
+            )
+        }
+    }
+}
+
+@Composable
+private fun OutcomeSessionSummaryCard(
+    sessionData: OutcomeSessionUi,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, BorderSoft)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "이번 세션 요약",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            OutcomeSummaryLine(label = "앱", value = sessionData.appName)
+            OutcomeSummaryLine(label = "처음 목적", value = sessionData.intentText)
+            OutcomeSummaryLine(label = "실제 사용", value = formatKoreanDuration(sessionData.actualUsageMillis))
+            OutcomeSummaryLine(label = "목표 시간", value = formatKoreanDuration(sessionData.targetDurationMillis))
+            OutcomeSummaryLine(label = "연장 횟수", value = "${sessionData.extensionCount}회")
+        }
+    }
+}
+
+@Composable
+private fun OutcomeSummaryLine(
+    label: String,
+    value: String
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
+        Text(
+            text = value,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+data class OutcomeSessionUi(
+    val appName: String,
+    val intentText: String,
+    val actualUsageMillis: Long,
+    val targetDurationMillis: Long,
+    val extensionCount: Int
+)
+
+private data class OutcomeSelectionOptionUi(
+    val ui: OutcomeOptionUi,
+    val outcomeType: OutcomeType
+)
+
+private fun formatKoreanDuration(durationMillis: Long): String {
+    val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return when {
+        minutes > 0L && seconds > 0L -> "${minutes}분 ${seconds}초"
+        minutes > 0L -> "${minutes}분"
+        else -> "${seconds}초"
+    }
+}
+
 private data class IntentOptionUi(
     val choice: IntentChoice,
     val text: String,
@@ -982,6 +1163,16 @@ private fun SessionBrakeScreenPreview() {
 @Composable
 private fun OutcomeCheckScreenPreview() {
     TeumTheme {
-        OutcomeCheckScreen(onSaveClick = {})
+        OutcomeCheckScreen(
+            sessionData = OutcomeSessionUi(
+                appName = "Instagram",
+                intentText = "인지된 휴식",
+                actualUsageMillis = 860_000L,
+                targetDurationMillis = 300_000L,
+                extensionCount = 2
+            ),
+            onSaveClick = {},
+            onDismissClick = {}
+        )
     }
 }

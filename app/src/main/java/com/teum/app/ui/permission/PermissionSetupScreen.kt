@@ -1,7 +1,8 @@
 package com.teum.app.ui.permission
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teum.app.core.model.PermissionStatus
 import com.teum.app.ui.theme.TeumTheme
 
 private val PermissionBlue = Color(0xFF5B5FEA)
@@ -38,12 +40,21 @@ private val PermissionBlueContainer = Color(0xFFECEEFF)
 private val PermissionMintContainer = Color(0xFFE8F8F4)
 private val PermissionOrangeContainer = Color(0xFFFFF3E4)
 private val PermissionBorder = Color(0xFFE3E7EF)
+private val PermissionReady = Color(0xFF2EC4A6)
+private val PermissionMissing = Color(0xFFF05D5E)
+private val PermissionMissingContainer = Color(0xFFFDEDEE)
 
 @Composable
 fun PermissionSetupScreen(
+    permissionStatus: PermissionStatus,
+    onOpenAccessibilitySettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
     onContinueClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val requiredPermissionsReady = permissionStatus.isAccessibilityEnabled &&
+        permissionStatus.canDrawOverlays
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -62,7 +73,7 @@ fun PermissionSetupScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "세션 기록과 알림에 필요한 최소 권한",
+                text = "세션 기록과 개입 화면에 필요한 최소 권한",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -72,24 +83,33 @@ fun PermissionSetupScreen(
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 PermissionCard(
                     title = "사용 기록 접근",
-                    description = "관리 앱이 실제로 열린 시간만 확인",
+                    description = "대상 앱 실행과 사용 흐름을 감지하기 위해 필요해요.",
                     badgeText = "필수",
+                    statusText = if (permissionStatus.isAccessibilityEnabled) "완료" else "설정 필요",
+                    granted = permissionStatus.isAccessibilityEnabled,
                     color = PermissionBlue,
-                    containerColor = PermissionBlueContainer
+                    containerColor = PermissionBlueContainer,
+                    onClick = onOpenAccessibilitySettings
                 )
                 PermissionCard(
-                    title = "알림 권한",
-                    description = "약속 시간 초과와 결과 점검을 알려줌",
+                    title = "화면 위 표시 권한",
+                    description = "Intent Check, Session Brake 같은 개입 화면을 띄워요.",
                     badgeText = "필수",
+                    statusText = if (permissionStatus.canDrawOverlays) "완료" else "설정 필요",
+                    granted = permissionStatus.canDrawOverlays,
                     color = PermissionMint,
-                    containerColor = PermissionMintContainer
+                    containerColor = PermissionMintContainer,
+                    onClick = onOpenOverlaySettings
                 )
                 PermissionCard(
                     title = "로컬 저장",
-                    description = "사용 기록의 기본 정보만 기기에 저장",
+                    description = "사용 기록의 기본 정보만 기기 안에 저장해요.",
                     badgeText = "자동",
+                    statusText = "준비됨",
+                    granted = true,
                     color = PermissionOrange,
-                    containerColor = PermissionOrangeContainer
+                    containerColor = PermissionOrangeContainer,
+                    onClick = null
                 )
             }
 
@@ -99,26 +119,41 @@ fun PermissionSetupScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            Text(
+                text = if (requiredPermissionsReady) {
+                    "필수 권한이 준비됐어요. 다음 단계로 이동할 수 있어요."
+                } else {
+                    "필수 권한을 모두 설정한 뒤 다음 단계로 이동할 수 있어요."
+                },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                color = if (requiredPermissionsReady) PermissionReady else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = if (requiredPermissionsReady) FontWeight.Bold else FontWeight.Normal
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = onContinueClick,
+                enabled = requiredPermissionsReady,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = Color(0xFFCDD2E0),
+                    disabledContentColor = Color.White
                 )
             ) {
                 Text(
-                    text = "권한 설정 계속하기",
+                    text = "권한 설정 완료",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
             Spacer(modifier = Modifier.height(29.dp))
             Text(
-                text = "언제든 설정에서 해제할 수 있어요",
+                text = "언제든 설정에서 권한을 다시 변경할 수 있어요.",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
@@ -132,22 +167,26 @@ private fun PermissionCard(
     title: String,
     description: String,
     badgeText: String,
+    statusText: String,
+    granted: Boolean,
     color: Color,
     containerColor: Color,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(112.dp),
+            .height(112.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, PermissionBorder)
+        border = BorderStroke(1.dp, if (granted) containerColor else PermissionBorder)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 13.dp, end = 22.dp),
+                .padding(start = 13.dp, end = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -157,7 +196,7 @@ private fun PermissionCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "✓",
+                    text = if (granted) "✓" else "!",
                     color = color,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -177,14 +216,26 @@ private fun PermissionCard(
                 Text(
                     text = description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
                 )
             }
-            PermissionBadge(
-                text = badgeText,
-                color = color,
-                containerColor = containerColor
-            )
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PermissionBadge(
+                    text = badgeText,
+                    color = color,
+                    containerColor = containerColor
+                )
+                PermissionBadge(
+                    text = statusText,
+                    color = if (granted) PermissionReady else PermissionMissing,
+                    containerColor = if (granted) PermissionMintContainer else PermissionMissingContainer,
+                    wide = true
+                )
+            }
         }
     }
 }
@@ -194,11 +245,12 @@ private fun PermissionBadge(
     text: String,
     color: Color,
     containerColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    wide: Boolean = false
 ) {
     Box(
         modifier = modifier
-            .size(width = 48.dp, height = 26.dp)
+            .size(width = if (wide) 62.dp else 48.dp, height = 26.dp)
             .background(containerColor, RoundedCornerShape(13.dp)),
         contentAlignment = Alignment.Center
     ) {
@@ -222,15 +274,16 @@ private fun NotCollectedCard(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "수집하지 않음",
+            text = "수집하지 않는 데이터",
             color = MaterialTheme.colorScheme.primary,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "메시지 내용 · 영상 내용 · 검색어 · 화면 캡처 · 위치 정보",
+            text = "메시지 내용 · 영상 내용 · 검색어 · 화면 캡처 · 연락처 · 위치 정보",
             color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            lineHeight = 17.sp
         )
     }
 }
@@ -239,6 +292,14 @@ private fun NotCollectedCard(modifier: Modifier = Modifier) {
 @Composable
 private fun PermissionSetupScreenPreview() {
     TeumTheme {
-        PermissionSetupScreen(onContinueClick = {})
+        PermissionSetupScreen(
+            permissionStatus = PermissionStatus(
+                isAccessibilityEnabled = false,
+                canDrawOverlays = true
+            ),
+            onOpenAccessibilitySettings = {},
+            onOpenOverlaySettings = {},
+            onContinueClick = {}
+        )
     }
 }

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.ui.privacy.PrivacySettingsScreen
@@ -92,6 +93,8 @@ fun DashboardScreen(
     onRemoveTargetPackage: (String) -> Unit,
     onDeleteAllSessionLogs: () -> Unit,
     onSelectPackage: (String?) -> Unit,
+    selectedInterventionMode: InterventionMode = InterventionMode.NORMAL,
+    onInterventionModeChange: (InterventionMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(DashboardTab.Home) }
@@ -179,6 +182,8 @@ fun DashboardScreen(
                 )
 
                 DashboardTab.Settings -> PrivacySettingsScreen(
+                    selectedMode = selectedInterventionMode,
+                    onModeChange = onInterventionModeChange,
                     onDeleteAllClick = { showDeleteConfirmation = true },
                     showBottomNav = false
                 )
