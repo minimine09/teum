@@ -48,7 +48,7 @@ private val NeutralTint = Color(0xFFF1F3F7)
 
 @Composable
 fun TargetAppSelectionScreen(
-    onCompleteClick: () -> Unit,
+    onCompleteClick: (List<TargetAppSelectionResult>) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -58,7 +58,7 @@ fun TargetAppSelectionScreen(
     }
     val checkedStates = remember {
         mutableStateMapOf<String, Boolean>().apply {
-            appItems.forEach { item -> put(item.name, item.initiallyChecked) }
+            appItems.forEach { item -> put(item.packageName, item.initiallyChecked) }
         }
     }
     val selectedCount = checkedStates.values.count { it }
@@ -92,12 +92,12 @@ fun TargetAppSelectionScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
-                items(appItems, key = { it.name }) { item ->
-                    val checked = checkedStates[item.name] == true
+                items(appItems, key = { it.packageName }) { item ->
+                    val checked = checkedStates[item.packageName] == true
                     TargetAppRow(
                         item = item,
                         checked = checked,
-                        onCheckedChange = { checkedStates[item.name] = it }
+                        onCheckedChange = { checkedStates[item.packageName] = it }
                     )
                 }
             }
@@ -109,7 +109,17 @@ fun TargetAppSelectionScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = onCompleteClick,
+                onClick = {
+                    onCompleteClick(
+                        appItems.map { item ->
+                            TargetAppSelectionResult(
+                                packageName = item.packageName,
+                                enabled = checkedStates[item.packageName] == true,
+                                defaultDurationMillis = item.defaultDurationMillis
+                            )
+                        }
+                    )
+                },
                 enabled = selectedCount > 0,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,7 +200,7 @@ private fun TargetAppRow(
                 )
             }
 
-            DurationPill(item.duration)
+            DurationPill(item.durationLabel)
             Spacer(modifier = Modifier.size(10.dp))
             Switch(
                 checked = checked,
@@ -235,14 +245,14 @@ private fun GuideCard(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "기본값은 앱별로 바꿀 수 있어요",
+            text = "기본값은 설정에서 바꿀 수 있어요.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "처음에는 3~5분으로 시작하는 것을 권장",
+            text = "처음에는 3~5분으로 시작하는 것을 권장해요.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp
         )
@@ -250,10 +260,12 @@ private fun GuideCard(modifier: Modifier = Modifier) {
 }
 
 private data class TargetAppUi(
+    val packageName: String,
     val initial: String,
     val name: String,
     val description: String,
-    val duration: String,
+    val durationLabel: String,
+    val defaultDurationMillis: Long,
     val initiallyChecked: Boolean,
     val iconColor: Color,
     val iconContainerColor: Color
@@ -264,68 +276,77 @@ private fun defaultTargetApps(
     mutedColor: Color
 ): List<TargetAppUi> = listOf(
     TargetAppUi(
+        packageName = "com.google.android.youtube",
         initial = "Y",
         name = "YouTube",
         description = "Shorts 포함 영상 앱",
-        duration = "5분",
+        durationLabel = "5분",
+        defaultDurationMillis = 300_000L,
         initiallyChecked = true,
         iconColor = Color(0xFFF05D5E),
         iconContainerColor = YouTubeTint
     ),
     TargetAppUi(
+        packageName = "com.instagram.android",
         initial = "I",
         name = "Instagram",
-        description = "릴스·피드·DM",
-        duration = "5분",
+        description = "릴스 · 피드 · DM",
+        durationLabel = "5분",
+        defaultDurationMillis = 300_000L,
         initiallyChecked = true,
         iconColor = Color(0xFFFF9F43),
         iconContainerColor = InstagramTint
     ),
     TargetAppUi(
+        packageName = "com.zhiliaoapp.musically",
         initial = "T",
         name = "TikTok",
-        description = "숏폼 추천 피드",
-        duration = "3분",
+        description = "추천 피드가 길어지기 쉬운 앱",
+        durationLabel = "3분",
+        defaultDurationMillis = 180_000L,
         initiallyChecked = true,
         iconColor = primaryColor,
         iconContainerColor = TikTokTint
     ),
     TargetAppUi(
+        packageName = "com.twitter.android",
         initial = "X",
         name = "X",
-        description = "피드·알림 확인",
-        duration = "5분",
+        description = "피드 · 알림 확인",
+        durationLabel = "5분",
+        defaultDurationMillis = 300_000L,
         initiallyChecked = false,
         iconColor = mutedColor,
         iconContainerColor = NeutralTint
     ),
     TargetAppUi(
-        initial = "W",
-        name = "웹 브라우저",
-        description = "뉴스·검색·커뮤니티",
-        duration = "10분",
+        packageName = "com.android.chrome",
+        initial = "C",
+        name = "Chrome",
+        description = "뉴스 · 검색 · 커뮤니티",
+        durationLabel = "10분",
+        defaultDurationMillis = 600_000L,
         initiallyChecked = false,
         iconColor = mutedColor,
         iconContainerColor = NeutralTint
     ),
     TargetAppUi(
+        packageName = "com.netflix.mediaclient",
         initial = "N",
         name = "Netflix",
         description = "영상 시청 앱",
-        duration = "10분",
+        durationLabel = "10분",
+        defaultDurationMillis = 600_000L,
         initiallyChecked = false,
         iconColor = Color(0xFFF05D5E),
         iconContainerColor = YouTubeTint
-    ),
-    TargetAppUi(
-        initial = "G",
-        name = "게임",
-        description = "짧게 시작해 길어지는 앱",
-        duration = "5분",
-        initiallyChecked = false,
-        iconColor = primaryColor,
-        iconContainerColor = TikTokTint
     )
+)
+
+data class TargetAppSelectionResult(
+    val packageName: String,
+    val enabled: Boolean,
+    val defaultDurationMillis: Long
 )
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)

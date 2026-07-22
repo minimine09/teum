@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.core.util.PermissionUtils
 import com.teum.app.data.repository.TargetAppRepository
@@ -20,6 +21,7 @@ import com.teum.app.dashboard.DashboardScreen
 import com.teum.app.dashboard.DashboardViewModel
 import com.teum.app.ui.onboarding.OnboardingScreen
 import com.teum.app.ui.permission.PermissionSetupScreen
+import com.teum.app.ui.setup.InterventionModeSetupScreen
 import com.teum.app.ui.target.TargetAppSelectionScreen
 import com.teum.app.ui.theme.TeumTheme
 
@@ -27,6 +29,7 @@ private enum class LaunchFlowStep {
     Onboarding,
     PermissionSetup,
     TargetAppSelection,
+    InterventionModeSetup,
     Dashboard
 }
 
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             TeumTheme {
                 var launchFlowStep by remember { mutableStateOf(LaunchFlowStep.Onboarding) }
+                var selectedInterventionMode by remember { mutableStateOf(InterventionMode.NORMAL) }
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val displayedPackages = targetPackages +
                     dashboardUiState.availablePackages +
@@ -68,13 +72,37 @@ class MainActivity : ComponentActivity() {
 
                     LaunchFlowStep.PermissionSetup -> {
                         PermissionSetupScreen(
+                            permissionStatus = permissionStatus,
+                            onOpenAccessibilitySettings = ::openAccessibilitySettings,
+                            onOpenOverlaySettings = ::openOverlaySettings,
                             onContinueClick = { launchFlowStep = LaunchFlowStep.TargetAppSelection }
                         )
                     }
 
                     LaunchFlowStep.TargetAppSelection -> {
                         TargetAppSelectionScreen(
-                            onCompleteClick = { launchFlowStep = LaunchFlowStep.Dashboard }
+                            onCompleteClick = { results ->
+                                results.forEach { result ->
+                                    if (result.enabled) {
+                                        targetAppRepository.addTargetPackage(result.packageName)
+                                    } else {
+                                        targetAppRepository.removeTargetPackage(result.packageName)
+                                    }
+                                }
+                                refreshTargetPackages()
+                                launchFlowStep = LaunchFlowStep.InterventionModeSetup
+                            }
+                        )
+                    }
+
+                    LaunchFlowStep.InterventionModeSetup -> {
+                        InterventionModeSetupScreen(
+                            selectedMode = selectedInterventionMode,
+                            onModeSelected = { selectedInterventionMode = it },
+                            onCompleteClick = {
+                                selectedInterventionMode = it
+                                launchFlowStep = LaunchFlowStep.Dashboard
+                            }
                         )
                     }
 
@@ -94,7 +122,9 @@ class MainActivity : ComponentActivity() {
                             onAddTargetPackage = ::addTargetPackage,
                             onRemoveTargetPackage = ::removeTargetPackage,
                             onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
-                            onSelectPackage = dashboardViewModel::selectPackage
+                            onSelectPackage = dashboardViewModel::selectPackage,
+                            selectedInterventionMode = selectedInterventionMode,
+                            onInterventionModeChange = { selectedInterventionMode = it }
                         )
                     }
                 }

@@ -23,10 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.ui.theme.TeumTheme
 
 private val PrivacyBorder = Color(0xFFE3E7EF)
@@ -45,6 +42,8 @@ private val PrivacyPill = Color(0xFFF1F3F7)
 
 @Composable
 fun PrivacySettingsScreen(
+    selectedMode: InterventionMode,
+    onModeChange: (InterventionMode) -> Unit,
     onDeleteAllClick: () -> Unit,
     showBottomNav: Boolean = true,
     modifier: Modifier = Modifier
@@ -76,7 +75,10 @@ fun PrivacySettingsScreen(
                 body = "메시지 내용 · 영상 내용 · 검색어 · 화면 캡처\n키보드 입력 · 연락처 · 위치 정보"
             )
             Spacer(modifier = Modifier.height(15.dp))
-            ModeCard()
+            ModeCard(
+                selectedMode = selectedMode,
+                onModeChange = onModeChange
+            )
             Spacer(modifier = Modifier.height(23.dp))
 
             Button(
@@ -201,10 +203,11 @@ private fun InfoCard(
 }
 
 @Composable
-private fun ModeCard(modifier: Modifier = Modifier) {
-    var selectedMode by remember { mutableStateOf("보통") }
-    val modes = listOf("약함", "보통", "강함")
-
+private fun ModeCard(
+    selectedMode: InterventionMode,
+    onModeChange: (InterventionMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -235,11 +238,11 @@ private fun ModeCard(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                modes.forEach { mode ->
+                InterventionMode.entries.forEach { mode ->
                     ModePill(
-                        text = mode,
+                        text = mode.label,
                         selected = selectedMode == mode,
-                        onClick = { selectedMode = mode }
+                        onClick = { onModeChange(mode) }
                     )
                 }
             }
@@ -285,7 +288,7 @@ private fun PrivacyBottomNav(modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         NavItem(icon = "⌂", label = "홈")
-        NavItem(icon = "●", label = "세션")
+        NavItem(icon = "•", label = "세션")
         NavItem(icon = "▤", label = "리포트")
         NavItem(icon = "⚙", label = "설정", selected = true)
     }
@@ -319,6 +322,10 @@ private fun NavItem(
 @Composable
 private fun PrivacySettingsScreenPreview() {
     TeumTheme {
-        PrivacySettingsScreen(onDeleteAllClick = {})
+        PrivacySettingsScreen(
+            selectedMode = InterventionMode.NORMAL,
+            onModeChange = {},
+            onDeleteAllClick = {}
+        )
     }
 }
