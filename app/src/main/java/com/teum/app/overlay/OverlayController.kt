@@ -14,14 +14,36 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.teum.app.debug.TeumLogger
 import com.teum.app.session.OutcomeType
+import com.teum.app.ui.intervention.IntentCheckScreen
+import com.teum.app.ui.intervention.ReopenCheckScreen
+import com.teum.app.ui.intervention.SessionBrakeScreen
+import com.teum.app.ui.theme.TeumTheme
 
 class OverlayController(context: Context) {
     private val overlayContext = context
     private val windowManager = overlayContext.getSystemService(WindowManager::class.java)
     private var overlayView: View? = null
     private var currentOverlayType: OverlayType? = null
+    private var currentOverlayOwner: OverlayViewTreeOwner? = null
 
     val overlayShowing: Boolean
         get() = overlayView?.isAttachedToWindow == true
@@ -41,7 +63,7 @@ class OverlayController(context: Context) {
     ) {
         removeOverlayIfAttached()
 
-        val view = createIntentCheckView(
+        val view = createIntentCheckComposeView(
             packageName = packageName,
             mode = mode,
             reopenGapMillis = reopenGapMillis,
@@ -68,11 +90,12 @@ class OverlayController(context: Context) {
         targetDurationMillis: Long,
         debugSessionId: Long? = null,
         source: String = "session_brake",
-        onBrakeChoice: (BrakeChoice) -> Unit
+        onBrakeChoice: (BrakeChoice) -> Unit,
+        onExtendDurationSelected: (Long) -> Unit
     ) {
         removeOverlayIfAttached()
 
-        val view = createSessionBrakeView(
+        val view = createSessionBrakeComposeView(
             packageName = packageName,
             elapsedMillis = elapsedMillis,
             targetDurationMillis = targetDurationMillis,
@@ -80,6 +103,11 @@ class OverlayController(context: Context) {
             onBrakeChoice = { choice ->
                 Log.d(BRAKE_TAG, "choice selected ${choice.name} package=$packageName")
                 onBrakeChoice(choice)
+                dismiss(reason = "brake_choice")
+            },
+            onExtendDurationSelected = { durationMillis ->
+                Log.d(BRAKE_TAG, "choice selected ${BrakeChoice.EXTEND_3_MIN.name} package=$packageName duration=$durationMillis")
+                onExtendDurationSelected(durationMillis)
                 dismiss(reason = "brake_choice")
             }
         )
@@ -150,6 +178,8 @@ class OverlayController(context: Context) {
         } finally {
             overlayView = null
             currentOverlayType = null
+            currentOverlayOwner?.onDestroy()
+            currentOverlayOwner = null
         }
     }
 
@@ -171,7 +201,157 @@ class OverlayController(context: Context) {
         } catch (exception: RuntimeException) {
             overlayView = null
             currentOverlayType = null
+            currentOverlayOwner?.onDestroy()
+            currentOverlayOwner = null
             Log.e(TAG, "failed to show $overlayName overlay", exception)
+        }
+    }
+
+    private fun createIntentCheckComposeView(
+        packageName: String,
+        mode: IntentCheckMode,
+        reopenGapMillis: Long?,
+        debugSessionId: Long?,
+        onIntentConfirmed: (IntentChoice, Long) -> Unit,
+        onCloseNowSelected: () -> Unit
+    ): View {
+        val owner = OverlayViewTreeOwner().apply {
+            onCreate()
+            onStart()
+            onResume()
+        }
+        currentOverlayOwner = owner
+
+        return ComposeView(overlayContext).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                var selectedIntentChoice by remember { mutableStateOf<IntentChoice?>(null) }
+                var selectedDurationChoice by remember {
+                    mutableStateOf<TargetDurationChoice?>(TargetDurationChoice.TEST_FIVE_SECONDS)
+                }
+
+                fun selectIntent(choice: IntentChoice) {
+                    if (selectedIntentChoice == choice) return
+                    selectedIntentChoice = choice
+                    Log.d(TAG, "intent choice selected: ${choice.name}")
+                    debugSessionId?.let {
+                        TeumLogger.session(
+                            debugSessionId = it,
+                            event = "INTENT_SELECTED",
+                            detail = "intent=${choice.name}"
+                        )
+                    }
+                }
+
+                fun selectDuration(choice: TargetDurationChoice) {
+                    if (selectedDurationChoice == choice) return
+                    selectedDurationChoice = choice
+                    Log.d(TAG, "target duration selected: ${choice.durationMillis}")
+                    debugSessionId?.let {
+                        TeumLogger.session(
+                            debugSessionId = it,
+                            event = "TARGET_SELECTED",
+                            detail = "target=${choice.durationMillis}"
+                        )
+                    }
+                }
+
+                fun startIntentSession() {
+                    val intentChoice = selectedIntentChoice ?: return
+                    if (intentChoice == IntentChoice.CLOSE_NOW) {
+                        onCloseNowSelected()
+                        return
+                    }
+
+                    val targetDurationMillis = selectedDurationChoice?.durationMillis ?: return
+                    Log.d(TAG, "start clicked intent=${intentChoice.name} target=$targetDurationMillis package=$packageName")
+                    onIntentConfirmed(intentChoice, targetDurationMillis)
+                }
+
+                TeumTheme {
+                    if (mode == IntentCheckMode.FAST_REOPEN) {
+                        ReopenCheckScreen(
+                            appName = displayNameForPackage(packageName),
+                            reopenGapMillis = reopenGapMillis,
+                            selectedIntent = selectedIntentChoice,
+                            selectedDuration = selectedDurationChoice,
+                            onIntentSelected = { selectIntent(it) },
+                            onDurationSelected = { selectDuration(it) },
+                            onStartClick = { startIntentSession() },
+                            onCloseClick = onCloseNowSelected
+                        )
+                    } else {
+                        IntentCheckScreen(
+                            appName = displayNameForPackage(packageName),
+                            selectedIntent = selectedIntentChoice,
+                            selectedDuration = selectedDurationChoice,
+                            onIntentSelected = { selectIntent(it) },
+                            onDurationSelected = { selectDuration(it) },
+                            onStartClick = { startIntentSession() },
+                            onCloseClick = onCloseNowSelected
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createSessionBrakeComposeView(
+        packageName: String,
+        elapsedMillis: Long,
+        targetDurationMillis: Long,
+        debugSessionId: Long?,
+        onBrakeChoice: (BrakeChoice) -> Unit,
+        onExtendDurationSelected: (Long) -> Unit
+    ): View {
+        val owner = OverlayViewTreeOwner().apply {
+            onCreate()
+            onStart()
+            onResume()
+        }
+        currentOverlayOwner = owner
+
+        return ComposeView(overlayContext).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                fun chooseBrake(choice: BrakeChoice) {
+                    debugSessionId?.let {
+                        TeumLogger.session(
+                            debugSessionId = it,
+                            event = "BRAKE_CHOICE",
+                            detail = "choice=${choice.name}"
+                        )
+                    }
+                    onBrakeChoice(choice)
+                }
+
+                fun extendBrake(durationChoice: TargetDurationChoice) {
+                    debugSessionId?.let {
+                        TeumLogger.session(
+                            debugSessionId = it,
+                            event = "BRAKE_CHOICE",
+                            detail = "choice=${BrakeChoice.EXTEND_3_MIN.name} duration=${durationChoice.durationMillis}"
+                        )
+                    }
+                    onExtendDurationSelected(durationChoice.durationMillis)
+                }
+
+                TeumTheme {
+                    SessionBrakeScreen(
+                        appName = displayNameForPackage(packageName),
+                        elapsedMillis = elapsedMillis,
+                        targetDurationMillis = targetDurationMillis,
+                        onEndClick = { chooseBrake(BrakeChoice.END_NOW) },
+                        onExtendClick = { extendBrake(it) }
+                    )
+                }
+            }
         }
     }
 
@@ -633,6 +813,14 @@ class OverlayController(context: Context) {
         }
     }
 
+    private fun displayNameForPackage(packageName: String): String {
+        return when (packageName) {
+            "com.google.android.youtube" -> "YouTube"
+            "com.instagram.android" -> "Instagram"
+            else -> packageName
+        }
+    }
+
     private fun dp(value: Int): Int {
         return (value * overlayContext.resources.displayMetrics.density).toInt()
     }
@@ -650,5 +838,46 @@ class OverlayController(context: Context) {
         INTENT_CHECK,
         SESSION_BRAKE,
         OUTCOME_CHECK
+    }
+
+    private class OverlayViewTreeOwner :
+        LifecycleOwner,
+        SavedStateRegistryOwner,
+        ViewModelStoreOwner {
+
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        private val savedStateRegistryController = SavedStateRegistryController.create(this)
+        private val store = ViewModelStore()
+        private var destroyed = false
+
+        override val lifecycle: Lifecycle
+            get() = lifecycleRegistry
+
+        override val savedStateRegistry: SavedStateRegistry
+            get() = savedStateRegistryController.savedStateRegistry
+
+        override val viewModelStore: ViewModelStore
+            get() = store
+
+        fun onCreate() {
+            savedStateRegistryController.performAttach()
+            savedStateRegistryController.performRestore(null)
+            lifecycleRegistry.currentState = Lifecycle.State.CREATED
+        }
+
+        fun onStart() {
+            lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        }
+
+        fun onResume() {
+            lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        }
+
+        fun onDestroy() {
+            if (destroyed) return
+            destroyed = true
+            lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+            store.clear()
+        }
     }
 }

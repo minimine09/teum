@@ -89,6 +89,9 @@ class TeumAccessibilityService : AccessibilityService() {
             cancelBrakeSchedule()
             var endedSession: AppSession? = null
             if (SessionManager.hasActiveSessionFor(previousPackage)) {
+                if (overlayController.currentOverlayName == "SESSION_BRAKE") {
+                    SessionManager.markInterventionHidden()
+                }
                 endedSession = SessionManager.endSession(
                     packageName = previousPackage,
                     reason = "target_exit"
@@ -263,8 +266,14 @@ class TeumAccessibilityService : AccessibilityService() {
             source = "session_brake",
             onBrakeChoice = { choice ->
                 handleBrakeChoice(choice, session.packageName)
+            },
+            onExtendDurationSelected = { durationMillis ->
+                handleBrakeExtension(session.packageName, durationMillis)
             }
         )
+        if (overlayController.currentOverlayName == "SESSION_BRAKE") {
+            SessionManager.markInterventionShown()
+        }
         val elapsedMillis = SessionManager.getElapsedMillis()
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
@@ -312,23 +321,31 @@ class TeumAccessibilityService : AccessibilityService() {
             }
 
             BrakeChoice.EXTEND_3_MIN -> {
-                SessionManager.extendCurrentSession(THREE_MINUTES_MILLIS)
-                brakeSuppressedForCurrentSession = false
-                scheduleBrakeForCurrentSession()
+                handleBrakeExtension(packageName, THREE_MINUTES_MILLIS)
             }
 
             BrakeChoice.NECESSARY_USE -> {
+                SessionManager.markInterventionHidden()
                 SessionManager.markCurrentSessionOutcome(OutcomeType.NECESSARY_USE)
                 brakeSuppressedForCurrentSession = true
                 Log.d(TAG, "brake suppressed for necessary use package=$packageName")
             }
 
             BrakeChoice.PURPOSE_DRIFT -> {
+                SessionManager.markInterventionHidden()
                 SessionManager.markCurrentSessionOutcome(OutcomeType.PURPOSE_DRIFT)
                 brakeSuppressedForCurrentSession = true
                 Log.d(TAG, "brake suppressed for purpose drift package=$packageName")
             }
         }
+    }
+
+    private fun handleBrakeExtension(packageName: String, durationMillis: Long) {
+        SessionManager.markInterventionHidden()
+        SessionManager.extendCurrentSession(durationMillis)
+        brakeSuppressedForCurrentSession = false
+        scheduleBrakeForCurrentSession()
+        Log.d(TAG, "brake extended package=$packageName duration=$durationMillis")
     }
 
     private fun saveEndedSession(
