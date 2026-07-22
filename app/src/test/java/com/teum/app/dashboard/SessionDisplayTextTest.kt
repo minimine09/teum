@@ -21,4 +21,11 @@ class SessionDisplayTextTest {
         assertEquals("필요한 사용으로 확인했어요", SessionDisplayText.outcome("NECESSARY_USE", null, null))
         assertEquals("사용 결과를 아직 확인하지 않았어요", SessionDisplayText.outcome(null, null, null))
     }
+
+    @Test
+    fun overrunUsesFriendlyTextForSubSecondDurations() {
+        assertEquals("목표 시간 안에 종료했어요", SessionDisplayText.overrun(0L))
+        assertEquals("목표 시간을 1초 미만 초과했어요", SessionDisplayText.overrun(37L))
+        assertEquals("목표 시간을 1분 5초 초과했어요", SessionDisplayText.overrun(65_000L))
+    }
 }

@@ -23,4 +23,21 @@ object SessionDisplayText {
         outcomeType == null -> "사용 결과를 아직 확인하지 않았어요"
         else -> "사용 결과를 확인할 수 없어요"
     }
+
+    fun overrun(overrunMillis: Long): String = when {
+        overrunMillis <= 0L -> "목표 시간 안에 종료했어요"
+        overrunMillis < 1_000L -> "목표 시간을 1초 미만 초과했어요"
+        else -> "목표 시간을 ${formatDuration(overrunMillis)} 초과했어요"
+    }
+
+    private fun formatDuration(durationMillis: Long): String {
+        val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return when {
+            minutes > 0L && seconds > 0L -> "${minutes}분 ${seconds}초"
+            minutes > 0L -> "${minutes}분"
+            else -> "${seconds}초"
+        }
+    }
 }

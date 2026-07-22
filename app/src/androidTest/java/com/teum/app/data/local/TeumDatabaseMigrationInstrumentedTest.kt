@@ -30,19 +30,39 @@ class TeumDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migrate1To3_preservesSessionsAndAddsAnalyticsSchema() {
+    fun migrate1To4_preservesSessionsAndAddsAnalyticsSchema() {
         createVersionOneDatabase()
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            3,
+            4,
             true,
             TeumDatabase.MIGRATION_1_2,
-            TeumDatabase.MIGRATION_2_3
+            TeumDatabase.MIGRATION_2_3,
+            TeumDatabase.MIGRATION_3_4
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
+            assertSessionMetricColumnsDefaultToZero(database)
             assertAppOpenEventsTableAcceptsRows(database)
+        }
+    }
+
+    @Test
+    fun migrate3To4_preservesSessionsAndAddsSessionMetrics() {
+        migrationHelper.createDatabase(TEST_DATABASE, 3).use { database ->
+            insertVersionThreeSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            4,
+            true,
+            TeumDatabase.MIGRATION_3_4
+        ).use { database ->
+            assertPreservedVersionOneSession(database)
+            assertOutcomeColumnsDefaultToNull(database)
+            assertSessionMetricColumnsDefaultToZero(database)
         }
     }
 
@@ -119,6 +139,75 @@ class TeumDatabaseMigrationInstrumentedTest {
                 assertNull(cursor.getString(columnIndex))
             }
         }
+    }
+
+    private fun assertSessionMetricColumnsDefaultToZero(database: SupportSQLiteDatabase) {
+        database.query(
+            """
+            SELECT
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                overrunMillis
+            FROM session_logs
+            WHERE id = $SESSION_ID
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            repeat(cursor.columnCount) { columnIndex ->
+                assertEquals(0L, cursor.getLong(columnIndex))
+            }
+        }
+    }
+
+    private fun insertVersionThreeSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(
+                SESSION_ID,
+                PACKAGE_NAME,
+                1_000L,
+                2_000L,
+                12_000L,
+                10_000L,
+                60_000L,
+                "CLEAR_PURPOSE",
+                "ENDED",
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                1,
+                1,
+                30_000L,
+                12_500L
+            )
+        )
     }
 
     private fun assertAppOpenEventsTableAcceptsRows(database: SupportSQLiteDatabase) {
