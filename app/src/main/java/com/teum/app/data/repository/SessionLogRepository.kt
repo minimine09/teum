@@ -29,6 +29,22 @@ class SessionLogRepository(context: Context) {
     suspend fun saveEndedSession(session: AppSession): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
         val durationMillis = (endedAtMillis - session.startedAtMillis).coerceAtLeast(0L)
+        val interventionVisibleMillis = session.interventionVisibleMillis.coerceAtLeast(0L)
+        val effectiveUsageMillis = (durationMillis - interventionVisibleMillis).coerceAtLeast(0L)
+        val totalExtensionDurationMillis = session.totalExtensionDurationMillis.coerceAtLeast(0L)
+        val finalTargetDurationMillis =
+            (session.targetDurationMillis + totalExtensionDurationMillis).coerceAtLeast(0L)
+        val overrunMillis = (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
+
+        com.teum.app.debug.TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "DB_SAVE_VALUES",
+            detail = "duration=$durationMillis intervention=$interventionVisibleMillis " +
+                "effective=$effectiveUsageMillis initialTarget=${session.targetDurationMillis} " +
+                "extensionTotal=$totalExtensionDurationMillis finalTarget=$finalTargetDurationMillis " +
+                "overrunMillis=$overrunMillis extensionCount=${session.extensionCount}"
+        )
+
         val entity = SessionLogEntity(
             packageName = session.packageName,
             entryDetectedAtMillis = session.entryDetectedAtMillis,
@@ -36,9 +52,14 @@ class SessionLogRepository(context: Context) {
             endedAtMillis = endedAtMillis,
             durationMillis = durationMillis,
             targetDurationMillis = session.targetDurationMillis,
+            interventionVisibleMillis = interventionVisibleMillis,
+            effectiveUsageMillis = effectiveUsageMillis,
+            totalExtensionDurationMillis = totalExtensionDurationMillis,
+            finalTargetDurationMillis = finalTargetDurationMillis,
+            overrunMillis = overrunMillis,
             intentChoice = session.intentChoice.name,
             outcomeType = session.outcomeType?.name,
-            overrun = durationMillis > session.targetDurationMillis,
+            overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,
             isFastReopen = session.isFastReopen,
             reopenGapMillis = session.reopenGapMillis,

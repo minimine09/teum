@@ -5,6 +5,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +51,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teum.app.overlay.IntentChoice
+import com.teum.app.overlay.TargetDurationChoice
 import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
@@ -61,11 +66,18 @@ private val BlueChoice = Color(0xFFEAF4FF)
 private val OrangeChoice = Color(0xFFFFF3E4)
 private val DangerChoice = Color(0xFFFDEDEE)
 private val Success = Color(0xFF34C6A8)
+private val NeutralDot = Color(0xFF9B9B9B)
 private val Danger = Color(0xFFF05D5E)
 private val Warning = Color(0xFFFF9F43)
 
 @Composable
 fun IntentCheckScreen(
+    appName: String = "Instagram",
+    recentOpenCountText: String? = null,
+    selectedIntent: IntentChoice?,
+    selectedDuration: TargetDurationChoice?,
+    onIntentSelected: (IntentChoice) -> Unit,
+    onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -78,13 +90,17 @@ fun IntentCheckScreen(
     ) {
         CheckModal(
             symbol = "?",
-            title = "Instagram을 왜 열었나요?",
-            description = "최근 24시간 내에 Instagram을 24회 실행했어요.",
+            title = "${appName}을 왜 열었나요?",
+            description = recentOpenCountText ?: "최근 24시간 내 $appName 실행을 감지했어요.",
             options = listOf(
-                InterventionOption("명확한 목적", PurpleChoice, MaterialTheme.colorScheme.primary),
-                InterventionOption("인지된 휴식", MintChoice, Color.White),
-                InterventionOption("무의식 실행", NeutralChoice, Color.White)
+                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적", PurpleChoice, MaterialTheme.colorScheme.primary),
+                IntentOptionUi(IntentChoice.MINDFUL_REST, "인지된 휴식", MintChoice, Success),
+                IntentOptionUi(IntentChoice.UNCONSCIOUS_OPEN, "무의식 실행", NeutralChoice, NeutralDot)
             ),
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = onIntentSelected,
+            onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
             onCloseClick = onCloseClick
         )
@@ -93,6 +109,12 @@ fun IntentCheckScreen(
 
 @Composable
 fun ReopenCheckScreen(
+    appName: String = "Instagram",
+    reopenGapMillis: Long? = null,
+    selectedIntent: IntentChoice?,
+    selectedDuration: TargetDurationChoice?,
+    onIntentSelected: (IntentChoice) -> Unit,
+    onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -106,12 +128,16 @@ fun ReopenCheckScreen(
         CheckModal(
             symbol = "!",
             title = "방금 다시 열었어요",
-            description = "마지막 실행: 1분 23초 전",
+            description = reopenGapMillis?.let { "마지막 실행: ${formatDurationMillis(it)} 전" } ?: "마지막 실행: 짧은 시간 전",
             options = listOf(
-                InterventionOption("명확한 목적으로 계속", PurpleChoice, MaterialTheme.colorScheme.primary),
-                InterventionOption("인지된 휴식", MintChoice, Color.White),
-                InterventionOption("무의식 실행", NeutralChoice, Color.White)
+                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적으로 계속", PurpleChoice, MaterialTheme.colorScheme.primary),
+                IntentOptionUi(IntentChoice.MINDFUL_REST, "인지된 휴식", MintChoice, Success),
+                IntentOptionUi(IntentChoice.UNCONSCIOUS_OPEN, "무의식 실행", NeutralChoice, NeutralDot)
             ),
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = onIntentSelected,
+            onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
             onCloseClick = onCloseClick
         )
@@ -120,74 +146,133 @@ fun ReopenCheckScreen(
 
 @Composable
 fun SessionBrakeScreen(
+    appName: String = "YouTube",
+    elapsedMillis: Long? = null,
+    targetDurationMillis: Long? = null,
     onEndClick: () -> Unit,
-    onExtendClick: () -> Unit,
+    onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = BrakeBackground
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.25f)),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
+        SessionBrakeContent(
+            appName = appName,
+            elapsedMillis = elapsedMillis,
+            targetDurationMillis = targetDurationMillis,
+            onEndClick = onEndClick,
+            onExtendClick = onExtendClick,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 17.dp)
-                .padding(top = 129.dp)
-        ) {
-            SessionBrakeContent(
-                onEndClick = onEndClick,
-                onExtendClick = onExtendClick
-            )
-        }
+                .padding(horizontal = 24.dp, vertical = 36.dp)
+                .fillMaxWidth()
+                .heightIn(max = 620.dp)
+        )
     }
 }
 
 @Composable
 fun SessionBrakeContent(
+    appName: String = "YouTube",
+    elapsedMillis: Long? = null,
+    targetDurationMillis: Long? = null,
     onEndClick: () -> Unit,
-    onExtendClick: () -> Unit,
+    onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var durationMinutes by remember { mutableFloatStateOf(0.5f) }
+    var isExtensionExpanded by remember { mutableStateOf(false) }
+    var selectedExtensionDuration by remember {
+        mutableStateOf(TargetDurationChoice.THREE_MINUTES)
+    }
+    val overrunMillis = if (elapsedMillis != null && targetDurationMillis != null) {
+        (elapsedMillis - targetDurationMillis).coerceAtLeast(0L)
+    } else {
+        null
+    }
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .height(540.dp)
             .background(InterventionBackground, RoundedCornerShape(34.dp))
-            .padding(horizontal = 31.dp, vertical = 40.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 31.dp, vertical = 34.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         AlertBubble(symbol = "!", size = 90)
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "약속한 시간이 됐어요",
+            text = "예상 시간을 초과했어요",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "처음 목적은 ‘인지된 휴식’이었습니다.",
+            text = "설정한 사용 시간을 넘겼어요.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(5.dp))
         Text(
-            text = "현재 사용 시간: 4분",
+            text = buildSessionBrakeSummary(
+                appName = appName,
+                elapsedMillis = elapsedMillis,
+                targetDurationMillis = targetDurationMillis,
+                overrunMillis = overrunMillis
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 13.sp
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(34.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "지금 계속 사용할 이유가 있나요?",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "조금 더 사용할지, 여기서 멈출지 짧게 확인해요.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
         TeumFilledButton("종료하기", onEndClick, MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.height(27.dp))
-        TeumFilledButton("연장하기", onExtendClick, MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(32.dp))
-        DurationSelector(
-            durationMinutes = durationMinutes,
-            onDurationChange = { durationMinutes = it }
+        Spacer(modifier = Modifier.height(18.dp))
+        TeumFilledButton(
+            text = if (isExtensionExpanded) {
+                "선택한 시간만큼 연장하기"
+            } else {
+                "연장하기"
+            },
+            onClick = {
+                if (isExtensionExpanded) {
+                    onExtendClick(selectedExtensionDuration)
+                } else {
+                    isExtensionExpanded = true
+                }
+            },
+            color = MaterialTheme.colorScheme.primary
         )
+        if (isExtensionExpanded) {
+            Spacer(modifier = Modifier.height(24.dp))
+            DurationChoiceSlider(
+                selectedDuration = selectedExtensionDuration,
+                onDurationSelected = { selectedExtensionDuration = it }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "연장 시간을 고른 뒤 다시 연장하기를 눌러주세요.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -334,13 +419,14 @@ private fun CheckModal(
     symbol: String,
     title: String,
     description: String,
-    options: List<InterventionOption>,
+    options: List<IntentOptionUi>,
+    selectedIntent: IntentChoice?,
+    selectedDuration: TargetDurationChoice?,
+    onIntentSelected: (IntentChoice) -> Unit,
+    onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
     onCloseClick: () -> Unit
 ) {
-    var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
-    var durationMinutes by remember { mutableFloatStateOf(0.5f) }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -367,18 +453,18 @@ private fun CheckModal(
         )
         Spacer(modifier = Modifier.height(48.dp))
         Column(verticalArrangement = Arrangement.spacedBy(23.dp)) {
-            options.forEachIndexed { index, option ->
+            options.forEach { option ->
                 ChoiceRow(
                     option = option,
-                    selected = selectedOptionIndex == index,
-                    onClick = { selectedOptionIndex = index }
+                    selected = selectedIntent == option.choice,
+                    onClick = { onIntentSelected(option.choice) }
                 )
             }
         }
         Spacer(modifier = Modifier.height(35.dp))
-        DurationSelector(
-            durationMinutes = durationMinutes,
-            onDurationChange = { durationMinutes = it }
+        DurationChoiceSlider(
+            selectedDuration = selectedDuration,
+            onDurationSelected = onDurationSelected
         )
         Spacer(modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -388,10 +474,15 @@ private fun CheckModal(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
                 height = 44,
-                enabled = selectedOptionIndex != null
+                enabled = selectedIntent != null &&
+                    selectedIntent != IntentChoice.CLOSE_NOW &&
+                    selectedDuration != null
             )
             OutlinedButton(
-                onClick = onCloseClick,
+                onClick = {
+                    onIntentSelected(IntentChoice.CLOSE_NOW)
+                    onCloseClick()
+                },
                 modifier = Modifier
                     .weight(0.64f)
                     .height(44.dp),
@@ -428,7 +519,7 @@ private fun AlertBubble(symbol: String, size: Int) {
 
 @Composable
 private fun ChoiceRow(
-    option: InterventionOption,
+    option: IntentOptionUi,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -460,6 +551,57 @@ private fun ChoiceRow(
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+@Composable
+private fun DurationChoiceSlider(
+    selectedDuration: TargetDurationChoice?,
+    onDurationSelected: (TargetDurationChoice) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val durationOptions = listOf(
+        TargetDurationChoice.TEST_FIVE_SECONDS,
+        TargetDurationChoice.ONE_MINUTE,
+        TargetDurationChoice.THREE_MINUTES,
+        TargetDurationChoice.FIVE_MINUTES,
+        TargetDurationChoice.TEN_MINUTES
+    )
+    val selectedIndex = durationOptions
+        .indexOf(selectedDuration)
+        .takeIf { it >= 0 }
+        ?: 0
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "예상 사용 시간",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = formatDurationChoice(durationOptions[selectedIndex]),
+                color = Color.Black,
+                fontSize = 12.sp
+            )
+        }
+        TeumDurationSlider(
+            value = selectedIndex.toFloat(),
+            onValueChange = { rawValue ->
+                val nextIndex = rawValue.roundToInt().coerceIn(0, durationOptions.lastIndex)
+                onDurationSelected(durationOptions[nextIndex])
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(23.dp),
+            valueRange = 0f..durationOptions.lastIndex.toFloat(),
+            steps = durationOptions.size - 2
+        )
     }
 }
 
@@ -714,7 +856,8 @@ private fun OutcomeOption(
     }
 }
 
-private data class InterventionOption(
+private data class IntentOptionUi(
+    val choice: IntentChoice,
     val text: String,
     val containerColor: Color,
     val dotColor: Color
@@ -734,11 +877,56 @@ private fun formatDuration(minutesValue: Float): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
+private fun formatDurationChoice(choice: TargetDurationChoice): String {
+    val totalSeconds = (choice.durationMillis / 1_000L).toInt()
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
+}
+
+private fun formatDurationMillis(durationMillis: Long): String {
+    val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return if (minutes > 0L) {
+        "${minutes}분 ${seconds}초"
+    } else {
+        "${seconds}초"
+    }
+}
+
+private fun buildSessionBrakeSummary(
+    appName: String,
+    elapsedMillis: Long?,
+    targetDurationMillis: Long?,
+    overrunMillis: Long?
+): String {
+    if (elapsedMillis == null || targetDurationMillis == null) {
+        return "감지된 앱: $appName"
+    }
+
+    val base = "감지된 앱: $appName\n사용 시간: ${formatDurationMillis(elapsedMillis)} / 목표 시간: ${formatDurationMillis(targetDurationMillis)}"
+    return if (overrunMillis != null && overrunMillis > 0L) {
+        "$base\n초과 시간: ${formatDurationMillis(overrunMillis)}"
+    } else {
+        base
+    }
+}
+
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun IntentCheckScreenPreview() {
     TeumTheme {
-        IntentCheckScreen(onStartClick = {}, onCloseClick = {})
+        var selectedIntent by remember { mutableStateOf<IntentChoice?>(IntentChoice.CLEAR_PURPOSE) }
+        var selectedDuration by remember { mutableStateOf<TargetDurationChoice?>(TargetDurationChoice.TEST_FIVE_SECONDS) }
+        IntentCheckScreen(
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = { selectedIntent = it },
+            onDurationSelected = { selectedDuration = it },
+            onStartClick = {},
+            onCloseClick = {}
+        )
     }
 }
 
@@ -746,7 +934,34 @@ private fun IntentCheckScreenPreview() {
 @Composable
 private fun ReopenCheckScreenPreview() {
     TeumTheme {
-        ReopenCheckScreen(onStartClick = {}, onCloseClick = {})
+        var selectedIntent by remember { mutableStateOf<IntentChoice?>(IntentChoice.UNCONSCIOUS_OPEN) }
+        var selectedDuration by remember { mutableStateOf<TargetDurationChoice?>(TargetDurationChoice.ONE_MINUTE) }
+        ReopenCheckScreen(
+            reopenGapMillis = 83_000L,
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = { selectedIntent = it },
+            onDurationSelected = { selectedDuration = it },
+            onStartClick = {},
+            onCloseClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun IntentCheckMindfulRestPreview() {
+    TeumTheme {
+        var selectedIntent by remember { mutableStateOf<IntentChoice?>(IntentChoice.MINDFUL_REST) }
+        var selectedDuration by remember { mutableStateOf<TargetDurationChoice?>(TargetDurationChoice.THREE_MINUTES) }
+        IntentCheckScreen(
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = { selectedIntent = it },
+            onDurationSelected = { selectedDuration = it },
+            onStartClick = {},
+            onCloseClick = {}
+        )
     }
 }
 
@@ -754,7 +969,12 @@ private fun ReopenCheckScreenPreview() {
 @Composable
 private fun SessionBrakeScreenPreview() {
     TeumTheme {
-        SessionBrakeScreen(onEndClick = {}, onExtendClick = {})
+        SessionBrakeScreen(
+            elapsedMillis = 74_000L,
+            targetDurationMillis = 60_000L,
+            onEndClick = {},
+            onExtendClick = {}
+        )
     }
 }
 

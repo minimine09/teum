@@ -88,22 +88,24 @@ object SessionManager {
     fun endSession(packageName: String, reason: String = "unknown"): AppSession? {
         val session = state.currentSession ?: return null
         if (session.packageName != packageName) return null
+        closeCurrentInterventionIfNeeded()
 
+        val updatedSession = state.currentSession ?: return null
         val endedAtMillis = System.currentTimeMillis()
-        val durationMillis = endedAtMillis - session.startedAtMillis
-        val overrun = durationMillis > session.targetDurationMillis
+        val durationMillis = endedAtMillis - updatedSession.startedAtMillis
+        val overrun = durationMillis > updatedSession.targetDurationMillis
 
         Log.d(
             TAG,
             "session ended package=$packageName duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
         )
         TeumLogger.session(
-            debugSessionId = session.debugSessionId,
+            debugSessionId = updatedSession.debugSessionId,
             event = "END",
-            detail = "reason=$reason duration=$durationMillis overrun=$overrun outcome=${session.outcomeType}"
+            detail = "reason=$reason duration=$durationMillis overrun=$overrun outcome=${updatedSession.outcomeType}"
         )
 
-        val endedSession = session.copy(endedAtMillis = endedAtMillis)
+        val endedSession = updatedSession.copy(endedAtMillis = endedAtMillis)
         lastEndedSessionByPackage[packageName] = endedSession
         state = SessionState(currentSession = endedSession)
         state = SessionState()
@@ -128,11 +130,14 @@ object SessionManager {
         return (nowMillis - session.startedAtMillis).coerceAtLeast(0L)
     }
 
-    fun extendCurrentSession(extraMillis: Long) {
+    fun extendCurrentSession(extraMillis: Long, nowMillis: Long = System.currentTimeMillis()) {
         val session = state.currentSession ?: return
+        val elapsedMillis = getElapsedMillis(nowMillis)
+        val nextLimitDurationMillis = elapsedMillis + extraMillis
         val updatedSession = session.copy(
-            currentLimitDurationMillis = session.currentLimitDurationMillis + extraMillis,
+            currentLimitDurationMillis = nextLimitDurationMillis,
             extensionCount = session.extensionCount + 1,
+            totalExtensionDurationMillis = session.totalExtensionDurationMillis + extraMillis,
             outcomeType = OutcomeType.EXTENDED
         )
         state = SessionState(currentSession = updatedSession)
@@ -140,12 +145,14 @@ object SessionManager {
         Log.d(
             TAG,
             "session extended package=${updatedSession.packageName} extensionCount=${updatedSession.extensionCount} " +
-                "originalTarget=${updatedSession.targetDurationMillis} currentLimit=${updatedSession.currentLimitDurationMillis}"
+                "originalTarget=${updatedSession.targetDurationMillis} currentLimit=${updatedSession.currentLimitDurationMillis} " +
+                "nextBrakeDelay=$extraMillis"
         )
         TeumLogger.session(
             debugSessionId = updatedSession.debugSessionId,
             event = "EXTEND",
-            detail = "extensionCount=${updatedSession.extensionCount} newTarget=${updatedSession.targetDurationMillis}"
+            detail = "duration=$extraMillis extensionCount=${updatedSession.extensionCount} " +
+                "nextBrakeDelay=$extraMillis nextLimit=${updatedSession.currentLimitDurationMillis}"
         )
     }
 
@@ -164,12 +171,46 @@ object SessionManager {
         )
     }
 
+    fun markInterventionShown(nowMillis: Long = System.currentTimeMillis()) {
+        val session = state.currentSession ?: return
+        if (session.currentInterventionStartedAtMillis != null) return
+
+        state = SessionState(
+            currentSession = session.copy(currentInterventionStartedAtMillis = nowMillis)
+        )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "INTERVENTION_SHOWN",
+            detail = "type=SESSION_BRAKE at=$nowMillis"
+        )
+    }
+
+    fun markInterventionHidden(nowMillis: Long = System.currentTimeMillis()) {
+        closeCurrentInterventionIfNeeded(nowMillis)
+    }
+
     fun clearCurrentSession() {
         val session = state.currentSession
         if (session != null) {
             Log.d(TAG, "session cleared package=${session.packageName}")
         }
         state = SessionState()
+    }
+
+    private fun closeCurrentInterventionIfNeeded(nowMillis: Long = System.currentTimeMillis()) {
+        val session = state.currentSession ?: return
+        val startedAtMillis = session.currentInterventionStartedAtMillis ?: return
+        val visibleMillis = (nowMillis - startedAtMillis).coerceAtLeast(0L)
+        val updatedSession = session.copy(
+            interventionVisibleMillis = session.interventionVisibleMillis + visibleMillis,
+            currentInterventionStartedAtMillis = null
+        )
+        state = SessionState(currentSession = updatedSession)
+        TeumLogger.session(
+            debugSessionId = updatedSession.debugSessionId,
+            event = "INTERVENTION_ACCUMULATED",
+            detail = "type=SESSION_BRAKE visible=$visibleMillis total=${updatedSession.interventionVisibleMillis}"
+        )
     }
 
     private const val DEFAULT_REOPEN_THRESHOLD_MILLIS = 5 * 60 * 1_000L
