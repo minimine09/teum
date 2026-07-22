@@ -665,17 +665,17 @@ private fun RecentSessionItem(
     session: SessionLogEntity,
     appDisplayName: String
 ) {
-    val overrunMillis = (session.durationMillis - session.targetDurationMillis).coerceAtLeast(0L)
+    val metrics = SessionMetricsResolver.resolve(session)
     val labelColor = when {
         session.purposeDrifted == true -> DashboardDanger
         session.closedAfterIntervention == true -> MaterialTheme.colorScheme.primary
-        session.overrun -> DashboardWarning
+        metrics.isOverrun -> DashboardWarning
         else -> DashboardSuccess
     }
     val pillText = when {
         session.purposeDrifted == true -> "목적 이탈"
         session.closedAfterIntervention == true -> "성공"
-        session.overrun -> "초과"
+        metrics.isOverrun -> "초과"
         else -> "필요 사용"
     }
 
@@ -702,7 +702,7 @@ private fun RecentSessionItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${SessionDisplayText.intent(session.intentChoice)} → ${formatDuration(session.durationMillis)} 사용",
+                    text = "${SessionDisplayText.intent(session.intentChoice)} → ${formatDuration(metrics.usageMillis)} 사용",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -714,7 +714,7 @@ private fun RecentSessionItem(
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             DetailLine(
-                text = "${formatDuration(session.durationMillis)} 사용 · 목표 ${formatDuration(session.targetDurationMillis)}",
+                text = "${formatDuration(metrics.usageMillis)} 사용 · 목표 ${formatDuration(metrics.targetMillis)}",
                 fontSize = 11
             )
             DetailLine(
@@ -726,16 +726,18 @@ private fun RecentSessionItem(
                 fontSize = 11
             )
             DetailLine(
-                text = if (session.overrun) {
-                    "목표 시간을 ${formatDuration(overrunMillis)} 초과했어요"
-                } else {
-                    "목표 시간 안에 종료했어요"
-                },
+                text = SessionDisplayText.overrun(metrics.overrunMillis),
                 fontSize = 11
             )
-            if (session.extensionCount > 0) {
+            if (metrics.extensionCount > 0) {
                 DetailLine(
-                    text = "사용 시간을 ${session.extensionCount}회 연장했어요",
+                    text = "사용 시간을 ${metrics.extensionCount}회 연장했어요",
+                    fontSize = 11
+                )
+            }
+            if (metrics.interventionVisibleMillis > 0L) {
+                DetailLine(
+                    text = "상세: 전체 체류 ${formatDuration(metrics.totalDurationMillis)} · 개입 화면 ${formatDuration(metrics.interventionVisibleMillis)}",
                     fontSize = 11
                 )
             }
