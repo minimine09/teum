@@ -30,39 +30,59 @@ class TeumDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migrate1To4_preservesSessionsAndAddsAnalyticsSchema() {
+    fun migrate1To5_preservesSessionsAndAddsAnalyticsSchema() {
         createVersionOneDatabase()
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            4,
+            5,
             true,
             TeumDatabase.MIGRATION_1_2,
             TeumDatabase.MIGRATION_2_3,
-            TeumDatabase.MIGRATION_3_4
+            TeumDatabase.MIGRATION_3_4,
+            TeumDatabase.MIGRATION_4_5
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
+            assertNecessaryUseColumns(database)
             assertAppOpenEventsTableAcceptsRows(database)
         }
     }
 
     @Test
-    fun migrate3To4_preservesSessionsAndAddsSessionMetrics() {
+    fun migrate3To5_preservesSessionsAndAddsSessionMetrics() {
         migrationHelper.createDatabase(TEST_DATABASE, 3).use { database ->
             insertVersionThreeSession(database)
         }
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            4,
+            5,
             true,
-            TeumDatabase.MIGRATION_3_4
+            TeumDatabase.MIGRATION_3_4,
+            TeumDatabase.MIGRATION_4_5
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
+            assertNecessaryUseColumns(database)
+        }
+    }
+
+    @Test
+    fun migrate4To5_preservesExistingOverrunAsRawOverrun() {
+        migrationHelper.createDatabase(TEST_DATABASE, 4).use { database ->
+            insertVersionFourSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            5,
+            true,
+            TeumDatabase.MIGRATION_4_5
+        ).use { database ->
+            assertNecessaryUseColumns(database, expectedRawOverrunMillis = 5_000L)
         }
     }
 
@@ -161,6 +181,33 @@ class TeumDatabaseMigrationInstrumentedTest {
         }
     }
 
+    private fun assertNecessaryUseColumns(
+        database: SupportSQLiteDatabase,
+        expectedRawOverrunMillis: Long = 0L
+    ) {
+        database.query(
+            """
+            SELECT
+                rawOverrunMillis,
+                necessaryUseExcessMillis,
+                brakeChoice
+            FROM session_logs
+            WHERE id = $SESSION_ID
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                expectedRawOverrunMillis,
+                cursor.getLong(cursor.getColumnIndexOrThrow("rawOverrunMillis"))
+            )
+            assertEquals(
+                0L,
+                cursor.getLong(cursor.getColumnIndexOrThrow("necessaryUseExcessMillis"))
+            )
+            assertNull(cursor.getString(cursor.getColumnIndexOrThrow("brakeChoice")))
+        }
+    }
+
     private fun insertVersionThreeSession(database: SupportSQLiteDatabase) {
         database.execSQL(
             """
@@ -205,6 +252,65 @@ class TeumDatabaseMigrationInstrumentedTest {
                 1,
                 1,
                 30_000L,
+                12_500L
+            )
+        )
+    }
+
+    private fun insertVersionFourSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                overrunMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(
+                SESSION_ID,
+                PACKAGE_NAME,
+                1_000L,
+                2_000L,
+                12_000L,
+                10_000L,
+                5_000L,
+                0L,
+                10_000L,
+                0L,
+                5_000L,
+                5_000L,
+                "CLEAR_PURPOSE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1,
+                0,
+                0,
+                null,
                 12_500L
             )
         )

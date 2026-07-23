@@ -5,6 +5,8 @@ import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
+import com.teum.app.overlay.BrakeChoice
+import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
@@ -26,7 +28,10 @@ class SessionLogRepository(context: Context) {
         )
     }
 
-    suspend fun saveEndedSession(session: AppSession): Long? {
+    suspend fun saveEndedSession(
+        session: AppSession,
+        brakeChoice: BrakeChoice? = null
+    ): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
         val durationMillis = (endedAtMillis - session.startedAtMillis).coerceAtLeast(0L)
         val interventionVisibleMillis = session.interventionVisibleMillis.coerceAtLeast(0L)
@@ -34,7 +39,14 @@ class SessionLogRepository(context: Context) {
         val totalExtensionDurationMillis = session.totalExtensionDurationMillis.coerceAtLeast(0L)
         val finalTargetDurationMillis =
             (session.targetDurationMillis + totalExtensionDurationMillis).coerceAtLeast(0L)
-        val overrunMillis = (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
+        val rawOverrunMillis =
+            (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
+        val isNecessaryUseException =
+            session.intentChoice == IntentChoice.CLEAR_PURPOSE &&
+                brakeChoice == BrakeChoice.NECESSARY_USE
+        val overrunMillis = if (isNecessaryUseException) 0L else rawOverrunMillis
+        val necessaryUseExcessMillis =
+            if (isNecessaryUseException) rawOverrunMillis else 0L
 
         com.teum.app.debug.TeumLogger.session(
             debugSessionId = session.debugSessionId,
@@ -42,7 +54,9 @@ class SessionLogRepository(context: Context) {
             detail = "duration=$durationMillis intervention=$interventionVisibleMillis " +
                 "effective=$effectiveUsageMillis initialTarget=${session.targetDurationMillis} " +
                 "extensionTotal=$totalExtensionDurationMillis finalTarget=$finalTargetDurationMillis " +
-                "overrunMillis=$overrunMillis extensionCount=${session.extensionCount}"
+                "rawOverrunMillis=$rawOverrunMillis overrunMillis=$overrunMillis " +
+                "necessaryUseExcessMillis=$necessaryUseExcessMillis " +
+                "brakeChoice=${brakeChoice?.name} extensionCount=${session.extensionCount}"
         )
 
         val entity = SessionLogEntity(
@@ -56,8 +70,11 @@ class SessionLogRepository(context: Context) {
             effectiveUsageMillis = effectiveUsageMillis,
             totalExtensionDurationMillis = totalExtensionDurationMillis,
             finalTargetDurationMillis = finalTargetDurationMillis,
+            rawOverrunMillis = rawOverrunMillis,
             overrunMillis = overrunMillis,
+            necessaryUseExcessMillis = necessaryUseExcessMillis,
             intentChoice = session.intentChoice.name,
+            brakeChoice = brakeChoice?.name,
             outcomeType = session.outcomeType?.name,
             overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,

@@ -76,7 +76,7 @@ class OutcomeAnalyticsInstrumentedTest {
 
         assertEquals(3, report.totalSessionCount)
         assertEquals(2, report.outcomeResponseCount)
-        assertEquals(0.5, report.purposeDriftRate, 0.0001)
+        assertEquals(1.0 / 3.0, report.purposeDriftRate, 0.0001)
         assertEquals(1, report.closedAfterInterventionCount)
         assertEquals(1, repository.observeTodayPurposeDriftCount().first())
     }

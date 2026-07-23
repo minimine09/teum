@@ -17,6 +17,9 @@ object WeeklyReportAnalyzer {
             session.outcomeRespondedAtMillis != null
         }
         val purposeDriftCount = clearPurposeSessions.count { it.purposeDrifted == true }
+        val necessaryUseSessions = clearPurposeSessions.filter { session ->
+            session.brakeChoice == NECESSARY_USE
+        }
         val reopenGaps = sessions.mapNotNull { it.reopenGapMillis }
         val mostVulnerableHourSlot = timeSlotStats
             .filter { it.sessionCount > 0 }
@@ -34,6 +37,10 @@ object WeeklyReportAnalyzer {
             fastReopenCount = sessions.count { it.isFastReopen },
             outcomeResponseCount = purposeOutcomeSessions.size,
             purposeDriftRate = rate(purposeDriftCount, clearPurposeSessions.size),
+            necessaryUseCount = necessaryUseSessions.size,
+            necessaryUseExcessMillis = necessaryUseSessions.sumOf {
+                it.necessaryUseExcessMillis
+            },
             closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
             averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
             mostVulnerableHourSlot = mostVulnerableHourSlot,
@@ -66,6 +73,7 @@ object WeeklyReportAnalyzer {
     }
 
     private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
+    private const val NECESSARY_USE = "NECESSARY_USE"
     private val DAYS = listOf(
         Calendar.MONDAY to "월",
         Calendar.TUESDAY to "화",
