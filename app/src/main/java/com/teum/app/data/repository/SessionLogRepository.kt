@@ -45,12 +45,12 @@ class SessionLogRepository(context: Context) {
             (session.targetDurationMillis + totalExtensionDurationMillis).coerceAtLeast(0L)
         val rawOverrunMillis =
             (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
-        val isNecessaryUseException =
+        val isNecessaryUse =
             session.intentChoice == IntentChoice.CLEAR_PURPOSE &&
                 session.outcomeType == OutcomeType.NECESSARY_USE
-        val overrunMillis = if (isNecessaryUseException) 0L else rawOverrunMillis
+        val overrunMillis = rawOverrunMillis
         val necessaryUseExcessMillis =
-            if (isNecessaryUseException) rawOverrunMillis else 0L
+            if (isNecessaryUse) rawOverrunMillis else 0L
 
         com.teum.app.debug.TeumLogger.session(
             debugSessionId = session.debugSessionId,
@@ -80,9 +80,18 @@ class SessionLogRepository(context: Context) {
             intentChoice = session.intentChoice.name,
             outcomeType = session.outcomeType?.name,
             outcomeRespondedAtMillis = session.outcomeType?.let { savedAtMillis },
+            outcomeAchieved = when (session.outcomeType) {
+                OutcomeType.PURPOSE_ACHIEVED -> true
+                OutcomeType.NECESSARY_USE,
+                OutcomeType.PURPOSE_DRIFT,
+                OutcomeType.CONTINUED_SCROLLING -> false
+                else -> null
+            },
             purposeDrifted = when (session.outcomeType) {
-                OutcomeType.PURPOSE_DRIFT -> true
+                OutcomeType.PURPOSE_ACHIEVED,
                 OutcomeType.NECESSARY_USE -> false
+                OutcomeType.PURPOSE_DRIFT,
+                OutcomeType.CONTINUED_SCROLLING -> true
                 else -> null
             },
             overrun = overrunMillis > 0L,
@@ -185,14 +194,15 @@ class SessionLogRepository(context: Context) {
 
     suspend fun updateSessionOutcome(
         sessionId: Long,
-        outcomeType: String,
-        achieved: Boolean,
-        drifted: Boolean,
+        outcomeType: OutcomeType,
         respondedAtMillis: Long = System.currentTimeMillis()
     ): Boolean {
+        val achieved = outcomeType == OutcomeType.PURPOSE_ACHIEVED
+        val drifted = outcomeType == OutcomeType.PURPOSE_DRIFT ||
+            outcomeType == OutcomeType.CONTINUED_SCROLLING
         return sessionLogDao.updateOutcome(
             sessionId = sessionId,
-            outcomeType = outcomeType,
+            outcomeType = outcomeType.name,
             respondedAtMillis = respondedAtMillis,
             achieved = achieved,
             drifted = drifted

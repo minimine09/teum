@@ -9,7 +9,6 @@ import com.teum.app.session.OutcomeType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,7 +16,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NecessaryUseAnalyticsInstrumentedTest {
     @Test
-    fun onlyClearPurposeNecessaryUse_isExcludedFromOverrunStats() = runBlocking {
+    fun necessaryUse_preservesTimeOverrunAndTracksSeparateExcess() = runBlocking {
         val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
         repository.deleteAllSessionLogs()
 
@@ -51,10 +50,11 @@ class NecessaryUseAnalyticsInstrumentedTest {
 
         assertEquals(5_000L, clearNecessary.rawOverrunMillis)
         assertEquals(5_000L, clearNecessary.necessaryUseExcessMillis)
-        assertEquals(0L, clearNecessary.overrunMillis)
-        assertFalse(clearNecessary.overrun)
+        assertEquals(5_000L, clearNecessary.overrunMillis)
+        assertTrue(clearNecessary.overrun)
         assertEquals(OutcomeType.NECESSARY_USE.name, clearNecessary.outcomeType)
         assertTrue(clearNecessary.outcomeRespondedAtMillis != null)
+        assertEquals(false, clearNecessary.outcomeAchieved)
         assertEquals(false, clearNecessary.purposeDrifted)
 
         assertEquals(5_000L, restNecessary.rawOverrunMillis)
@@ -75,14 +75,14 @@ class NecessaryUseAnalyticsInstrumentedTest {
             reopenLogs = emptyList()
         )
         assertEquals(3, report.totalSessionCount)
-        assertEquals(2, report.overrunCount)
-        assertEquals(2.0 / 3.0, report.overrunRate, 0.0001)
+        assertEquals(3, report.overrunCount)
+        assertEquals(1.0, report.overrunRate, 0.0001)
         assertEquals(1, report.necessaryUseCount)
         assertEquals(5_000L, report.necessaryUseExcessMillis)
     }
 
     @Test
-    fun updatingOutcomeToNecessaryUse_reclassifiesStoredOverrun() = runBlocking {
+    fun updatingOutcomeToNecessaryUse_preservesStoredOverrun() = runBlocking {
         val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
         repository.deleteAllSessionLogs()
 
@@ -98,9 +98,7 @@ class NecessaryUseAnalyticsInstrumentedTest {
         assertTrue(
             repository.updateSessionOutcome(
                 sessionId = sessionId,
-                outcomeType = OutcomeType.NECESSARY_USE.name,
-                achieved = false,
-                drifted = false,
+                outcomeType = OutcomeType.NECESSARY_USE,
                 respondedAtMillis = now + 1_000L
             )
         )
@@ -108,8 +106,10 @@ class NecessaryUseAnalyticsInstrumentedTest {
         val session = repository.observeSessionsForLastSevenDays().first().single()
         assertEquals(5_000L, session.rawOverrunMillis)
         assertEquals(5_000L, session.necessaryUseExcessMillis)
-        assertEquals(0L, session.overrunMillis)
-        assertFalse(session.overrun)
+        assertEquals(5_000L, session.overrunMillis)
+        assertTrue(session.overrun)
+        assertEquals(false, session.outcomeAchieved)
+        assertEquals(false, session.purposeDrifted)
     }
 
     private fun overrunSession(

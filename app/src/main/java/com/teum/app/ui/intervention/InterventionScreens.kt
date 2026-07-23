@@ -873,7 +873,7 @@ fun OutcomeCheckScreen(
                 containerColor = MintChoice,
                 dotColor = Success
             ),
-            outcomeType = OutcomeType.NECESSARY_USE
+            outcomeType = OutcomeType.PURPOSE_ACHIEVED
         ),
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
@@ -900,7 +900,7 @@ fun OutcomeCheckScreen(
                 containerColor = OrangeChoice,
                 dotColor = Warning
             ),
-            outcomeType = OutcomeType.ENDED
+            outcomeType = OutcomeType.CONTINUED_SCROLLING
         )
     )
 

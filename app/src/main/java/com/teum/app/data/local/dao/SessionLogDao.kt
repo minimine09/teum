@@ -59,14 +59,8 @@ interface SessionLogDao {
                     THEN rawOverrunMillis
                 ELSE 0
             END,
-            overrunMillis = CASE
-                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
-                    THEN 0
-                ELSE rawOverrunMillis
-            END,
+            overrunMillis = rawOverrunMillis,
             overrun = CASE
-                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
-                    THEN 0
                 WHEN rawOverrunMillis > 0 THEN 1
                 ELSE 0
             END
