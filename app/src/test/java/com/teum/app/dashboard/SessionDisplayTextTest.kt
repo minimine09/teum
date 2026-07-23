@@ -15,10 +15,16 @@ class SessionDisplayTextTest {
 
     @Test
     fun outcomePrefersOutcomeCheckAnswersAndHandlesMissingValue() {
+        assertEquals("목표를 달성했어요", SessionDisplayText.outcome("PURPOSE_ACHIEVED", null, null))
+        assertEquals("필요한 사용으로 확인했어요", SessionDisplayText.outcome("NECESSARY_USE", null, null))
+        assertEquals("목적에서 벗어났어요", SessionDisplayText.outcome("PURPOSE_DRIFT", null, null))
+        assertEquals(
+            "무의식적으로 계속 사용했어요",
+            SessionDisplayText.outcome("CONTINUED_SCROLLING", null, null)
+        )
+        assertEquals("사용 시간을 연장했어요", SessionDisplayText.outcome("EXTENDED", null, null))
         assertEquals("목표를 달성했어요", SessionDisplayText.outcome(null, true, false))
         assertEquals("목적에서 벗어났어요", SessionDisplayText.outcome("ENDED", false, true))
-        assertEquals("사용 시간을 연장했어요", SessionDisplayText.outcome("EXTENDED", null, null))
-        assertEquals("필요한 사용으로 확인했어요", SessionDisplayText.outcome("NECESSARY_USE", null, null))
         assertEquals("사용 결과를 아직 확인하지 않았어요", SessionDisplayText.outcome(null, null, null))
     }
 

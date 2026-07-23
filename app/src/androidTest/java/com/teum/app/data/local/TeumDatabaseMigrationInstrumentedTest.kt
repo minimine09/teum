@@ -30,39 +30,82 @@ class TeumDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migrate1To4_preservesSessionsAndAddsAnalyticsSchema() {
+    fun migrate1To6_preservesSessionsAndAddsAnalyticsSchema() {
         createVersionOneDatabase()
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            4,
+            6,
             true,
             TeumDatabase.MIGRATION_1_2,
             TeumDatabase.MIGRATION_2_3,
-            TeumDatabase.MIGRATION_3_4
+            TeumDatabase.MIGRATION_3_4,
+            TeumDatabase.MIGRATION_4_5,
+            TeumDatabase.MIGRATION_5_6
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
+            assertNecessaryUseColumns(database)
             assertAppOpenEventsTableAcceptsRows(database)
+            assertReopenLogsTableAcceptsRows(database)
         }
     }
 
     @Test
-    fun migrate3To4_preservesSessionsAndAddsSessionMetrics() {
+    fun migrate3To6_preservesSessionsAndAddsSessionMetrics() {
         migrationHelper.createDatabase(TEST_DATABASE, 3).use { database ->
             insertVersionThreeSession(database)
         }
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            4,
+            6,
             true,
-            TeumDatabase.MIGRATION_3_4
+            TeumDatabase.MIGRATION_3_4,
+            TeumDatabase.MIGRATION_4_5,
+            TeumDatabase.MIGRATION_5_6
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
+            assertNecessaryUseColumns(database)
+            assertReopenLogsTableAcceptsRows(database)
+        }
+    }
+
+    @Test
+    fun migrate4To6_preservesExistingOverrunAsRawOverrun() {
+        migrationHelper.createDatabase(TEST_DATABASE, 4).use { database ->
+            insertVersionFourSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            6,
+            true,
+            TeumDatabase.MIGRATION_4_5,
+            TeumDatabase.MIGRATION_5_6
+        ).use { database ->
+            assertNecessaryUseColumns(database, expectedRawOverrunMillis = 5_000L)
+            assertReopenLogsTableAcceptsRows(database)
+        }
+    }
+
+    @Test
+    fun migrate5To6_addsReopenLogRelationships() {
+        migrationHelper.createDatabase(TEST_DATABASE, 5).use { database ->
+            insertVersionFiveSession(database)
+            insertVersionFiveReopenedSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            6,
+            true,
+            TeumDatabase.MIGRATION_5_6
+        ).use { database ->
+            assertVersionFiveReopenWasMigrated(database)
         }
     }
 
@@ -161,6 +204,31 @@ class TeumDatabaseMigrationInstrumentedTest {
         }
     }
 
+    private fun assertNecessaryUseColumns(
+        database: SupportSQLiteDatabase,
+        expectedRawOverrunMillis: Long = 0L
+    ) {
+        database.query(
+            """
+            SELECT
+                rawOverrunMillis,
+                necessaryUseExcessMillis
+            FROM session_logs
+            WHERE id = $SESSION_ID
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(
+                expectedRawOverrunMillis,
+                cursor.getLong(cursor.getColumnIndexOrThrow("rawOverrunMillis"))
+            )
+            assertEquals(
+                0L,
+                cursor.getLong(cursor.getColumnIndexOrThrow("necessaryUseExcessMillis"))
+            )
+        }
+    }
+
     private fun insertVersionThreeSession(database: SupportSQLiteDatabase) {
         database.execSQL(
             """
@@ -210,6 +278,202 @@ class TeumDatabaseMigrationInstrumentedTest {
         )
     }
 
+    private fun insertVersionFourSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                overrunMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(
+                SESSION_ID,
+                PACKAGE_NAME,
+                1_000L,
+                2_000L,
+                12_000L,
+                10_000L,
+                5_000L,
+                0L,
+                10_000L,
+                0L,
+                5_000L,
+                5_000L,
+                "CLEAR_PURPOSE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1,
+                0,
+                0,
+                null,
+                12_500L
+            )
+        )
+    }
+
+    private fun insertVersionFiveSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                rawOverrunMillis,
+                overrunMillis,
+                necessaryUseExcessMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(
+                SESSION_ID,
+                PACKAGE_NAME,
+                1_000L,
+                2_000L,
+                12_000L,
+                10_000L,
+                5_000L,
+                0L,
+                10_000L,
+                0L,
+                5_000L,
+                5_000L,
+                5_000L,
+                0L,
+                "CLEAR_PURPOSE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1,
+                0,
+                0,
+                null,
+                12_500L
+            )
+        )
+    }
+
+    private fun insertVersionFiveReopenedSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                rawOverrunMillis,
+                overrunMillis,
+                necessaryUseExcessMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            )
+            SELECT
+                ?,
+                packageName,
+                ?,
+                ?,
+                ?,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                rawOverrunMillis,
+                overrunMillis,
+                necessaryUseExcessMillis,
+                intentChoice,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                ?,
+                ?,
+                ?
+            FROM session_logs
+            WHERE id = ?
+            """.trimIndent(),
+            arrayOf(
+                CURRENT_SESSION_ID,
+                42_000L,
+                42_000L,
+                52_000L,
+                1,
+                30_000L,
+                52_500L,
+                SESSION_ID
+            )
+        )
+    }
+
     private fun assertAppOpenEventsTableAcceptsRows(database: SupportSQLiteDatabase) {
         database.execSQL(
             "INSERT INTO app_open_events (packageName, detectedAtMillis) VALUES (?, ?)",
@@ -223,9 +487,53 @@ class TeumDatabaseMigrationInstrumentedTest {
         }
     }
 
+    private fun assertReopenLogsTableAcceptsRows(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO reopen_logs (
+                previousSessionId,
+                currentSessionId,
+                gapTimeMillis,
+                isFastReopen
+            ) VALUES (?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(SESSION_ID, SESSION_ID, 30_000L, 1)
+        )
+
+        database.query(
+            """
+            SELECT previousSessionId, currentSessionId, gapTimeMillis, isFastReopen
+            FROM reopen_logs
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(SESSION_ID, cursor.getLong(0))
+            assertEquals(SESSION_ID, cursor.getLong(1))
+            assertEquals(30_000L, cursor.getLong(2))
+            assertEquals(1, cursor.getInt(3))
+        }
+    }
+
+    private fun assertVersionFiveReopenWasMigrated(database: SupportSQLiteDatabase) {
+        database.query(
+            """
+            SELECT previousSessionId, currentSessionId, gapTimeMillis, isFastReopen
+            FROM reopen_logs
+            WHERE currentSessionId = $CURRENT_SESSION_ID
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(SESSION_ID, cursor.getLong(0))
+            assertEquals(CURRENT_SESSION_ID, cursor.getLong(1))
+            assertEquals(30_000L, cursor.getLong(2))
+            assertEquals(1, cursor.getInt(3))
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE = "teum-migration-test.db"
         const val SESSION_ID = 7L
+        const val CURRENT_SESSION_ID = 8L
         const val PACKAGE_NAME = "com.google.android.youtube"
 
         val CREATE_VERSION_ONE_SESSION_LOGS =

@@ -29,6 +29,21 @@ interface SessionLogDao {
     @Query("SELECT * FROM session_logs WHERE startedAtMillis >= :sinceMillis ORDER BY startedAtMillis DESC")
     fun observeSessionsSince(sinceMillis: Long): Flow<List<SessionLogEntity>>
 
+    @Query(
+        """
+        SELECT *
+        FROM session_logs
+        WHERE packageName = :packageName
+            AND endedAtMillis <= :beforeMillis
+        ORDER BY endedAtMillis DESC
+        LIMIT 1
+        """
+    )
+    suspend fun findLatestEndedSession(
+        packageName: String,
+        beforeMillis: Long
+    ): SessionLogEntity?
+
     @Query("DELETE FROM session_logs")
     suspend fun deleteAllSessionLogs()
 
@@ -38,7 +53,17 @@ interface SessionLogDao {
         SET outcomeType = :outcomeType,
             outcomeRespondedAtMillis = :respondedAtMillis,
             outcomeAchieved = :achieved,
-            purposeDrifted = :drifted
+            purposeDrifted = :drifted,
+            necessaryUseExcessMillis = CASE
+                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
+                    THEN rawOverrunMillis
+                ELSE 0
+            END,
+            overrunMillis = rawOverrunMillis,
+            overrun = CASE
+                WHEN rawOverrunMillis > 0 THEN 1
+                ELSE 0
+            END
         WHERE id = :sessionId
         """
     )

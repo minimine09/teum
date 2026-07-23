@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
+import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
+import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
+import com.teum.app.session.OutcomeType
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
@@ -13,6 +16,7 @@ class SessionLogRepository(context: Context) {
     private val database = TeumDatabase.getInstance(context)
     private val sessionLogDao = database.sessionLogDao()
     private val appOpenEventDao = database.appOpenEventDao()
+    private val reopenLogDao = database.reopenLogDao()
 
     suspend fun saveAppOpenEvent(
         packageName: String,
@@ -28,13 +32,25 @@ class SessionLogRepository(context: Context) {
 
     suspend fun saveEndedSession(session: AppSession): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
+        val savedAtMillis = System.currentTimeMillis()
+        val reopenCheck = checkReopen(
+            packageName = session.packageName,
+            currentEntryTimeMillis = session.entryDetectedAtMillis
+        )
         val durationMillis = (endedAtMillis - session.startedAtMillis).coerceAtLeast(0L)
         val interventionVisibleMillis = session.interventionVisibleMillis.coerceAtLeast(0L)
         val effectiveUsageMillis = (durationMillis - interventionVisibleMillis).coerceAtLeast(0L)
         val totalExtensionDurationMillis = session.totalExtensionDurationMillis.coerceAtLeast(0L)
         val finalTargetDurationMillis =
             (session.targetDurationMillis + totalExtensionDurationMillis).coerceAtLeast(0L)
-        val overrunMillis = (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
+        val rawOverrunMillis =
+            (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
+        val isNecessaryUse =
+            session.intentChoice == IntentChoice.CLEAR_PURPOSE &&
+                session.outcomeType == OutcomeType.NECESSARY_USE
+        val overrunMillis = rawOverrunMillis
+        val necessaryUseExcessMillis =
+            if (isNecessaryUse) rawOverrunMillis else 0L
 
         com.teum.app.debug.TeumLogger.session(
             debugSessionId = session.debugSessionId,
@@ -42,7 +58,9 @@ class SessionLogRepository(context: Context) {
             detail = "duration=$durationMillis intervention=$interventionVisibleMillis " +
                 "effective=$effectiveUsageMillis initialTarget=${session.targetDurationMillis} " +
                 "extensionTotal=$totalExtensionDurationMillis finalTarget=$finalTargetDurationMillis " +
-                "overrunMillis=$overrunMillis extensionCount=${session.extensionCount}"
+                "rawOverrunMillis=$rawOverrunMillis overrunMillis=$overrunMillis " +
+                "necessaryUseExcessMillis=$necessaryUseExcessMillis " +
+                "outcomeType=${session.outcomeType?.name} extensionCount=${session.extensionCount}"
         )
 
         val entity = SessionLogEntity(
@@ -56,16 +74,72 @@ class SessionLogRepository(context: Context) {
             effectiveUsageMillis = effectiveUsageMillis,
             totalExtensionDurationMillis = totalExtensionDurationMillis,
             finalTargetDurationMillis = finalTargetDurationMillis,
+            rawOverrunMillis = rawOverrunMillis,
             overrunMillis = overrunMillis,
+            necessaryUseExcessMillis = necessaryUseExcessMillis,
             intentChoice = session.intentChoice.name,
             outcomeType = session.outcomeType?.name,
+            outcomeRespondedAtMillis = session.outcomeType?.let { savedAtMillis },
+            outcomeAchieved = when (session.outcomeType) {
+                OutcomeType.PURPOSE_ACHIEVED -> true
+                OutcomeType.NECESSARY_USE,
+                OutcomeType.PURPOSE_DRIFT,
+                OutcomeType.CONTINUED_SCROLLING -> false
+                else -> null
+            },
+            purposeDrifted = when (session.outcomeType) {
+                OutcomeType.PURPOSE_ACHIEVED,
+                OutcomeType.NECESSARY_USE -> false
+                OutcomeType.PURPOSE_DRIFT,
+                OutcomeType.CONTINUED_SCROLLING -> true
+                else -> null
+            },
             overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,
-            isFastReopen = session.isFastReopen,
-            reopenGapMillis = session.reopenGapMillis,
-            createdAtMillis = System.currentTimeMillis()
+            isFastReopen = reopenCheck.isFastReopen,
+            reopenGapMillis = reopenCheck.gapTimeMillis,
+            createdAtMillis = savedAtMillis
         )
-        return sessionLogDao.insertSessionLog(entity)
+        return database.withTransaction {
+            val currentSessionId = sessionLogDao.insertSessionLog(entity)
+            val previousSessionId = reopenCheck.previousSessionId
+            val gapTimeMillis = reopenCheck.gapTimeMillis
+            if (previousSessionId != null && gapTimeMillis != null) {
+                reopenLogDao.insertReopenLog(
+                    ReopenLogEntity(
+                        previousSessionId = previousSessionId,
+                        currentSessionId = currentSessionId,
+                        gapTimeMillis = gapTimeMillis,
+                        isFastReopen = reopenCheck.isFastReopen
+                    )
+                )
+            }
+            currentSessionId
+        }
+    }
+
+    suspend fun checkReopen(
+        packageName: String,
+        currentEntryTimeMillis: Long,
+        thresholdMillis: Long = DEFAULT_REOPEN_THRESHOLD_MILLIS
+    ): ReopenCheckResult {
+        val previousSession = sessionLogDao.findLatestEndedSession(
+            packageName = packageName,
+            beforeMillis = currentEntryTimeMillis
+        ) ?: return ReopenCheckResult(
+            previousSessionId = null,
+            previousEndTimeMillis = null,
+            gapTimeMillis = null,
+            isFastReopen = false
+        )
+        val gapTimeMillis =
+            (currentEntryTimeMillis - previousSession.endedAtMillis).coerceAtLeast(0L)
+        return ReopenCheckResult(
+            previousSessionId = previousSession.id,
+            previousEndTimeMillis = previousSession.endedAtMillis,
+            gapTimeMillis = gapTimeMillis,
+            isFastReopen = gapTimeMillis <= thresholdMillis
+        )
     }
 
     fun observeRecentSessions(limit: Int = 10): Flow<List<SessionLogEntity>> {
@@ -104,6 +178,13 @@ class SessionLogRepository(context: Context) {
         return appOpenEventDao.observeOpenEventsSince(sinceMillis)
     }
 
+    fun observeReopenLogsSince(
+        sinceMillis: Long,
+        packageName: String? = null
+    ): Flow<List<ReopenLogEntity>> {
+        return reopenLogDao.observeReopenLogsSince(sinceMillis, packageName)
+    }
+
     suspend fun deleteAllSessionLogs() {
         database.withTransaction {
             sessionLogDao.deleteAllSessionLogs()
@@ -113,14 +194,15 @@ class SessionLogRepository(context: Context) {
 
     suspend fun updateSessionOutcome(
         sessionId: Long,
-        outcomeType: String,
-        achieved: Boolean,
-        drifted: Boolean,
+        outcomeType: OutcomeType,
         respondedAtMillis: Long = System.currentTimeMillis()
     ): Boolean {
+        val achieved = outcomeType == OutcomeType.PURPOSE_ACHIEVED
+        val drifted = outcomeType == OutcomeType.PURPOSE_DRIFT ||
+            outcomeType == OutcomeType.CONTINUED_SCROLLING
         return sessionLogDao.updateOutcome(
             sessionId = sessionId,
-            outcomeType = outcomeType,
+            outcomeType = outcomeType.name,
             respondedAtMillis = respondedAtMillis,
             achieved = achieved,
             drifted = drifted
@@ -138,6 +220,8 @@ class SessionLogRepository(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_REOPEN_THRESHOLD_MILLIS = 5L * 60L * 1_000L
+
         fun startOfTodayMillis(): Long {
             return Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, 0)

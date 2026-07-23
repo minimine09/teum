@@ -634,7 +634,7 @@ class OverlayController(context: Context) {
         card.addView(sectionLabel(text = "\uACB0\uACFC \uC120\uD0DD", topMargin = 18))
 
         card.addView(outcomeButton("\uBAA9\uC801 \uB2EC\uC131") {
-            onOutcomeSelected(OutcomeType.NECESSARY_USE)
+            onOutcomeSelected(OutcomeType.PURPOSE_ACHIEVED)
         })
         card.addView(outcomeButton("\uD544\uC694\uD55C \uC0AC\uC6A9\uC774\uC5C8\uC74C") {
             onOutcomeSelected(OutcomeType.NECESSARY_USE)
@@ -642,8 +642,8 @@ class OverlayController(context: Context) {
         card.addView(outcomeButton("\uBAA9\uC801\uC5D0\uC11C \uBC97\uC5B4\uB0AC\uB2E4") {
             onOutcomeSelected(OutcomeType.PURPOSE_DRIFT)
         })
-        card.addView(outcomeButton("\uADF8\uB0E5 \uC885\uB8CC") {
-            onOutcomeSelected(OutcomeType.ENDED)
+        card.addView(outcomeButton("\uBB34\uC758\uC2DD\uC801\uC73C\uB85C \uACC4\uC18D \uC0AC\uC6A9") {
+            onOutcomeSelected(OutcomeType.CONTINUED_SCROLLING)
         })
 
         val dismissButton = choiceButton(text = "\uB2EB\uAE30").apply {

@@ -1,6 +1,7 @@
 ﻿package com.teum.app.dashboard
 
 import com.teum.app.data.local.entity.SessionLogEntity
+import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -17,7 +18,7 @@ class WeeklyReportAnalyzerTest {
         val report = report(listOf(
             session(Calendar.MONDAY, 9, overrun=true, extensions=2, gap=20_000),
             session(Calendar.MONDAY, 9, gap=40_000),
-            session(Calendar.SATURDAY, 21, overrun=true, fast=true)
+            session(Calendar.SATURDAY, 21, overrun=true, fast=true, gap=30_000)
         ))
         assertEquals(3, report.totalSessionCount); assertEquals(2, report.overrunCount)
         assertEquals(2.0/3, report.overrunRate, 1e-6); assertEquals(2, report.extensionCount)
@@ -26,13 +27,13 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
     }
 
-    @Test fun outcomeSummaryUsesOnlyAnsweredClearPurposeSessions() {
+    @Test fun purposeDriftRateUsesAllClearPurposeSessionsWhileResponsesStaySeparate() {
         val report = report(listOf(
             session(Calendar.TUESDAY,13,answered=true,drifted=true,closed=true),
             session(Calendar.TUESDAY,13,answered=true,drifted=false), session(Calendar.TUESDAY,13),
             session(Calendar.TUESDAY,13,intent="RECOGNIZED_BREAK",answered=true,drifted=true)
         ))
-        assertEquals(2, report.outcomeResponseCount); assertEquals(.5, report.purposeDriftRate, 0.0)
+        assertEquals(2, report.outcomeResponseCount); assertEquals(1.0/3.0, report.purposeDriftRate, 0.0)
         assertEquals(1, report.closedAfterInterventionCount)
     }
 
@@ -43,16 +44,51 @@ class WeeklyReportAnalyzerTest {
         assertEquals(20, countWinner.mostVulnerableHourSlot)
     }
 
-    private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(s, VulnerabilityAnalyzer.calculateTimeSlotStats(s))
+    @Test fun necessaryUseSummaryCountsOnlyClearPurposeOutcomeExceptions() {
+        val report = report(listOf(
+            session(
+                Calendar.THURSDAY,
+                15,
+                outcome = "NECESSARY_USE",
+                necessaryUseExcessMillis = 30_000L
+            ),
+            session(
+                Calendar.THURSDAY,
+                15,
+                intent = "MINDFUL_REST",
+                outcome = "NECESSARY_USE",
+                necessaryUseExcessMillis = 0L
+            ),
+            session(Calendar.THURSDAY, 15, outcome = "PURPOSE_DRIFT")
+        ))
+        assertEquals(1, report.necessaryUseCount)
+        assertEquals(30_000L, report.necessaryUseExcessMillis)
+    }
+
+    private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(
+        sessions = s,
+        timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(s),
+        reopenLogs = s.mapIndexedNotNull { index, session ->
+            session.reopenGapMillis?.let { gapTimeMillis ->
+                ReopenLogEntity(
+                    id = index + 1L,
+                    previousSessionId = index + 1L,
+                    currentSessionId = index + 2L,
+                    gapTimeMillis = gapTimeMillis,
+                    isFastReopen = session.isFastReopen
+                )
+            }
+        }
+    )
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
-        closed:Boolean?=null): SessionLogEntity {
+        closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L): SessionLogEntity {
         val start=time(day,hour)
         return SessionLogEntity(packageName="target",entryDetectedAtMillis=start,startedAtMillis=start,
             endedAtMillis=start+60_000,durationMillis=60_000,targetDurationMillis=60_000,intentChoice=intent,
-            outcomeType=null,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
+            outcomeType=outcome,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
             closedAfterIntervention=closed,overrun=overrun,extensionCount=extensions,isFastReopen=fast,
-            reopenGapMillis=gap,createdAtMillis=start)
+            reopenGapMillis=gap,necessaryUseExcessMillis=necessaryUseExcessMillis,createdAtMillis=start)
     }
     private fun time(day:Int,hour:Int)=Calendar.getInstance().apply {
         clear(); set(2026,Calendar.MAY,11 + ((day - Calendar.MONDAY + 7) % 7),hour,0)

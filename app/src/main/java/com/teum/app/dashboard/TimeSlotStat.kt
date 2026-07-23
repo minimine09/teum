@@ -11,6 +11,8 @@ data class TimeSlotStat(
     val purposeOutcomeResponseCount: Int,
     val overrunRate: Double,
     val fastReopenRate: Double,
+    val extensionScore: Double,
+    val openScore: Double,
     val purposeDriftRate: Double,
     val vulnerabilityScore: Double
 ) {

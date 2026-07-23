@@ -14,12 +14,14 @@ object SessionDisplayText {
         outcomeAchieved: Boolean?,
         purposeDrifted: Boolean?
     ): String = when {
+        outcomeType == "PURPOSE_ACHIEVED" -> "목표를 달성했어요"
+        outcomeType == "NECESSARY_USE" -> "필요한 사용으로 확인했어요"
+        outcomeType == "PURPOSE_DRIFT" -> "목적에서 벗어났어요"
+        outcomeType == "CONTINUED_SCROLLING" -> "무의식적으로 계속 사용했어요"
         outcomeAchieved == true -> "목표를 달성했어요"
         purposeDrifted == true -> "목적에서 벗어났어요"
         outcomeType == "ENDED" -> "사용을 종료했어요"
         outcomeType == "EXTENDED" -> "사용 시간을 연장했어요"
-        outcomeType == "NECESSARY_USE" -> "필요한 사용으로 확인했어요"
-        outcomeType == "PURPOSE_DRIFT" -> "목적에서 벗어났어요"
         outcomeType == null -> "사용 결과를 아직 확인하지 않았어요"
         else -> "사용 결과를 확인할 수 없어요"
     }

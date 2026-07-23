@@ -15,6 +15,8 @@ data class WeeklyReportStats(
     val fastReopenCount: Int = 0,
     val outcomeResponseCount: Int = 0,
     val purposeDriftRate: Double = 0.0,
+    val necessaryUseCount: Int = 0,
+    val necessaryUseExcessMillis: Long = 0L,
     val closedAfterInterventionCount: Int = 0,
     val averageReopenGapMillis: Long? = null,
     val mostVulnerableHourSlot: Int? = null,
