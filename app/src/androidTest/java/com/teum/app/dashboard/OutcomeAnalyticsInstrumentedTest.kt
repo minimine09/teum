@@ -72,7 +72,7 @@ class OutcomeAnalyticsInstrumentedTest {
         assertEquals(now, drifted.interventionExitConfirmedAtMillis)
 
         val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(sessions)
-        val report = WeeklyReportAnalyzer.calculate(sessions, timeSlotStats)
+        val report = WeeklyReportAnalyzer.calculate(sessions, timeSlotStats, emptyList())
 
         assertEquals(3, report.totalSessionCount)
         assertEquals(2, report.outcomeResponseCount)

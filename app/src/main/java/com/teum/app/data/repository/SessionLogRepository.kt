@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
+import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.overlay.BrakeChoice
 import com.teum.app.overlay.IntentChoice
@@ -15,6 +16,7 @@ class SessionLogRepository(context: Context) {
     private val database = TeumDatabase.getInstance(context)
     private val sessionLogDao = database.sessionLogDao()
     private val appOpenEventDao = database.appOpenEventDao()
+    private val reopenLogDao = database.reopenLogDao()
 
     suspend fun saveAppOpenEvent(
         packageName: String,
@@ -33,6 +35,10 @@ class SessionLogRepository(context: Context) {
         brakeChoice: BrakeChoice? = null
     ): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
+        val reopenCheck = checkReopen(
+            packageName = session.packageName,
+            currentEntryTimeMillis = session.entryDetectedAtMillis
+        )
         val durationMillis = (endedAtMillis - session.startedAtMillis).coerceAtLeast(0L)
         val interventionVisibleMillis = session.interventionVisibleMillis.coerceAtLeast(0L)
         val effectiveUsageMillis = (durationMillis - interventionVisibleMillis).coerceAtLeast(0L)
@@ -78,11 +84,50 @@ class SessionLogRepository(context: Context) {
             outcomeType = session.outcomeType?.name,
             overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,
-            isFastReopen = session.isFastReopen,
-            reopenGapMillis = session.reopenGapMillis,
+            isFastReopen = reopenCheck.isFastReopen,
+            reopenGapMillis = reopenCheck.gapTimeMillis,
             createdAtMillis = System.currentTimeMillis()
         )
-        return sessionLogDao.insertSessionLog(entity)
+        return database.withTransaction {
+            val currentSessionId = sessionLogDao.insertSessionLog(entity)
+            val previousSessionId = reopenCheck.previousSessionId
+            val gapTimeMillis = reopenCheck.gapTimeMillis
+            if (previousSessionId != null && gapTimeMillis != null) {
+                reopenLogDao.insertReopenLog(
+                    ReopenLogEntity(
+                        previousSessionId = previousSessionId,
+                        currentSessionId = currentSessionId,
+                        gapTimeMillis = gapTimeMillis,
+                        isFastReopen = reopenCheck.isFastReopen
+                    )
+                )
+            }
+            currentSessionId
+        }
+    }
+
+    suspend fun checkReopen(
+        packageName: String,
+        currentEntryTimeMillis: Long,
+        thresholdMillis: Long = DEFAULT_REOPEN_THRESHOLD_MILLIS
+    ): ReopenCheckResult {
+        val previousSession = sessionLogDao.findLatestEndedSession(
+            packageName = packageName,
+            beforeMillis = currentEntryTimeMillis
+        ) ?: return ReopenCheckResult(
+            previousSessionId = null,
+            previousEndTimeMillis = null,
+            gapTimeMillis = null,
+            isFastReopen = false
+        )
+        val gapTimeMillis =
+            (currentEntryTimeMillis - previousSession.endedAtMillis).coerceAtLeast(0L)
+        return ReopenCheckResult(
+            previousSessionId = previousSession.id,
+            previousEndTimeMillis = previousSession.endedAtMillis,
+            gapTimeMillis = gapTimeMillis,
+            isFastReopen = gapTimeMillis <= thresholdMillis
+        )
     }
 
     fun observeRecentSessions(limit: Int = 10): Flow<List<SessionLogEntity>> {
@@ -121,6 +166,13 @@ class SessionLogRepository(context: Context) {
         return appOpenEventDao.observeOpenEventsSince(sinceMillis)
     }
 
+    fun observeReopenLogsSince(
+        sinceMillis: Long,
+        packageName: String? = null
+    ): Flow<List<ReopenLogEntity>> {
+        return reopenLogDao.observeReopenLogsSince(sinceMillis, packageName)
+    }
+
     suspend fun deleteAllSessionLogs() {
         database.withTransaction {
             sessionLogDao.deleteAllSessionLogs()
@@ -155,6 +207,8 @@ class SessionLogRepository(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_REOPEN_THRESHOLD_MILLIS = 5L * 60L * 1_000L
+
         fun startOfTodayMillis(): Long {
             return Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, 0)

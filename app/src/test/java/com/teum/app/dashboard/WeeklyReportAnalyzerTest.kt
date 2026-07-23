@@ -1,6 +1,7 @@
 ﻿package com.teum.app.dashboard
 
 import com.teum.app.data.local.entity.SessionLogEntity
+import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Calendar
@@ -17,7 +18,7 @@ class WeeklyReportAnalyzerTest {
         val report = report(listOf(
             session(Calendar.MONDAY, 9, overrun=true, extensions=2, gap=20_000),
             session(Calendar.MONDAY, 9, gap=40_000),
-            session(Calendar.SATURDAY, 21, overrun=true, fast=true)
+            session(Calendar.SATURDAY, 21, overrun=true, fast=true, gap=30_000)
         ))
         assertEquals(3, report.totalSessionCount); assertEquals(2, report.overrunCount)
         assertEquals(2.0/3, report.overrunRate, 1e-6); assertEquals(2, report.extensionCount)
@@ -64,7 +65,21 @@ class WeeklyReportAnalyzerTest {
         assertEquals(30_000L, report.necessaryUseExcessMillis)
     }
 
-    private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(s, VulnerabilityAnalyzer.calculateTimeSlotStats(s))
+    private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(
+        sessions = s,
+        timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(s),
+        reopenLogs = s.mapIndexedNotNull { index, session ->
+            session.reopenGapMillis?.let { gapTimeMillis ->
+                ReopenLogEntity(
+                    id = index + 1L,
+                    previousSessionId = index + 1L,
+                    currentSessionId = index + 2L,
+                    gapTimeMillis = gapTimeMillis,
+                    isFastReopen = session.isFastReopen
+                )
+            }
+        }
+    )
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
         closed:Boolean?=null,brakeChoice:String?=null,necessaryUseExcessMillis:Long=0L): SessionLogEntity {

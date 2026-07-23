@@ -1,12 +1,14 @@
 package com.teum.app.dashboard
 
+import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import java.util.Calendar
 
 object WeeklyReportAnalyzer {
     fun calculate(
         sessions: List<SessionLogEntity>,
-        timeSlotStats: List<TimeSlotStat>
+        timeSlotStats: List<TimeSlotStat>,
+        reopenLogs: List<ReopenLogEntity>
     ): WeeklyReportStats {
         val totalSessionCount = sessions.size
         val overrunCount = sessions.count { it.overrun }
@@ -20,7 +22,7 @@ object WeeklyReportAnalyzer {
         val necessaryUseSessions = clearPurposeSessions.filter { session ->
             session.brakeChoice == NECESSARY_USE
         }
-        val reopenGaps = sessions.mapNotNull { it.reopenGapMillis }
+        val reopenGaps = reopenLogs.map { it.gapTimeMillis }
         val mostVulnerableHourSlot = timeSlotStats
             .filter { it.sessionCount > 0 }
             .maxWithOrNull(
@@ -34,7 +36,7 @@ object WeeklyReportAnalyzer {
             overrunCount = overrunCount,
             overrunRate = rate(overrunCount, totalSessionCount),
             extensionCount = sessions.sumOf { it.extensionCount },
-            fastReopenCount = sessions.count { it.isFastReopen },
+            fastReopenCount = reopenLogs.count { it.isFastReopen },
             outcomeResponseCount = purposeOutcomeSessions.size,
             purposeDriftRate = rate(purposeDriftCount, clearPurposeSessions.size),
             necessaryUseCount = necessaryUseSessions.size,

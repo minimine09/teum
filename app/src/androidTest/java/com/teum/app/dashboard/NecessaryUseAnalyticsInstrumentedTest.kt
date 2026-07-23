@@ -67,7 +67,8 @@ class NecessaryUseAnalyticsInstrumentedTest {
 
         val report = WeeklyReportAnalyzer.calculate(
             sessions = sessions,
-            timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(sessions)
+            timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(sessions),
+            reopenLogs = emptyList()
         )
         assertEquals(3, report.totalSessionCount)
         assertEquals(2, report.overrunCount)

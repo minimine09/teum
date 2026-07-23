@@ -39,8 +39,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }.flatMapLatest { (range, selectedPackage) ->
         combine(
             repository.observeSessionsSince(range.startOfSevenDayPeriodMillis),
-            repository.observeOpenEventsSince(range.startOfSevenDayPeriodMillis)
-        ) { allSessions, allOpenEvents ->
+            repository.observeOpenEventsSince(range.startOfSevenDayPeriodMillis),
+            repository.observeReopenLogsSince(
+                sinceMillis = range.startOfSevenDayPeriodMillis,
+                packageName = selectedPackage
+            )
+        ) { allSessions, allOpenEvents, reopenLogs ->
             val sessions = DashboardDataFilter.sessions(allSessions, selectedPackage)
             val openEvents = DashboardDataFilter.openEvents(allOpenEvents, selectedPackage)
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
@@ -54,7 +58,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 timeSlotStats = timeSlotStats,
                 weeklyReportStats = WeeklyReportAnalyzer.calculate(
                     sessions = sessions,
-                    timeSlotStats = timeSlotStats
+                    timeSlotStats = timeSlotStats,
+                    reopenLogs = reopenLogs
                 ),
                 availablePackages = (allSessions.map { it.packageName } +
                     allOpenEvents.map { it.packageName }).toSet(),
