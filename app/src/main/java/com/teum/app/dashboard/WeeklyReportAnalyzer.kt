@@ -10,11 +10,13 @@ object WeeklyReportAnalyzer {
     ): WeeklyReportStats {
         val totalSessionCount = sessions.size
         val overrunCount = sessions.count { it.overrun }
-        val purposeOutcomeSessions = sessions.filter { session ->
-            session.intentChoice == CLEAR_PURPOSE &&
-                session.outcomeRespondedAtMillis != null
+        val clearPurposeSessions = sessions.filter { session ->
+            session.intentChoice == CLEAR_PURPOSE
         }
-        val purposeDriftCount = purposeOutcomeSessions.count { it.purposeDrifted == true }
+        val purposeOutcomeSessions = clearPurposeSessions.filter { session ->
+            session.outcomeRespondedAtMillis != null
+        }
+        val purposeDriftCount = clearPurposeSessions.count { it.purposeDrifted == true }
         val reopenGaps = sessions.mapNotNull { it.reopenGapMillis }
         val mostVulnerableHourSlot = timeSlotStats
             .filter { it.sessionCount > 0 }
@@ -31,7 +33,7 @@ object WeeklyReportAnalyzer {
             extensionCount = sessions.sumOf { it.extensionCount },
             fastReopenCount = sessions.count { it.isFastReopen },
             outcomeResponseCount = purposeOutcomeSessions.size,
-            purposeDriftRate = rate(purposeDriftCount, purposeOutcomeSessions.size),
+            purposeDriftRate = rate(purposeDriftCount, clearPurposeSessions.size),
             closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
             averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
             mostVulnerableHourSlot = mostVulnerableHourSlot,

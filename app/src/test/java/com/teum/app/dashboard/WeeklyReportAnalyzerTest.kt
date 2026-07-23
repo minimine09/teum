@@ -26,13 +26,13 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
     }
 
-    @Test fun outcomeSummaryUsesOnlyAnsweredClearPurposeSessions() {
+    @Test fun purposeDriftRateUsesAllClearPurposeSessionsWhileResponsesStaySeparate() {
         val report = report(listOf(
             session(Calendar.TUESDAY,13,answered=true,drifted=true,closed=true),
             session(Calendar.TUESDAY,13,answered=true,drifted=false), session(Calendar.TUESDAY,13),
             session(Calendar.TUESDAY,13,intent="RECOGNIZED_BREAK",answered=true,drifted=true)
         ))
-        assertEquals(2, report.outcomeResponseCount); assertEquals(.5, report.purposeDriftRate, 0.0)
+        assertEquals(2, report.outcomeResponseCount); assertEquals(1.0/3.0, report.purposeDriftRate, 0.0)
         assertEquals(1, report.closedAfterInterventionCount)
     }
 
