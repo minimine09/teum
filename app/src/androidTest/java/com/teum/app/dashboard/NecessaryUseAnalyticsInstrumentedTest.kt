@@ -3,9 +3,9 @@ package com.teum.app.dashboard
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.teum.app.data.repository.SessionLogRepository
-import com.teum.app.overlay.BrakeChoice
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
+import com.teum.app.session.OutcomeType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -25,23 +25,23 @@ class NecessaryUseAnalyticsInstrumentedTest {
         val clearNecessaryId = repository.saveEndedSession(
             session = overrunSession(
                 endedAtMillis = now - 3_000L,
-                intentChoice = IntentChoice.CLEAR_PURPOSE
-            ),
-            brakeChoice = BrakeChoice.NECESSARY_USE
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                outcomeType = OutcomeType.NECESSARY_USE
+            )
         )!!
         val restNecessaryId = repository.saveEndedSession(
             session = overrunSession(
                 endedAtMillis = now - 2_000L,
-                intentChoice = IntentChoice.MINDFUL_REST
-            ),
-            brakeChoice = BrakeChoice.NECESSARY_USE
+                intentChoice = IntentChoice.MINDFUL_REST,
+                outcomeType = OutcomeType.NECESSARY_USE
+            )
         )!!
         val clearDriftId = repository.saveEndedSession(
             session = overrunSession(
                 endedAtMillis = now - 1_000L,
-                intentChoice = IntentChoice.CLEAR_PURPOSE
-            ),
-            brakeChoice = BrakeChoice.PURPOSE_DRIFT
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                outcomeType = OutcomeType.PURPOSE_DRIFT
+            )
         )!!
 
         val sessions = repository.observeSessionsForLastSevenDays().first()
@@ -53,7 +53,9 @@ class NecessaryUseAnalyticsInstrumentedTest {
         assertEquals(5_000L, clearNecessary.necessaryUseExcessMillis)
         assertEquals(0L, clearNecessary.overrunMillis)
         assertFalse(clearNecessary.overrun)
-        assertEquals(BrakeChoice.NECESSARY_USE.name, clearNecessary.brakeChoice)
+        assertEquals(OutcomeType.NECESSARY_USE.name, clearNecessary.outcomeType)
+        assertTrue(clearNecessary.outcomeRespondedAtMillis != null)
+        assertEquals(false, clearNecessary.purposeDrifted)
 
         assertEquals(5_000L, restNecessary.rawOverrunMillis)
         assertEquals(0L, restNecessary.necessaryUseExcessMillis)
@@ -64,6 +66,8 @@ class NecessaryUseAnalyticsInstrumentedTest {
         assertEquals(0L, clearDrift.necessaryUseExcessMillis)
         assertEquals(5_000L, clearDrift.overrunMillis)
         assertTrue(clearDrift.overrun)
+        assertTrue(clearDrift.outcomeRespondedAtMillis != null)
+        assertEquals(true, clearDrift.purposeDrifted)
 
         val report = WeeklyReportAnalyzer.calculate(
             sessions = sessions,
@@ -77,9 +81,41 @@ class NecessaryUseAnalyticsInstrumentedTest {
         assertEquals(5_000L, report.necessaryUseExcessMillis)
     }
 
+    @Test
+    fun updatingOutcomeToNecessaryUse_reclassifiesStoredOverrun() = runBlocking {
+        val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
+        repository.deleteAllSessionLogs()
+
+        val now = System.currentTimeMillis()
+        val sessionId = repository.saveEndedSession(
+            overrunSession(
+                endedAtMillis = now,
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                outcomeType = null
+            )
+        )!!
+
+        assertTrue(
+            repository.updateSessionOutcome(
+                sessionId = sessionId,
+                outcomeType = OutcomeType.NECESSARY_USE.name,
+                achieved = false,
+                drifted = false,
+                respondedAtMillis = now + 1_000L
+            )
+        )
+
+        val session = repository.observeSessionsForLastSevenDays().first().single()
+        assertEquals(5_000L, session.rawOverrunMillis)
+        assertEquals(5_000L, session.necessaryUseExcessMillis)
+        assertEquals(0L, session.overrunMillis)
+        assertFalse(session.overrun)
+    }
+
     private fun overrunSession(
         endedAtMillis: Long,
-        intentChoice: IntentChoice
+        intentChoice: IntentChoice,
+        outcomeType: OutcomeType?
     ): AppSession {
         return AppSession(
             debugSessionId = endedAtMillis,
@@ -88,6 +124,7 @@ class NecessaryUseAnalyticsInstrumentedTest {
             startedAtMillis = endedAtMillis - 10_000L,
             intentChoice = intentChoice,
             targetDurationMillis = 5_000L,
+            outcomeType = outcomeType,
             endedAtMillis = endedAtMillis
         )
     }

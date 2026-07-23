@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "149fa5ad7d85cf686eb9b8d572e63724",
+    "identityHash": "4f18909797c9c0989dfa1651e9032e02",
     "entities": [
       {
         "tableName": "session_logs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `entryDetectedAtMillis` INTEGER NOT NULL, `startedAtMillis` INTEGER NOT NULL, `endedAtMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `targetDurationMillis` INTEGER NOT NULL, `interventionVisibleMillis` INTEGER NOT NULL, `effectiveUsageMillis` INTEGER NOT NULL, `totalExtensionDurationMillis` INTEGER NOT NULL, `finalTargetDurationMillis` INTEGER NOT NULL, `rawOverrunMillis` INTEGER NOT NULL, `overrunMillis` INTEGER NOT NULL, `necessaryUseExcessMillis` INTEGER NOT NULL, `intentChoice` TEXT NOT NULL, `brakeChoice` TEXT, `outcomeType` TEXT, `outcomeRespondedAtMillis` INTEGER, `outcomeAchieved` INTEGER, `purposeDrifted` INTEGER, `closedAfterIntervention` INTEGER, `interventionExitConfirmedAtMillis` INTEGER, `overrun` INTEGER NOT NULL, `extensionCount` INTEGER NOT NULL, `isFastReopen` INTEGER NOT NULL, `reopenGapMillis` INTEGER, `createdAtMillis` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `entryDetectedAtMillis` INTEGER NOT NULL, `startedAtMillis` INTEGER NOT NULL, `endedAtMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `targetDurationMillis` INTEGER NOT NULL, `interventionVisibleMillis` INTEGER NOT NULL, `effectiveUsageMillis` INTEGER NOT NULL, `totalExtensionDurationMillis` INTEGER NOT NULL, `finalTargetDurationMillis` INTEGER NOT NULL, `rawOverrunMillis` INTEGER NOT NULL, `overrunMillis` INTEGER NOT NULL, `necessaryUseExcessMillis` INTEGER NOT NULL, `intentChoice` TEXT NOT NULL, `outcomeType` TEXT, `outcomeRespondedAtMillis` INTEGER, `outcomeAchieved` INTEGER, `purposeDrifted` INTEGER, `closedAfterIntervention` INTEGER, `interventionExitConfirmedAtMillis` INTEGER, `overrun` INTEGER NOT NULL, `extensionCount` INTEGER NOT NULL, `isFastReopen` INTEGER NOT NULL, `reopenGapMillis` INTEGER, `createdAtMillis` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -97,12 +97,6 @@
             "columnName": "intentChoice",
             "affinity": "TEXT",
             "notNull": true
-          },
-          {
-            "fieldPath": "brakeChoice",
-            "columnName": "brakeChoice",
-            "affinity": "TEXT",
-            "notNull": false
           },
           {
             "fieldPath": "outcomeType",
@@ -216,7 +210,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '149fa5ad7d85cf686eb9b8d572e63724')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4f18909797c9c0989dfa1651e9032e02')"
     ]
   }
 }

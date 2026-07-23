@@ -44,22 +44,22 @@ class WeeklyReportAnalyzerTest {
         assertEquals(20, countWinner.mostVulnerableHourSlot)
     }
 
-    @Test fun necessaryUseSummaryCountsOnlyClearPurposeBrakeExceptions() {
+    @Test fun necessaryUseSummaryCountsOnlyClearPurposeOutcomeExceptions() {
         val report = report(listOf(
             session(
                 Calendar.THURSDAY,
                 15,
-                brakeChoice = "NECESSARY_USE",
+                outcome = "NECESSARY_USE",
                 necessaryUseExcessMillis = 30_000L
             ),
             session(
                 Calendar.THURSDAY,
                 15,
                 intent = "MINDFUL_REST",
-                brakeChoice = "NECESSARY_USE",
+                outcome = "NECESSARY_USE",
                 necessaryUseExcessMillis = 0L
             ),
-            session(Calendar.THURSDAY, 15, brakeChoice = "PURPOSE_DRIFT")
+            session(Calendar.THURSDAY, 15, outcome = "PURPOSE_DRIFT")
         ))
         assertEquals(1, report.necessaryUseCount)
         assertEquals(30_000L, report.necessaryUseExcessMillis)
@@ -82,14 +82,13 @@ class WeeklyReportAnalyzerTest {
     )
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
-        closed:Boolean?=null,brakeChoice:String?=null,necessaryUseExcessMillis:Long=0L): SessionLogEntity {
+        closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L): SessionLogEntity {
         val start=time(day,hour)
         return SessionLogEntity(packageName="target",entryDetectedAtMillis=start,startedAtMillis=start,
             endedAtMillis=start+60_000,durationMillis=60_000,targetDurationMillis=60_000,intentChoice=intent,
-            outcomeType=null,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
+            outcomeType=outcome,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
             closedAfterIntervention=closed,overrun=overrun,extensionCount=extensions,isFastReopen=fast,
-            reopenGapMillis=gap,brakeChoice=brakeChoice,
-            necessaryUseExcessMillis=necessaryUseExcessMillis,createdAtMillis=start)
+            reopenGapMillis=gap,necessaryUseExcessMillis=necessaryUseExcessMillis,createdAtMillis=start)
     }
     private fun time(day:Int,hour:Int)=Calendar.getInstance().apply {
         clear(); set(2026,Calendar.MAY,11 + ((day - Calendar.MONDAY + 7) % 7),hour,0)

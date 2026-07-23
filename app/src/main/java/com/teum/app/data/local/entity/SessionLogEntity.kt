@@ -21,7 +21,6 @@ data class SessionLogEntity(
     val overrunMillis: Long = 0L,
     val necessaryUseExcessMillis: Long = 0L,
     val intentChoice: String,
-    val brakeChoice: String? = null,
     val outcomeType: String?,
     val outcomeRespondedAtMillis: Long? = null,
     val outcomeAchieved: Boolean? = null,

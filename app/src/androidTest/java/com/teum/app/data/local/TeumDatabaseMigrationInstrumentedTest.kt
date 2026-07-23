@@ -212,8 +212,7 @@ class TeumDatabaseMigrationInstrumentedTest {
             """
             SELECT
                 rawOverrunMillis,
-                necessaryUseExcessMillis,
-                brakeChoice
+                necessaryUseExcessMillis
             FROM session_logs
             WHERE id = $SESSION_ID
             """.trimIndent()
@@ -227,7 +226,6 @@ class TeumDatabaseMigrationInstrumentedTest {
                 0L,
                 cursor.getLong(cursor.getColumnIndexOrThrow("necessaryUseExcessMillis"))
             )
-            assertNull(cursor.getString(cursor.getColumnIndexOrThrow("brakeChoice")))
         }
     }
 
@@ -358,7 +356,6 @@ class TeumDatabaseMigrationInstrumentedTest {
                 overrunMillis,
                 necessaryUseExcessMillis,
                 intentChoice,
-                brakeChoice,
                 outcomeType,
                 outcomeRespondedAtMillis,
                 outcomeAchieved,
@@ -370,7 +367,7 @@ class TeumDatabaseMigrationInstrumentedTest {
                 isFastReopen,
                 reopenGapMillis,
                 createdAtMillis
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             arrayOf(
                 SESSION_ID,
@@ -388,7 +385,6 @@ class TeumDatabaseMigrationInstrumentedTest {
                 5_000L,
                 0L,
                 "CLEAR_PURPOSE",
-                null,
                 null,
                 null,
                 null,
@@ -423,7 +419,6 @@ class TeumDatabaseMigrationInstrumentedTest {
                 overrunMillis,
                 necessaryUseExcessMillis,
                 intentChoice,
-                brakeChoice,
                 outcomeType,
                 outcomeRespondedAtMillis,
                 outcomeAchieved,
@@ -452,7 +447,6 @@ class TeumDatabaseMigrationInstrumentedTest {
                 overrunMillis,
                 necessaryUseExcessMillis,
                 intentChoice,
-                brakeChoice,
                 outcomeType,
                 outcomeRespondedAtMillis,
                 outcomeAchieved,

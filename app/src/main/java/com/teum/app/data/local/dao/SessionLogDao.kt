@@ -53,7 +53,23 @@ interface SessionLogDao {
         SET outcomeType = :outcomeType,
             outcomeRespondedAtMillis = :respondedAtMillis,
             outcomeAchieved = :achieved,
-            purposeDrifted = :drifted
+            purposeDrifted = :drifted,
+            necessaryUseExcessMillis = CASE
+                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
+                    THEN rawOverrunMillis
+                ELSE 0
+            END,
+            overrunMillis = CASE
+                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
+                    THEN 0
+                ELSE rawOverrunMillis
+            END,
+            overrun = CASE
+                WHEN intentChoice = 'CLEAR_PURPOSE' AND :outcomeType = 'NECESSARY_USE'
+                    THEN 0
+                WHEN rawOverrunMillis > 0 THEN 1
+                ELSE 0
+            END
         WHERE id = :sessionId
         """
     )

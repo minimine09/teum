@@ -6,9 +6,9 @@ import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
-import com.teum.app.overlay.BrakeChoice
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
+import com.teum.app.session.OutcomeType
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
@@ -30,11 +30,9 @@ class SessionLogRepository(context: Context) {
         )
     }
 
-    suspend fun saveEndedSession(
-        session: AppSession,
-        brakeChoice: BrakeChoice? = null
-    ): Long? {
+    suspend fun saveEndedSession(session: AppSession): Long? {
         val endedAtMillis = session.endedAtMillis ?: return null
+        val savedAtMillis = System.currentTimeMillis()
         val reopenCheck = checkReopen(
             packageName = session.packageName,
             currentEntryTimeMillis = session.entryDetectedAtMillis
@@ -49,7 +47,7 @@ class SessionLogRepository(context: Context) {
             (effectiveUsageMillis - finalTargetDurationMillis).coerceAtLeast(0L)
         val isNecessaryUseException =
             session.intentChoice == IntentChoice.CLEAR_PURPOSE &&
-                brakeChoice == BrakeChoice.NECESSARY_USE
+                session.outcomeType == OutcomeType.NECESSARY_USE
         val overrunMillis = if (isNecessaryUseException) 0L else rawOverrunMillis
         val necessaryUseExcessMillis =
             if (isNecessaryUseException) rawOverrunMillis else 0L
@@ -62,7 +60,7 @@ class SessionLogRepository(context: Context) {
                 "extensionTotal=$totalExtensionDurationMillis finalTarget=$finalTargetDurationMillis " +
                 "rawOverrunMillis=$rawOverrunMillis overrunMillis=$overrunMillis " +
                 "necessaryUseExcessMillis=$necessaryUseExcessMillis " +
-                "brakeChoice=${brakeChoice?.name} extensionCount=${session.extensionCount}"
+                "outcomeType=${session.outcomeType?.name} extensionCount=${session.extensionCount}"
         )
 
         val entity = SessionLogEntity(
@@ -80,13 +78,18 @@ class SessionLogRepository(context: Context) {
             overrunMillis = overrunMillis,
             necessaryUseExcessMillis = necessaryUseExcessMillis,
             intentChoice = session.intentChoice.name,
-            brakeChoice = brakeChoice?.name,
             outcomeType = session.outcomeType?.name,
+            outcomeRespondedAtMillis = session.outcomeType?.let { savedAtMillis },
+            purposeDrifted = when (session.outcomeType) {
+                OutcomeType.PURPOSE_DRIFT -> true
+                OutcomeType.NECESSARY_USE -> false
+                else -> null
+            },
             overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,
             isFastReopen = reopenCheck.isFastReopen,
             reopenGapMillis = reopenCheck.gapTimeMillis,
-            createdAtMillis = System.currentTimeMillis()
+            createdAtMillis = savedAtMillis
         )
         return database.withTransaction {
             val currentSessionId = sessionLogDao.insertSessionLog(entity)

@@ -20,7 +20,7 @@ object WeeklyReportAnalyzer {
         }
         val purposeDriftCount = clearPurposeSessions.count { it.purposeDrifted == true }
         val necessaryUseSessions = clearPurposeSessions.filter { session ->
-            session.brakeChoice == NECESSARY_USE
+            session.outcomeType == NECESSARY_USE
         }
         val reopenGaps = reopenLogs.map { it.gapTimeMillis }
         val mostVulnerableHourSlot = timeSlotStats

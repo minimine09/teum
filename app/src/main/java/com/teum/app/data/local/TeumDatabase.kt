@@ -114,9 +114,6 @@ abstract class TeumDatabase : RoomDatabase() {
                     "ALTER TABLE session_logs ADD COLUMN necessaryUseExcessMillis INTEGER NOT NULL DEFAULT 0"
                 )
                 database.execSQL(
-                    "ALTER TABLE session_logs ADD COLUMN brakeChoice TEXT"
-                )
-                database.execSQL(
                     "UPDATE session_logs SET rawOverrunMillis = overrunMillis"
                 )
             }
