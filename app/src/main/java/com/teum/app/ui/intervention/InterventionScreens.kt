@@ -84,8 +84,8 @@ fun IntentCheckScreen(
     modifier: Modifier = Modifier
 ) {
     InterventionLayout(
-        title = "Intent Check",
-        subtitle = "앱 실행 전 5초 자기점검",
+        title = "열기 전 확인",
+        subtitle = "열기 전에 잠깐 확인해요",
         backgroundColor = InterventionBackground,
         modifier = modifier
     ) {
@@ -121,7 +121,7 @@ fun ReopenCheckScreen(
     modifier: Modifier = Modifier
 ) {
     InterventionLayout(
-        title = "Reopen Check",
+        title = "다시 열기 확인",
         subtitle = null,
         backgroundColor = InterventionBackground,
         modifier = modifier
@@ -287,7 +287,7 @@ fun OutcomeCheckScreen(
         OutcomeOptionUi("목적 달성함", "필요한 사용 또는 계획된 휴식", MintChoice, Success),
         OutcomeOptionUi("목적과 다른 사용으로 이어짐", "릴스·추천 피드 등으로 이동", DangerChoice, Danger),
         OutcomeOptionUi("시간을 초과했지만 필요했음", "자료 확인, 연락 등 예외 처리", BlueChoice, MaterialTheme.colorScheme.primary),
-        OutcomeOptionUi("계속 스크롤하게 됨", "세션 과몰입으로 기록", OrangeChoice, Warning)
+        OutcomeOptionUi("계속 보게 됨", "무심코 이어진 사용으로 기록", OrangeChoice, Warning)
     )
 
     Surface(
@@ -300,7 +300,7 @@ fun OutcomeCheckScreen(
                 .padding(horizontal = 24.dp)
                 .padding(top = 50.dp, bottom = 79.dp)
         ) {
-            ScreenHeader(title = "Outcome Check", subtitle = "목적과 실제 결과 연결")
+            ScreenHeader(title = "사용 후 확인", subtitle = "이번 사용을 돌아봐요")
             Spacer(modifier = Modifier.height(23.dp))
             SessionSummaryCard()
             Spacer(modifier = Modifier.height(38.dp))
@@ -312,7 +312,7 @@ fun OutcomeCheckScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "결과 응답은 다음 리포트와 개입 강도에 반영됩니다.",
+                text = "다음 리포트에 반영돼요.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -328,7 +328,7 @@ fun OutcomeCheckScreen(
             }
             Spacer(modifier = Modifier.weight(1f))
             TeumFilledButton(
-                text = "기록 저장",
+                text = "저장하기",
                 onClick = onSaveClick,
                 color = MaterialTheme.colorScheme.primary,
                 height = 49,
@@ -781,7 +781,7 @@ private fun SessionSummaryCard() {
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 27.dp)
         ) {
             Text(
-                text = "이번 세션 요약",
+                text = "이번 사용 요약",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
@@ -914,7 +914,7 @@ fun OutcomeCheckScreen(
                 .padding(horizontal = 24.dp)
                 .padding(top = 50.dp, bottom = 79.dp)
         ) {
-            ScreenHeader(title = "Outcome Check", subtitle = "목적과 실제 결과 연결")
+            ScreenHeader(title = "사용 후 확인", subtitle = "이번 사용을 돌아봐요")
             Spacer(modifier = Modifier.height(23.dp))
             OutcomeSessionSummaryCard(sessionData = sessionData)
             Spacer(modifier = Modifier.height(38.dp))
@@ -926,7 +926,7 @@ fun OutcomeCheckScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "결과 응답은 다음 리포트와 개입 강도에 반영됩니다.",
+                text = "다음 리포트에 반영돼요.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -952,7 +952,7 @@ fun OutcomeCheckScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             TeumFilledButton(
-                text = "기록 저장",
+                text = "저장하기",
                 onClick = { selectedOutcomeType?.let(onSaveClick) },
                 color = MaterialTheme.colorScheme.primary,
                 height = 49,
@@ -978,7 +978,7 @@ private fun OutcomeSessionSummaryCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "이번 세션 요약",
+                text = "이번 사용 요약",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold

@@ -65,14 +65,14 @@ fun InterventionModeSetupScreen(
                 .padding(top = 50.dp, bottom = 42.dp)
         ) {
             Text(
-                text = "개입 강도 선택",
+                text = "알림 강도 선택",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "처음에는 보통으로 시작하고 나중에 설정에서 바꿀 수 있어요.",
+                text = "처음에는 보통으로 시작해도 좋아요.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -117,7 +117,7 @@ fun InterventionModeSetupScreen(
             }
             Spacer(modifier = Modifier.height(29.dp))
             Text(
-                text = "개입 강도는 기기 안에서만 사용돼요.",
+                text = "선택한 강도는 설정에서 바꿀 수 있어요.",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
@@ -184,7 +184,7 @@ private fun ModeOptionCard(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = mode.description,
+                    text = mode.setupDescription(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
@@ -192,6 +192,11 @@ private fun ModeOptionCard(
             }
         }
     }
+}
+
+private fun InterventionMode.setupDescription(): String = when (this) {
+    InterventionMode.NORMAL -> "앱을 열 때와 시간이 지났을 때 한 번씩 확인해요."
+    else -> description
 }
 
 @Composable
@@ -204,13 +209,13 @@ private fun GuideCard(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "추천 설정",
+            text = "추천",
             color = MaterialTheme.colorScheme.primary,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "데모에서는 보통 모드가 가장 자연스러워요. 고강도 정책은 A/B의 저장·제한 로직이 확정된 뒤 실제 동작에 반영하면 됩니다.",
+            text = "처음 사용한다면 보통을 추천해요.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 12.sp,
             lineHeight = 17.sp
