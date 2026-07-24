@@ -40,9 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +53,7 @@ import com.teum.app.core.model.InterventionMode
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.ui.privacy.PrivacySettingsScreen
+import com.teum.app.ui.target.TargetAppSelectionScreen
 import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
@@ -73,7 +77,8 @@ private enum class DashboardTab {
     Home,
     Session,
     Report,
-    Settings
+    Settings,
+    TargetApps
 }
 
 @Composable
@@ -104,7 +109,7 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
             title = { Text("사용 기록을 삭제할까요?") },
-            text = { Text("저장된 세션과 대시보드 통계가 모두 삭제되며 복구할 수 없습니다.") },
+            text = { Text("저장된 사용 기록과 통계가 모두 삭제되며 복구할 수 없습니다.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -150,27 +155,17 @@ fun DashboardScreen(
         ) {
             when (selectedTab) {
                 DashboardTab.Home -> HomeDashboardContent(
-                    permissionStatus = permissionStatus,
-                    targetPackages = targetPackages,
                     appDisplayNames = appDisplayNames,
                     dashboardStats = dashboardStats,
                     recentSessions = recentSessions,
                     timeSlotStats = timeSlotStats,
-                    weeklyReportStats = weeklyReportStats,
-                    availablePackages = availablePackages,
-                    selectedPackageName = selectedPackageName,
-                    onOpenAccessibilitySettings = onOpenAccessibilitySettings,
-                    onOpenOverlaySettings = onOpenOverlaySettings,
-                    onAddTargetPackage = onAddTargetPackage,
-                    onRemoveTargetPackage = onRemoveTargetPackage,
-                    onSelectPackage = onSelectPackage
+                    weeklyReportStats = weeklyReportStats
                 )
 
                 DashboardTab.Session -> SessionHistoryContent(
                     targetPackages = targetPackages,
                     appDisplayNames = appDisplayNames,
                     recentSessions = recentSessions,
-                    timeSlotStats = timeSlotStats,
                     availablePackages = availablePackages,
                     selectedPackageName = selectedPackageName,
                     onSelectPackage = onSelectPackage
@@ -184,8 +179,23 @@ fun DashboardScreen(
                 DashboardTab.Settings -> PrivacySettingsScreen(
                     selectedMode = selectedInterventionMode,
                     onModeChange = onInterventionModeChange,
+                    onManageTargetAppsClick = { selectedTab = DashboardTab.TargetApps },
                     onDeleteAllClick = { showDeleteConfirmation = true },
                     showBottomNav = false
+                )
+
+                DashboardTab.TargetApps -> TargetAppSelectionScreen(
+                    initialSelectedPackages = targetPackages,
+                    onCompleteClick = { results ->
+                        results.forEach { result ->
+                            if (result.enabled) {
+                                onAddTargetPackage(result.packageName)
+                            } else {
+                                onRemoveTargetPackage(result.packageName)
+                            }
+                        }
+                        selectedTab = DashboardTab.Settings
+                    }
                 )
             }
         }
@@ -194,20 +204,11 @@ fun DashboardScreen(
 
 @Composable
 private fun HomeDashboardContent(
-    permissionStatus: PermissionStatus,
-    targetPackages: Set<String>,
     appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
     recentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
-    weeklyReportStats: WeeklyReportStats,
-    availablePackages: Set<String>,
-    selectedPackageName: String?,
-    onOpenAccessibilitySettings: () -> Unit,
-    onOpenOverlaySettings: () -> Unit,
-    onAddTargetPackage: (String) -> Unit,
-    onRemoveTargetPackage: (String) -> Unit,
-    onSelectPackage: (String?) -> Unit
+    weeklyReportStats: WeeklyReportStats
 ) {
     Column(
         modifier = Modifier
@@ -218,9 +219,8 @@ private fun HomeDashboardContent(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         DashboardHeader(
-            title = "오늘의 루프",
-            subtitle = "기기 안에서 계산한 오늘의 사용 흐름",
-            chip = "로컬"
+            title = "오늘의 사용",
+            subtitle = "오늘의 앱 사용 흐름을 확인하세요"
         )
         HomeMainStatCard(dashboardStats)
         HomeSmallStatsRow(dashboardStats, weeklyReportStats)
@@ -230,25 +230,6 @@ private fun HomeDashboardContent(
             appDisplayNames = appDisplayNames,
             maxItems = 3
         )
-        VulnerabilityPatternDetailCard(timeSlotStats)
-        AppStatisticsFilterCard(
-            packages = targetPackages + availablePackages,
-            selectedPackageName = selectedPackageName,
-            appDisplayNames = appDisplayNames,
-            onSelectPackage = onSelectPackage
-        )
-        PermissionStatusCard(
-            permissionStatus = permissionStatus,
-            onOpenAccessibilitySettings = onOpenAccessibilitySettings,
-            onOpenOverlaySettings = onOpenOverlaySettings
-        )
-        TargetAppCard(
-            permissionStatus = permissionStatus,
-            targetPackages = targetPackages,
-            appDisplayNames = appDisplayNames,
-            onAddTargetPackage = onAddTargetPackage,
-            onRemoveTargetPackage = onRemoveTargetPackage
-        )
     }
 }
 
@@ -257,7 +238,6 @@ private fun SessionHistoryContent(
     targetPackages: Set<String>,
     appDisplayNames: Map<String, String>,
     recentSessions: List<SessionLogEntity>,
-    timeSlotStats: List<TimeSlotStat>,
     availablePackages: Set<String>,
     selectedPackageName: String?,
     onSelectPackage: (String?) -> Unit
@@ -271,9 +251,8 @@ private fun SessionHistoryContent(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         DashboardHeader(
-            title = "세션 기록",
-            subtitle = "최근 사용 흐름과 앱별 통계를 확인하세요",
-            chip = "로컬"
+            title = "사용 기록",
+            subtitle = "앱별 사용 내역을 확인하세요"
         )
         AppStatisticsFilterCard(
             packages = targetPackages + availablePackages,
@@ -281,12 +260,16 @@ private fun SessionHistoryContent(
             appDisplayNames = appDisplayNames,
             onSelectPackage = onSelectPackage
         )
+        SessionHistorySummaryCard(
+            recentSessions = recentSessions,
+            selectedPackageName = selectedPackageName,
+            appDisplayNames = appDisplayNames
+        )
         RecentSessionsCard(
             recentSessions = recentSessions,
             appDisplayNames = appDisplayNames,
             maxItems = 10
         )
-        VulnerabilityPatternDetailCard(timeSlotStats)
     }
 }
 
@@ -305,27 +288,26 @@ private fun WeeklyReportContent(
     ) {
         DashboardHeader(
             title = "이번 주 리포트",
-            subtitle = "목적 이탈과 취약 시간대 분석",
-            chip = "7일"
+            subtitle = "이번 주 사용 패턴을 정리했어요"
         )
         ReportVulnerableTimeCard(stats)
         WeeklyOverrunBars(stats.dailyOverrunStats)
         ReportMetricCard(
             title = "목적 이탈률",
             value = formatPercent(stats.purposeDriftRate),
-            description = "릴스·추천 피드 이동 응답 기준",
+            description = "처음 목적과 달라진 비율",
             color = DashboardDanger
         )
         ReportMetricCard(
-            title = "평균 gap time",
+            title = "다시 열기까지",
             value = stats.averageReopenGapMillis?.let(::formatDuration) ?: "기록 없음",
-            description = "빠른 재진입 기준보다 짧은지 확인",
+            description = "앱을 다시 열기까지 걸린 시간",
             color = DashboardWarning
         )
         ReportMetricCard(
-            title = "개입 후 닫기",
+            title = "알림 후 닫기",
             value = "${stats.closedAfterInterventionCount}회",
-            description = "무의식 실행을 중단한 횟수",
+            description = "알림 뒤 앱을 닫은 횟수",
             color = DashboardSuccess
         )
         WeeklyReportDetailCard(stats)
@@ -343,40 +325,139 @@ private fun WeeklyReportContent(
 }
 
 @Composable
+private fun SessionHistorySummaryCard(
+    recentSessions: List<SessionLogEntity>,
+    selectedPackageName: String?,
+    appDisplayNames: Map<String, String>
+) {
+    val filteredLabel = selectedPackageName?.let { appDisplayNames[it] ?: it } ?: "전체 앱"
+    val overrunCount = recentSessions.count { SessionMetricsResolver.resolve(it).isOverrun }
+    val driftCount = recentSessions.count { it.purposeDrifted == true }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, DashboardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = filteredLabel,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "선택한 앱의 최근 기록",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .background(DashboardPill, RoundedCornerShape(15.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${recentSessions.size}개",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SessionSummaryMiniStat(
+                    label = "전체",
+                    value = "${recentSessions.size}회",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                SessionSummaryMiniStat(
+                    label = "초과",
+                    value = "${overrunCount}회",
+                    color = DashboardWarning,
+                    modifier = Modifier.weight(1f)
+                )
+                SessionSummaryMiniStat(
+                    label = "목적 이탈",
+                    value = "${driftCount}회",
+                    color = DashboardDanger,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionSummaryMiniStat(
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(color.copy(alpha = 0.09f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            color = color,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 private fun DashboardHeader(
     title: String,
-    subtitle: String,
-    chip: String
+    subtitle: String
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(width = 56.dp, height = 30.dp)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(15.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = chip,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
     }
 }
 
@@ -398,7 +479,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
     ) {
         Column {
             Text(
-                text = "목적을 지킨 세션",
+                text = "목적대로 사용한 횟수",
                 color = Color(0xFFAAB1C3),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
@@ -461,13 +542,13 @@ private fun HomeSmallStatsRow(
             modifier = Modifier.weight(1f)
         )
         HomeSmallStatCard(
-            label = "빠른 재진입",
+            label = "다시 열기",
             value = "${dashboardStats.todayFastReopenCount}회",
             color = DashboardWarning,
             modifier = Modifier.weight(1f)
         )
         HomeSmallStatCard(
-            label = "개입 후 닫기",
+            label = "알림 후 닫기",
             value = "${weeklyReportStats.closedAfterInterventionCount}회",
             color = DashboardSuccess,
             modifier = Modifier.weight(1f)
@@ -533,14 +614,14 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 26.dp)
         ) {
             Text(
-                text = "주의분산 취약 시간",
+                text = "자주 흔들린 시간",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${highlightedHour}시대에 초과 세션이 집중됨",
+                text = "${highlightedHour}시쯤 사용이 길어졌어요",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -576,7 +657,7 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "시간대별 취약 패턴",
+                text = "자주 흔들린 시간",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
@@ -584,7 +665,7 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
 
             if (activeStats.isEmpty()) {
                 Text(
-                    text = "아직 분석할 세션 기록이 없습니다.",
+                    text = "아직 분석할 사용 기록이 없습니다.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -592,14 +673,14 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
             }
 
             Text(
-                text = "가장 취약한 시간대 Top 3",
+                text = "가장 자주 흔들린 시간 Top 3",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
             )
             topStats.forEach { stat ->
                 DetailLine(
-                    text = "${stat.hourSlot}시: 취약도 ${formatScore(stat.vulnerabilityScore)} / 초과율 ${formatPercent(stat.overrunRate)} / 빠른 재진입 ${stat.fastReopenCount}회${lowDataSuffix(stat)}"
+                    text = "${stat.hourSlot}시: 점수 ${formatScore(stat.vulnerabilityScore)} / 초과율 ${formatPercent(stat.overrunRate)} / 다시 열기 ${stat.fastReopenCount}회${lowDataSuffix(stat)}"
                 )
             }
 
@@ -612,7 +693,7 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
             )
             activeStats.sortedBy { it.hourSlot }.forEach { stat ->
                 DetailLine(
-                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 빠른 재진입 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회 / 취약도 ${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}"
+                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 다시 열기 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회 / 점수 ${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}"
                 )
             }
         }
@@ -634,22 +715,32 @@ private fun RecentSessionsCard(
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = if (recentSessions.isEmpty()) {
-                    "최근 세션"
-                } else {
-                    "최근 세션 · 최근 ${displayedSessions.size}개"
-                },
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "최근 사용",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (recentSessions.isNotEmpty()) {
+                    Text(
+                        text = "최근 ${displayedSessions.size}개",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             if (recentSessions.isEmpty()) {
                 Text(
-                    text = "아직 저장된 세션이 없습니다.",
+                    text = "아직 저장된 사용 기록이 없습니다.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -671,112 +762,155 @@ private fun RecentSessionItem(
     appDisplayName: String
 ) {
     val metrics = SessionMetricsResolver.resolve(session)
-    val labelColor = when {
-        session.purposeDrifted == true -> DashboardDanger
-        session.closedAfterIntervention == true -> MaterialTheme.colorScheme.primary
-        metrics.isOverrun -> DashboardWarning
-        else -> DashboardSuccess
+    val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    val intentColor = when (session.intentChoice) {
+        "CLEAR_PURPOSE" -> MaterialTheme.colorScheme.primary
+        "MINDFUL_REST" -> DashboardSuccess
+        "UNCONSCIOUS_OPEN" -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> secondaryTextColor
     }
-    val pillText = when {
-        session.purposeDrifted == true -> "목적 이탈"
-        session.closedAfterIntervention == true -> "성공"
-        metrics.isOverrun -> "초과"
-        else -> "필요 사용"
+    val outcomeStatus = if (session.intentChoice == "CLEAR_PURPOSE") {
+        when {
+            session.outcomeType == "PURPOSE_ACHIEVED" || session.outcomeAchieved == true ->
+                "목적 달성" to DashboardSuccess
+            session.outcomeType == "NECESSARY_USE" ->
+                "필요한 사용" to DashboardSuccess
+            session.outcomeType == "CONTINUED_SCROLLING" ->
+                "무의식 사용 지속" to DashboardDanger
+            session.outcomeType == "PURPOSE_DRIFT" || session.purposeDrifted == true ->
+                "목적 이탈" to DashboardDanger
+            else ->
+                "결과 미확인" to secondaryTextColor
+        }
+    } else {
+        null
+    }
+    val overrunStatus = if (metrics.isOverrun) {
+        "${formatDuration(metrics.overrunMillis)} 초과" to DashboardWarning
+    } else {
+        "시간 내 종료" to secondaryTextColor
+    }
+    val reopenStatus = if (session.isFastReopen) {
+        val text = session.reopenGapMillis?.let {
+            "${formatDuration(it)} 만에 재실행"
+        } ?: "빠른 재실행"
+        text to MaterialTheme.colorScheme.primary
+    } else {
+        "재실행 없음" to secondaryTextColor
+    }
+    val sessionStatuses = buildList {
+        outcomeStatus?.let(::add)
+        add(overrunStatus)
+        add(reopenStatus)
     }
 
-    Column(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .background(labelColor, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(intentColor, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = appDisplayName,
+                    modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "${SessionDisplayText.intent(session.intentChoice)} → ${formatDuration(metrics.usageMillis)} 사용",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    text = SessionDisplayText.intent(session.intentChoice),
+                    color = intentColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            StatusPill(text = pillText, color = labelColor)
-        }
-        Column(
-            modifier = Modifier.padding(start = 26.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            DetailLine(
-                text = "${formatDuration(metrics.usageMillis)} 사용 · 목표 ${formatDuration(metrics.targetMillis)}",
-                fontSize = 11
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${formatDuration(metrics.usageMillis)} 사용",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 18.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+                Text(
+                    text = "목표 ${formatDuration(metrics.targetMillis)}",
+                    color = secondaryTextColor,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = buildAnnotatedString {
+                    sessionStatuses.forEachIndexed { index, (text, color) ->
+                        if (index > 0) {
+                            withStyle(SpanStyle(color = secondaryTextColor)) {
+                                append(" · ")
+                            }
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = color,
+                                fontWeight = FontWeight.Medium
+                            )
+                        ) {
+                            append(text)
+                        }
+                    }
+                },
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
             )
-            DetailLine(
-                text = "사용 목적: ${SessionDisplayText.intent(session.intentChoice)}",
-                fontSize = 11
-            )
-            DetailLine(
-                text = "사용 결과: ${SessionDisplayText.outcome(session.outcomeType, session.outcomeAchieved, session.purposeDrifted)}",
-                fontSize = 11
-            )
-            DetailLine(
-                text = SessionDisplayText.overrun(metrics.overrunMillis),
-                fontSize = 11
-            )
+            if (session.closedAfterIntervention == true) {
+                Text(
+                    text = "알림 후 앱을 닫았어요",
+                    color = secondaryTextColor,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                )
+            }
             if (metrics.extensionCount > 0) {
-                DetailLine(
+                Text(
                     text = "사용 시간을 ${metrics.extensionCount}회 연장했어요",
-                    fontSize = 11
+                    color = secondaryTextColor,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
                 )
             }
             if (metrics.interventionVisibleMillis > 0L) {
-                DetailLine(
-                    text = "상세: 전체 체류 ${formatDuration(metrics.totalDurationMillis)} · 개입 화면 ${formatDuration(metrics.interventionVisibleMillis)}",
-                    fontSize = 11
+                Text(
+                    text = "상세: 전체 ${formatDuration(metrics.totalDurationMillis)} · 확인 화면 ${formatDuration(metrics.interventionVisibleMillis)}",
+                    color = secondaryTextColor,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            DetailLine(
-                text = if (session.isFastReopen) {
-                    session.reopenGapMillis?.let { "${formatDuration(it)} 만에 다시 열었어요" }
-                        ?: "앱을 빠르게 다시 열었어요"
-                } else {
-                    "빠른 재진입 없이 시작했어요"
-                },
-                fontSize = 11
-            )
         }
-    }
-}
-
-@Composable
-private fun StatusPill(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .size(width = 70.dp, height = 26.dp)
-            .background(DashboardPill, RoundedCornerShape(13.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
@@ -786,34 +920,34 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
     val timeRange = hourSlot?.let(::formatHourRange) ?: "데이터 없음"
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(148.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 27.dp)
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp)
         ) {
             Text(
-                text = "주의분산 취약 시간대",
+                text = "자주 흔들린 시간",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = timeRange,
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 32.sp,
+                lineHeight = 36.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "초과율 ${formatPercent(stats.overrunRate)} · 빠른 재진입 ${stats.fastReopenCount}회",
+                text = "초과율 ${formatPercent(stats.overrunRate)} · 다시 열기 ${stats.fastReopenCount}회",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp
+                fontSize = 13.sp,
+                lineHeight = 17.sp
             )
         }
     }
@@ -829,7 +963,7 @@ private fun WeeklyOverrunBars(dailyStats: List<DailyOverrunStat>) {
 
     Column {
         Text(
-            text = "요일별 초과 세션",
+            text = "요일별 오래 쓴 횟수",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold
@@ -893,38 +1027,36 @@ private fun ReportMetricCard(
     description: String,
     color: Color
 ) {
-    val valueFontSize = if (value.length > 5) 18.sp else 22.sp
+    val valueFontSize = if (value.length >= 5) 18.sp else 24.sp
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 86.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 13.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 17.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(42.dp)
                     .background(color.copy(alpha = 0.11f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(7.dp)
+                        .size(8.dp)
                         .background(color, CircleShape)
                 )
             }
-            Spacer(modifier = Modifier.width(13.dp))
+            Spacer(modifier = Modifier.width(14.dp))
             Column(
-                modifier = Modifier.weight(0.95f),
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = title,
@@ -932,25 +1064,31 @@ private fun ReportMetricCard(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = value,
-                    color = color,
-                    fontSize = valueFontSize,
-                    lineHeight = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = value,
+                        color = color,
+                        fontSize = valueFontSize,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = description,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
-                lineHeight = 14.sp,
-                modifier = Modifier.weight(1f)
-            )
         }
     }
 }
@@ -965,7 +1103,7 @@ private fun WeeklyReportDetailCard(stats: WeeklyReportStats) {
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "주간 상세 요약",
@@ -973,33 +1111,87 @@ private fun WeeklyReportDetailCard(stats: WeeklyReportStats) {
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
-            DetailLine(
-                text = "세션 ${stats.totalSessionCount}회 / 초과 ${stats.overrunCount}회 (${formatPercent(stats.overrunRate)})"
+            WeeklySummaryRow(
+                label = "전체 사용",
+                value = "${stats.totalSessionCount}회",
+                subValue = "초과 ${stats.overrunCount}회 · ${formatPercent(stats.overrunRate)}"
             )
-            DetailLine(
-                text = "연장 ${stats.extensionCount}회 / 빠른 재진입 ${stats.fastReopenCount}회 / 목적 이탈 ${formatPercent(stats.purposeDriftRate)} (응답 ${stats.outcomeResponseCount}회)"
+            WeeklySummaryRow(
+                label = "목적 이탈",
+                value = formatPercent(stats.purposeDriftRate),
+                subValue = "응답 ${stats.outcomeResponseCount}회 · 연장 ${stats.extensionCount}회"
             )
-            DetailLine(
-                text = "개입 후 실제 종료 ${stats.closedAfterInterventionCount}회"
+            WeeklySummaryRow(
+                label = "다시 열기",
+                value = "${stats.fastReopenCount}회",
+                subValue = stats.averageReopenGapMillis?.let { "평균 ${formatDuration(it)}" } ?: "평균 데이터 없음"
             )
-            DetailLine(
-                text = stats.averageReopenGapMillis?.let { gapMillis ->
-                    "평균 재진입 간격 ${formatDuration(gapMillis)}"
-                } ?: "평균 재진입 간격: 데이터 없음"
-            )
-            DetailLine(
-                text = stats.mostVulnerableHourSlot?.let { hourSlot ->
-                    "가장 취약한 시간대: ${hourSlot}시"
-                } ?: "가장 취약한 시간대: 데이터 없음"
+            WeeklySummaryRow(
+                label = "알림 후 닫기",
+                value = "${stats.closedAfterInterventionCount}회",
+                subValue = stats.mostVulnerableHourSlot?.let { "자주 흔들린 시간 ${it}시" } ?: "시간 데이터 없음"
             )
             val activeDays = stats.dailyOverrunStats.filter { it.sessionCount > 0 }
             if (activeDays.isNotEmpty()) {
-                DetailLine(
+                Text(
                     text = activeDays.joinToString(separator = " · ") { day ->
                         "${day.label} ${day.overrunCount}/${day.sessionCount}"
-                    }
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WeeklySummaryRow(
+    label: String,
+    value: String,
+    subValue: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(DashboardPill, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(0.8f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Column(
+            modifier = Modifier.weight(1.25f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = value,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subValue,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End
+            )
         }
     }
 }
@@ -1042,7 +1234,7 @@ private fun DashboardBottomNavigation(
             DashboardNavItem("⌂", "홈", selectedTab == DashboardTab.Home) {
                 onTabSelected(DashboardTab.Home)
             }
-            DashboardNavItem("●", "세션", selectedTab == DashboardTab.Session) {
+            DashboardNavItem("●", "기록", selectedTab == DashboardTab.Session) {
                 onTabSelected(DashboardTab.Session)
             }
             DashboardNavItem("▤", "리포트", selectedTab == DashboardTab.Report) {
@@ -1305,14 +1497,9 @@ private fun AppStatisticsFilterCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "통계 앱 선택",
+                text = "앱별로 보기",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "선택한 앱의 오늘 통계와 최근 7일 분석을 보여드려요.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Row(
                 modifier = Modifier

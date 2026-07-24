@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import com.teum.app.ui.theme.TeumTheme
 
 private val TargetBorder = Color(0xFFE3E7EF)
-private val TargetPill = Color(0xFFF1F3F7)
 private val TargetGuide = Color(0xFFE8F8F4)
 private val YouTubeTint = Color(0xFFFFEBEE)
 private val InstagramTint = Color(0xFFFFF3E4)
@@ -49,6 +48,7 @@ private val NeutralTint = Color(0xFFF1F3F7)
 @Composable
 fun TargetAppSelectionScreen(
     onCompleteClick: (List<TargetAppSelectionResult>) -> Unit,
+    initialSelectedPackages: Set<String>? = null,
     modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -58,7 +58,12 @@ fun TargetAppSelectionScreen(
     }
     val checkedStates = remember {
         mutableStateMapOf<String, Boolean>().apply {
-            appItems.forEach { item -> put(item.packageName, item.initiallyChecked) }
+            appItems.forEach { item ->
+                put(
+                    item.packageName,
+                    initialSelectedPackages?.contains(item.packageName) ?: item.initiallyChecked
+                )
+            }
         }
     }
     val selectedCount = checkedStates.values.count { it }
@@ -81,7 +86,7 @@ fun TargetAppSelectionScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "목적 확인을 적용할 앱을 고르세요 · ${selectedCount}개 선택됨",
+                text = "사용을 줄이고 싶은 앱을 골라주세요 · ${selectedCount}개 선택됨",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -200,8 +205,6 @@ private fun TargetAppRow(
                 )
             }
 
-            DurationPill(item.durationLabel)
-            Spacer(modifier = Modifier.size(10.dp))
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
@@ -218,23 +221,6 @@ private fun TargetAppRow(
 }
 
 @Composable
-private fun DurationPill(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(width = 47.dp, height = 26.dp)
-            .background(TargetPill, RoundedCornerShape(13.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
 private fun GuideCard(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
@@ -245,14 +231,14 @@ private fun GuideCard(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "기본값은 설정에서 바꿀 수 있어요.",
+            text = "목표 시간은 앱을 열 때 정해요.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "처음에는 3~5분으로 시작하는 것을 권장해요.",
+            text = "여기서는 관리할 앱만 선택합니다.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp
         )
@@ -264,7 +250,6 @@ private data class TargetAppUi(
     val initial: String,
     val name: String,
     val description: String,
-    val durationLabel: String,
     val defaultDurationMillis: Long,
     val initiallyChecked: Boolean,
     val iconColor: Color,
@@ -280,7 +265,6 @@ private fun defaultTargetApps(
         initial = "Y",
         name = "YouTube",
         description = "Shorts 포함 영상 앱",
-        durationLabel = "5분",
         defaultDurationMillis = 300_000L,
         initiallyChecked = true,
         iconColor = Color(0xFFF05D5E),
@@ -291,7 +275,6 @@ private fun defaultTargetApps(
         initial = "I",
         name = "Instagram",
         description = "릴스 · 피드 · DM",
-        durationLabel = "5분",
         defaultDurationMillis = 300_000L,
         initiallyChecked = true,
         iconColor = Color(0xFFFF9F43),
@@ -302,7 +285,6 @@ private fun defaultTargetApps(
         initial = "T",
         name = "TikTok",
         description = "추천 피드가 길어지기 쉬운 앱",
-        durationLabel = "3분",
         defaultDurationMillis = 180_000L,
         initiallyChecked = true,
         iconColor = primaryColor,
@@ -313,7 +295,6 @@ private fun defaultTargetApps(
         initial = "X",
         name = "X",
         description = "피드 · 알림 확인",
-        durationLabel = "5분",
         defaultDurationMillis = 300_000L,
         initiallyChecked = false,
         iconColor = mutedColor,
@@ -324,7 +305,6 @@ private fun defaultTargetApps(
         initial = "C",
         name = "Chrome",
         description = "뉴스 · 검색 · 커뮤니티",
-        durationLabel = "10분",
         defaultDurationMillis = 600_000L,
         initiallyChecked = false,
         iconColor = mutedColor,
@@ -335,7 +315,6 @@ private fun defaultTargetApps(
         initial = "N",
         name = "Netflix",
         description = "영상 시청 앱",
-        durationLabel = "10분",
         defaultDurationMillis = 600_000L,
         initiallyChecked = false,
         iconColor = Color(0xFFF05D5E),

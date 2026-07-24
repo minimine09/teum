@@ -73,7 +73,7 @@ fun PermissionSetupScreen(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "세션 기록과 개입 화면에 필요한 최소 권한",
+                text = "앱 사용을 확인하고 안내를 띄우기 위해 필요해요",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -83,7 +83,7 @@ fun PermissionSetupScreen(
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 PermissionCard(
                     title = "사용 기록 접근",
-                    description = "대상 앱 실행과 사용 흐름을 감지하기 위해 필요해요.",
+                    description = "관리 앱을 언제 열고 닫는지 확인해요.",
                     badgeText = "필수",
                     statusText = if (permissionStatus.isAccessibilityEnabled) "완료" else "설정 필요",
                     granted = permissionStatus.isAccessibilityEnabled,
@@ -93,7 +93,7 @@ fun PermissionSetupScreen(
                 )
                 PermissionCard(
                     title = "화면 위 표시 권한",
-                    description = "Intent Check, Session Brake 같은 개입 화면을 띄워요.",
+                    description = "앱 위에 짧은 확인 화면을 띄워요.",
                     badgeText = "필수",
                     statusText = if (permissionStatus.canDrawOverlays) "완료" else "설정 필요",
                     granted = permissionStatus.canDrawOverlays,
@@ -153,7 +153,7 @@ fun PermissionSetupScreen(
             }
             Spacer(modifier = Modifier.height(29.dp))
             Text(
-                text = "언제든 설정에서 권한을 다시 변경할 수 있어요.",
+                text = "권한은 언제든 설정에서 바꿀 수 있어요.",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
