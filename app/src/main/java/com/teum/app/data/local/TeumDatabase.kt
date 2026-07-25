@@ -19,7 +19,7 @@ import com.teum.app.data.local.entity.SessionLogEntity
         AppOpenEventEntity::class,
         ReopenLogEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class TeumDatabase : RoomDatabase() {
@@ -42,7 +42,8 @@ abstract class TeumDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
-                    MIGRATION_5_6
+                    MIGRATION_5_6,
+                    MIGRATION_6_7
                 )
                     .build()
                     .also { database ->
@@ -175,6 +176,22 @@ abstract class TeumDatabase : RoomDatabase() {
                                 AND previous.endedAtMillis <= current.entryDetectedAtMillis
                         )
                     """.trimIndent()
+                )
+            }
+        }
+
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN modeAtStart TEXT"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs " +
+                        "ADD COLUMN isVulnerableTimeAtStart INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs " +
+                        "ADD COLUMN interventionAppliedAtStart INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }

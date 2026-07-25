@@ -60,7 +60,10 @@ class SessionLogRepository(context: Context) {
                 "extensionTotal=$totalExtensionDurationMillis finalTarget=$finalTargetDurationMillis " +
                 "rawOverrunMillis=$rawOverrunMillis overrunMillis=$overrunMillis " +
                 "necessaryUseExcessMillis=$necessaryUseExcessMillis " +
-                "outcomeType=${session.outcomeType?.name} extensionCount=${session.extensionCount}"
+                "outcomeType=${session.outcomeType?.name} extensionCount=${session.extensionCount} " +
+                "modeAtStart=${session.modeAtStart} " +
+                "isVulnerableTimeAtStart=${session.isVulnerableTimeAtStart} " +
+                "interventionAppliedAtStart=${session.interventionAppliedAtStart}"
         )
 
         val entity = SessionLogEntity(
@@ -78,6 +81,9 @@ class SessionLogRepository(context: Context) {
             overrunMillis = overrunMillis,
             necessaryUseExcessMillis = necessaryUseExcessMillis,
             intentChoice = session.intentChoice.name,
+            modeAtStart = session.modeAtStart,
+            isVulnerableTimeAtStart = session.isVulnerableTimeAtStart,
+            interventionAppliedAtStart = session.interventionAppliedAtStart,
             outcomeType = session.outcomeType?.name,
             outcomeRespondedAtMillis = session.outcomeType?.let { savedAtMillis },
             outcomeAchieved = when (session.outcomeType) {
