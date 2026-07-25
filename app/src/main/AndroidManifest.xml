@@ -6,6 +6,10 @@
     <queries>
         <package android:name="com.google.android.youtube" />
         <package android:name="com.instagram.android" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
     <application
         android:allowBackup="true"

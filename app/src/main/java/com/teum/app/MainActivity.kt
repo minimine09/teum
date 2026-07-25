@@ -1,6 +1,7 @@
 package com.teum.app
 
 import android.content.Intent
+import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -22,6 +23,7 @@ import com.teum.app.dashboard.DashboardViewModel
 import com.teum.app.ui.onboarding.OnboardingScreen
 import com.teum.app.ui.permission.PermissionSetupScreen
 import com.teum.app.ui.setup.InterventionModeSetupScreen
+import com.teum.app.ui.target.TargetAppInstalledApp
 import com.teum.app.ui.target.TargetAppSelectionScreen
 import com.teum.app.ui.theme.TeumTheme
 
@@ -47,11 +49,13 @@ class MainActivity : ComponentActivity() {
         )
     )
     private var targetPackages by mutableStateOf(emptySet<String>())
+    private var installedLauncherApps by mutableStateOf(emptyList<TargetAppInstalledApp>())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         refreshPermissionStatus()
         refreshTargetPackages()
+        refreshInstalledLauncherApps()
 
         setContent {
             TeumTheme {
@@ -81,6 +85,7 @@ class MainActivity : ComponentActivity() {
 
                     LaunchFlowStep.TargetAppSelection -> {
                         TargetAppSelectionScreen(
+                            installedApps = installedLauncherApps,
                             onCompleteClick = { results ->
                                 results.forEach { result ->
                                     if (result.enabled) {
@@ -116,6 +121,7 @@ class MainActivity : ComponentActivity() {
                             timeSlotStats = dashboardUiState.timeSlotStats,
                             weeklyReportStats = dashboardUiState.weeklyReportStats,
                             availablePackages = dashboardUiState.availablePackages,
+                            installedApps = installedLauncherApps,
                             selectedPackageName = dashboardUiState.selectedPackageName,
                             onOpenAccessibilitySettings = ::openAccessibilitySettings,
                             onOpenOverlaySettings = ::openOverlaySettings,
@@ -136,6 +142,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refreshPermissionStatus()
         refreshTargetPackages()
+        refreshInstalledLauncherApps()
     }
 
     private fun refreshPermissionStatus() {
@@ -169,5 +176,35 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshTargetPackages() {
         targetPackages = targetAppRepository.getTargetPackages()
+    }
+
+    private fun refreshInstalledLauncherApps() {
+        val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        installedLauncherApps = packageManager.queryIntentActivitiesCompat(launcherIntent)
+            .mapNotNull { resolveInfo ->
+                val activityInfo = resolveInfo.activityInfo ?: return@mapNotNull null
+                val packageName = activityInfo.packageName.orEmpty()
+                if (packageName.isBlank() || packageName == this.packageName) {
+                    return@mapNotNull null
+                }
+                TargetAppInstalledApp(
+                    packageName = packageName,
+                    appName = resolveInfo.loadLabel(packageManager)?.toString()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: packageName,
+                    icon = resolveInfo.loadIcon(packageManager)
+                )
+            }
+            .distinctBy { it.packageName }
+            .sortedBy { it.appName.lowercase() }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun android.content.pm.PackageManager.queryIntentActivitiesCompat(
+        intent: Intent
+    ): List<ResolveInfo> {
+        return queryIntentActivities(intent, 0)
     }
 }
