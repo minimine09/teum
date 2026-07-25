@@ -875,34 +875,60 @@ private fun OutcomeOption(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val optionBackground = if (selected) {
+        option.containerColor
+    } else {
+        option.containerColor.copy(alpha = 0.72f)
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 58.dp)
+            .height(52.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = option.containerColor),
-        border = if (selected) BorderStroke(1.4.dp, option.dotColor) else null
+        shape = RoundedCornerShape(13.dp),
+        colors = CardDefaults.cardColors(containerColor = optionBackground),
+        border = if (selected) BorderStroke(1.2.dp, option.dotColor) else null
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SelectionDot(
+            OutcomeSelectionDot(
                 color = option.dotColor,
-                selected = selected,
-                size = 21
+                selected = selected
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(11.dp))
             Text(
                 text = option.title,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun OutcomeSelectionDot(
+    color: Color,
+    selected: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .size(18.dp)
+            .background(if (selected) color else Color.White, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(Color.White, CircleShape)
             )
         }
     }
