@@ -179,8 +179,7 @@ fun DashboardScreen(
 
                 DashboardTab.Report -> WeeklyReportContent(
                     stats = weeklyReportStats,
-                    appDisplayNames = appDisplayNames,
-                    onDeleteAllSessionLogs = { showDeleteConfirmation = true }
+                    appDisplayNames = appDisplayNames
                 )
 
                 DashboardTab.Settings -> PrivacySettingsScreen(
@@ -289,8 +288,7 @@ private fun SessionHistoryContent(
 @Composable
 private fun WeeklyReportContent(
     stats: WeeklyReportStats,
-    appDisplayNames: Map<String, String>,
-    onDeleteAllSessionLogs: () -> Unit
+    appDisplayNames: Map<String, String>
 ) {
     Column(
         modifier = Modifier
@@ -328,16 +326,6 @@ private fun WeeklyReportContent(
             color = DashboardSuccess
         )
         WeeklyReportDetailCard(stats)
-        TextButton(
-            onClick = onDeleteAllSessionLogs,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "기록 전체 삭제",
-                color = DashboardDanger,
-                fontWeight = FontWeight.Bold
-            )
-        }
     }
 }
 
