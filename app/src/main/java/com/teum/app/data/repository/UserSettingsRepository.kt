@@ -21,8 +21,19 @@ class UserSettingsRepository(context: Context) {
             .apply()
     }
 
+    fun getForceVulnerableNowForDebug(): Boolean {
+        return preferences.getBoolean(KEY_FORCE_VULNERABLE_NOW_FOR_DEBUG, false)
+    }
+
+    fun setForceVulnerableNowForDebug(value: Boolean) {
+        preferences.edit()
+            .putBoolean(KEY_FORCE_VULNERABLE_NOW_FOR_DEBUG, value)
+            .apply()
+    }
+
     private companion object {
         const val PREFS_NAME = "teum_user_settings"
         const val KEY_INTERVENTION_MODE = "teum_mode"
+        const val KEY_FORCE_VULNERABLE_NOW_FOR_DEBUG = "force_vulnerable_now_for_debug"
     }
 }

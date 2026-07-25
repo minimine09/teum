@@ -5,13 +5,17 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.debug.TeumLogger
 import com.teum.app.data.repository.SessionLogRepository
 import com.teum.app.data.repository.TargetAppRepository
+import com.teum.app.data.repository.UserSettingsRepository
+import com.teum.app.data.repository.VulnerableTimeRepository
 import com.teum.app.overlay.BrakeChoice
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.overlay.IntentCheckMode
 import com.teum.app.overlay.OverlayController
+import com.teum.app.overlay.TargetDurationChoice
 import com.teum.app.session.AppSession
 import com.teum.app.session.OutcomeType
 import com.teum.app.session.ReopenCheckResult
@@ -32,6 +36,12 @@ class TeumAccessibilityService : AccessibilityService() {
     private val sessionLogRepository by lazy {
         SessionLogRepository(applicationContext)
     }
+    private val userSettingsRepository by lazy {
+        UserSettingsRepository(applicationContext)
+    }
+    private val vulnerableTimeRepository by lazy {
+        VulnerableTimeRepository(applicationContext)
+    }
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val brakeHandler = Handler(Looper.getMainLooper())
     private val brakeRunnable = Runnable {
@@ -46,6 +56,7 @@ class TeumAccessibilityService : AccessibilityService() {
     private var currentEntryTimeMillis: Long? = null
     private var currentReopenCheckResult: ReopenCheckResult? = null
     private var currentDebugSessionId: Long? = null
+    private var currentPolicySnapshot: PolicySnapshot = PolicySnapshot()
     private var pendingOutcome: PendingOutcome? = null
     private var latestObservedPackage: String? = null
     private var pendingEnterPackage: String? = null
@@ -174,24 +185,37 @@ class TeumAccessibilityService : AccessibilityService() {
 
         if (shouldSuppressReentry(packageName)) return
 
-        currentForegroundPackage = packageName
-        TeumLogger.flow("[ACCESS] ENTER_CONFIRMED package=$packageName")
-        Log.d(TAG, "target app entered: $packageName")
-        TeumLogger.access("ENTER", packageName)
         val entryTimeMillis = System.currentTimeMillis()
-        saveAppOpenEvent(
-            packageName = packageName,
-            detectedAtMillis = entryTimeMillis
-        )
-        val reopenCheckResult = SessionManager.checkFastReopen(
-            packageName = packageName,
-            currentEntryTimeMillis = entryTimeMillis
-        )
-        startIntentCheckSession(
-            packageName = packageName,
-            entryTimeMillis = entryTimeMillis,
-            reopenCheckResult = reopenCheckResult
-        )
+        serviceScope.launch {
+            val policySnapshot = resolvePolicySnapshot(entryTimeMillis)
+            brakeHandler.post {
+                if (currentStablePackageName() != packageName) {
+                    TeumLogger.flow(
+                        "[ACCESS] ENTER_IGNORED_NOT_STABLE package=$packageName current=${currentStablePackageName()}"
+                    )
+                    return@post
+                }
+
+                currentForegroundPackage = packageName
+                currentPolicySnapshot = policySnapshot
+                TeumLogger.flow("[ACCESS] ENTER_CONFIRMED package=$packageName")
+                Log.d(TAG, "target app entered: $packageName")
+                TeumLogger.access("ENTER", packageName)
+                saveAppOpenEvent(
+                    packageName = packageName,
+                    detectedAtMillis = entryTimeMillis
+                )
+                val reopenCheckResult = SessionManager.checkFastReopen(
+                    packageName = packageName,
+                    currentEntryTimeMillis = entryTimeMillis
+                )
+                startIntentCheckSession(
+                    packageName = packageName,
+                    entryTimeMillis = entryTimeMillis,
+                    reopenCheckResult = reopenCheckResult
+                )
+            }
+        }
     }
 
     private fun cancelPendingTargetEnter(reason: String, currentPackage: String?) {
@@ -273,11 +297,14 @@ class TeumAccessibilityService : AccessibilityService() {
             packageName = packageName,
             mode = intentCheckMode,
             reopenGapMillis = currentReopenCheckResult?.gapMillis,
+            interventionActive = currentPolicySnapshot.interventionActive,
+            availableDurations = availableDurationsForPolicy(currentPolicySnapshot),
             debugSessionId = currentDebugSessionId,
             source = intentCheckSource,
             onIntentConfirmed = { intentChoice, targetDurationMillis ->
                 val entryTimeMillis = currentEntryTimeMillis ?: System.currentTimeMillis()
                 val reopenCheckResult = currentReopenCheckResult
+                val policySnapshot = currentPolicySnapshot
                 SessionManager.startSession(
                     packageName = packageName,
                     intentChoice = intentChoice,
@@ -285,6 +312,9 @@ class TeumAccessibilityService : AccessibilityService() {
                     entryDetectedAtMillis = entryTimeMillis,
                     isFastReopen = reopenCheckResult?.isFastReopen == true,
                     reopenGapMillis = reopenCheckResult?.gapMillis,
+                    modeAtStart = policySnapshot.mode.name,
+                    isVulnerableTimeAtStart = policySnapshot.isVulnerableTime,
+                    interventionAppliedAtStart = policySnapshot.interventionActive,
                     debugSessionId = currentDebugSessionId ?: SessionManager.createDebugSessionId()
                 )
                 intentCheckedForCurrentSession = true
@@ -350,6 +380,8 @@ class TeumAccessibilityService : AccessibilityService() {
             packageName = session.packageName,
             elapsedMillis = SessionManager.getElapsedMillis(),
             targetDurationMillis = session.currentLimitDurationMillis,
+            interventionActive = session.interventionAppliedAtStart,
+            extensionLimitReached = isExtensionLimitReached(session),
             debugSessionId = session.debugSessionId,
             source = "session_brake",
             onBrakeChoice = { choice ->
@@ -434,6 +466,27 @@ class TeumAccessibilityService : AccessibilityService() {
     }
 
     private fun handleBrakeExtension(packageName: String, durationMillis: Long) {
+        val session = SessionManager.getCurrentSession() ?: return
+        val maxExtensions = maxExtensionCountForSession(session)
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "EXTENSION_LIMIT_CHECK",
+            detail = "mode=${session.modeAtStart} vulnerable=${session.isVulnerableTimeAtStart} " +
+                "extensionCount=${session.extensionCount} max=$maxExtensions"
+        )
+        if (session.interventionAppliedAtStart && session.extensionCount >= maxExtensions) {
+            TeumLogger.session(
+                debugSessionId = session.debugSessionId,
+                event = "EXTENSION_BLOCKED",
+                detail = "reason=vulnerable_time_limit extensionCount=${session.extensionCount} max=$maxExtensions"
+            )
+            return
+        }
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "EXTENSION_ALLOWED",
+            detail = "reason=${if (session.interventionAppliedAtStart) "within_vulnerable_time_limit" else "normal_mode"}"
+        )
         SessionManager.markInterventionHidden()
         SessionManager.extendCurrentSession(durationMillis)
         brakeSuppressedForCurrentSession = false
@@ -584,6 +637,7 @@ class TeumAccessibilityService : AccessibilityService() {
             targetDurationMillis = endedSession.targetDurationMillis +
                 endedSession.totalExtensionDurationMillis,
             extensionCount = endedSession.extensionCount,
+            interventionActive = endedSession.interventionAppliedAtStart,
             source = source,
             onOutcomeSelected = { outcomeType ->
                 handleOutcomeSelected(outcomeType)
@@ -765,6 +819,62 @@ class TeumAccessibilityService : AccessibilityService() {
         return session.intentChoice == IntentChoice.CLEAR_PURPOSE
     }
 
+    private suspend fun resolvePolicySnapshot(nowMillis: Long): PolicySnapshot {
+        val mode = userSettingsRepository.getInterventionMode()
+        val isVulnerableTime = try {
+            vulnerableTimeRepository.isVulnerableNow(nowMillis = nowMillis)
+        } catch (exception: RuntimeException) {
+            Log.w(TAG, "failed to resolve vulnerable time policy", exception)
+            false
+        }
+        val interventionActive = mode.isIntervention && isVulnerableTime
+        val snapshot = PolicySnapshot(
+            mode = mode,
+            isVulnerableTime = isVulnerableTime,
+            interventionActive = interventionActive
+        )
+        val durations = availableDurationsForPolicy(snapshot)
+
+        TeumLogger.flow(
+            "[POLICY] MODE_RESOLVED mode=${mode.name} vulnerable=$isVulnerableTime " +
+                "interventionActive=$interventionActive"
+        )
+        TeumLogger.flow(
+            "[POLICY] AVAILABLE_DURATIONS durations=${durations.joinToString(",") { it.name }} " +
+                "reason=${if (interventionActive) "vulnerable_time_intervention_mode" else "normal_or_not_vulnerable"}"
+        )
+        if (interventionActive) {
+            TeumLogger.flow(
+                "[POLICY] DURATION_LIMIT_APPLIED max=${TargetDurationChoice.FIVE_MINUTES.name} " +
+                    "reason=vulnerable_time_intervention_mode"
+            )
+        }
+
+        return snapshot
+    }
+
+    private fun availableDurationsForPolicy(policySnapshot: PolicySnapshot): List<TargetDurationChoice> {
+        return if (policySnapshot.interventionActive) {
+            listOf(
+                TargetDurationChoice.TEST_FIVE_SECONDS,
+                TargetDurationChoice.ONE_MINUTE,
+                TargetDurationChoice.THREE_MINUTES,
+                TargetDurationChoice.FIVE_MINUTES
+            )
+        } else {
+            TargetDurationChoice.entries.toList()
+        }
+    }
+
+    private fun maxExtensionCountForSession(session: AppSession): Int {
+        return if (session.interventionAppliedAtStart) 1 else Int.MAX_VALUE
+    }
+
+    private fun isExtensionLimitReached(session: AppSession): Boolean {
+        return session.interventionAppliedAtStart &&
+            session.extensionCount >= maxExtensionCountForSession(session)
+    }
+
     private fun suppressReentry(
         packageName: String,
         reason: String,
@@ -807,6 +917,7 @@ class TeumAccessibilityService : AccessibilityService() {
         currentEntryTimeMillis = null
         currentReopenCheckResult = null
         currentDebugSessionId = null
+        currentPolicySnapshot = PolicySnapshot()
         sessionNeedsIntentCheck = false
         intentCheckedForCurrentSession = false
         brakeSuppressedForCurrentSession = false
@@ -827,6 +938,12 @@ class TeumAccessibilityService : AccessibilityService() {
         val sessionLogId: Long,
         val homeNavigationReason: String? = null,
         var handled: Boolean = false
+    )
+
+    private data class PolicySnapshot(
+        val mode: InterventionMode = InterventionMode.NORMAL,
+        val isVulnerableTime: Boolean = false,
+        val interventionActive: Boolean = false
     )
 
     private companion object {

@@ -23,6 +23,9 @@ object SessionManager {
         entryDetectedAtMillis: Long = System.currentTimeMillis(),
         isFastReopen: Boolean = false,
         reopenGapMillis: Long? = null,
+        modeAtStart: String? = null,
+        isVulnerableTimeAtStart: Boolean = false,
+        interventionAppliedAtStart: Boolean = false,
         debugSessionId: Long = createDebugSessionId()
     ) {
         val session = AppSession(
@@ -33,7 +36,10 @@ object SessionManager {
             intentChoice = intentChoice,
             targetDurationMillis = targetDurationMillis,
             isFastReopen = isFastReopen,
-            reopenGapMillis = reopenGapMillis
+            reopenGapMillis = reopenGapMillis,
+            modeAtStart = modeAtStart,
+            isVulnerableTimeAtStart = isVulnerableTimeAtStart,
+            interventionAppliedAtStart = interventionAppliedAtStart
         )
 
         state = SessionState(currentSession = session)
@@ -45,7 +51,15 @@ object SessionManager {
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
             event = "START",
-            detail = "package=$packageName intent=${intentChoice.name} target=$targetDurationMillis fastReopen=$isFastReopen gap=$reopenGapMillis"
+            detail = "package=$packageName intent=${intentChoice.name} target=$targetDurationMillis " +
+                "fastReopen=$isFastReopen gap=$reopenGapMillis mode=$modeAtStart " +
+                "vulnerable=$isVulnerableTimeAtStart interventionActive=$interventionAppliedAtStart"
+        )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "POLICY_SNAPSHOT",
+            detail = "mode=$modeAtStart vulnerable=$isVulnerableTimeAtStart " +
+                "interventionActive=$interventionAppliedAtStart"
         )
     }
 

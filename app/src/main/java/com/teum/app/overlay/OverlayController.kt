@@ -58,6 +58,7 @@ class OverlayController(context: Context) {
         mode: IntentCheckMode = IntentCheckMode.NORMAL,
         reopenGapMillis: Long? = null,
         interventionActive: Boolean = false,
+        availableDurations: List<TargetDurationChoice> = TargetDurationChoice.entries,
         debugSessionId: Long? = null,
         source: String = "target_enter",
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
@@ -71,6 +72,7 @@ class OverlayController(context: Context) {
             mode = mode,
             reopenGapMillis = reopenGapMillis,
             interventionActive = interventionActive,
+            availableDurations = availableDurations,
             debugSessionId = debugSessionId,
             onIntentConfirmed = { choice, targetDurationMillis ->
                 Log.d(TAG, "intent selected: ${choice.name} target=$targetDurationMillis for $packageName")
@@ -268,6 +270,7 @@ class OverlayController(context: Context) {
         mode: IntentCheckMode,
         reopenGapMillis: Long?,
         interventionActive: Boolean,
+        availableDurations: List<TargetDurationChoice>,
         debugSessionId: Long?,
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
         onCloseNowSelected: () -> Unit
@@ -336,6 +339,7 @@ class OverlayController(context: Context) {
                             interventionActive = interventionActive,
                             selectedIntent = selectedIntentChoice,
                             selectedDuration = selectedDurationChoice,
+                            availableDurations = availableDurations,
                             onIntentSelected = { selectIntent(it) },
                             onDurationSelected = { selectDuration(it) },
                             onStartClick = { startIntentSession() },
@@ -347,6 +351,7 @@ class OverlayController(context: Context) {
                             interventionActive = interventionActive,
                             selectedIntent = selectedIntentChoice,
                             selectedDuration = selectedDurationChoice,
+                            availableDurations = availableDurations,
                             onIntentSelected = { selectIntent(it) },
                             onDurationSelected = { selectDuration(it) },
                             onStartClick = { startIntentSession() },

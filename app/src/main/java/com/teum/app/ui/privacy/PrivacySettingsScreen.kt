@@ -24,6 +24,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +50,9 @@ private val PrivacyNormalContainer = Color(0xFFECEEFF)
 fun PrivacySettingsScreen(
     selectedMode: InterventionMode,
     onModeChange: (InterventionMode) -> Unit,
+    showVulnerableDebugOverride: Boolean = false,
+    forceVulnerableNowForDebug: Boolean = false,
+    onForceVulnerableNowForDebugChange: (Boolean) -> Unit = {},
     onManageTargetAppsClick: () -> Unit = {},
     onDeleteAllClick: () -> Unit,
     showBottomNav: Boolean = true,
@@ -72,6 +77,13 @@ fun PrivacySettingsScreen(
                 selectedMode = selectedMode,
                 onModeChange = onModeChange
             )
+            if (showVulnerableDebugOverride) {
+                Spacer(modifier = Modifier.height(16.dp))
+                VulnerableDebugOverrideCard(
+                    enabled = forceVulnerableNowForDebug,
+                    onEnabledChange = onForceVulnerableNowForDebugChange
+                )
+            }
             Spacer(modifier = Modifier.height(16.dp))
             ManageTargetAppsCard(onClick = onManageTargetAppsClick)
             Spacer(modifier = Modifier.height(23.dp))
@@ -135,6 +147,59 @@ private fun ManageTargetAppsCard(
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun VulnerableDebugOverrideCard(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = PrivacyCareContainer),
+        border = BorderStroke(1.dp, PrivacyCare)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onEnabledChange(!enabled) }
+                .padding(horizontal = 24.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "시연용 취약 시간대",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (enabled) {
+                        "현재 시간을 취약 시간대로 강제 적용 중"
+                    } else {
+                        "켜면 현재 시간이 취약 시간대로 판정돼요"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Switch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = PrivacyCare,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = PrivacyPill
+                )
             )
         }
     }
