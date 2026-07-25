@@ -1,6 +1,7 @@
 package com.teum.app
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Bundle
@@ -54,9 +55,13 @@ class MainActivity : ComponentActivity() {
     )
     private var targetPackages by mutableStateOf(emptySet<String>())
     private var installedLauncherApps by mutableStateOf(emptyList<TargetAppInstalledApp>())
+    private var forceVulnerableNowForDebug by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        forceVulnerableNowForDebug = userSettingsRepository.getForceVulnerableNowForDebug()
+
         refreshPermissionStatus()
         refreshTargetPackages()
         refreshInstalledLauncherApps()
@@ -140,6 +145,12 @@ class MainActivity : ComponentActivity() {
                             onInterventionModeChange = {
                                 selectedInterventionMode = it
                                 userSettingsRepository.setInterventionMode(it)
+                            },
+                            showVulnerableDebugOverride = isDebuggableBuild(),
+                            forceVulnerableNowForDebug = forceVulnerableNowForDebug,
+                            onForceVulnerableNowForDebugChange = {
+                                forceVulnerableNowForDebug = it
+                                userSettingsRepository.setForceVulnerableNowForDebug(it)
                             }
                         )
                     }
@@ -209,6 +220,10 @@ class MainActivity : ComponentActivity() {
             }
             .distinctBy { it.packageName }
             .sortedBy { it.appName.lowercase() }
+    }
+
+    private fun isDebuggableBuild(): Boolean {
+        return (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     }
 
     @Suppress("DEPRECATION")

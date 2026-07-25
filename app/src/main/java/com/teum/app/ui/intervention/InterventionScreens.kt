@@ -81,6 +81,7 @@ fun IntentCheckScreen(
     interventionActive: Boolean = false,
     selectedIntent: IntentChoice?,
     selectedDuration: TargetDurationChoice?,
+    availableDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onIntentSelected: (IntentChoice) -> Unit,
     onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
@@ -111,6 +112,7 @@ fun IntentCheckScreen(
             ),
             selectedIntent = selectedIntent,
             selectedDuration = selectedDuration,
+            availableDurations = availableDurations,
             onIntentSelected = onIntentSelected,
             onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
@@ -127,6 +129,7 @@ fun ReopenCheckScreen(
     interventionActive: Boolean = false,
     selectedIntent: IntentChoice?,
     selectedDuration: TargetDurationChoice?,
+    availableDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onIntentSelected: (IntentChoice) -> Unit,
     onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
@@ -152,6 +155,7 @@ fun ReopenCheckScreen(
             ),
             selectedIntent = selectedIntent,
             selectedDuration = selectedDuration,
+            availableDurations = availableDurations,
             onIntentSelected = onIntentSelected,
             onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
@@ -292,7 +296,8 @@ fun SessionBrakeContent(
                     isExtensionExpanded = true
                 }
             },
-            color = accentColor
+            color = accentColor,
+            enabled = !extensionLimitReached
         )
         if (isExtensionExpanded) {
             Spacer(modifier = Modifier.height(24.dp))
@@ -472,6 +477,7 @@ private fun CheckModal(
     options: List<IntentOptionUi>,
     selectedIntent: IntentChoice?,
     selectedDuration: TargetDurationChoice?,
+    availableDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onIntentSelected: (IntentChoice) -> Unit,
     onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
@@ -515,6 +521,7 @@ private fun CheckModal(
         Spacer(modifier = Modifier.height(25.dp))
         DurationChoiceSlider(
             selectedDuration = selectedDuration,
+            availableDurations = availableDurations,
             onDurationSelected = onDurationSelected
         )
         Spacer(modifier = Modifier.height(18.dp))
@@ -613,15 +620,10 @@ private fun ChoiceRow(
 private fun DurationChoiceSlider(
     selectedDuration: TargetDurationChoice?,
     onDurationSelected: (TargetDurationChoice) -> Unit,
+    availableDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     modifier: Modifier = Modifier
 ) {
-    val durationOptions = listOf(
-        TargetDurationChoice.TEST_FIVE_SECONDS,
-        TargetDurationChoice.ONE_MINUTE,
-        TargetDurationChoice.THREE_MINUTES,
-        TargetDurationChoice.FIVE_MINUTES,
-        TargetDurationChoice.TEN_MINUTES
-    )
+    val durationOptions = availableDurations.ifEmpty { DefaultDurationOptions }
     val selectedIndex = durationOptions
         .indexOf(selectedDuration)
         .takeIf { it >= 0 }
@@ -655,10 +657,18 @@ private fun DurationChoiceSlider(
                 .fillMaxWidth()
                 .height(23.dp),
             valueRange = 0f..durationOptions.lastIndex.toFloat(),
-            steps = durationOptions.size - 2
+            steps = (durationOptions.size - 2).coerceAtLeast(0)
         )
     }
 }
+
+private val DefaultDurationOptions = listOf(
+    TargetDurationChoice.TEST_FIVE_SECONDS,
+    TargetDurationChoice.ONE_MINUTE,
+    TargetDurationChoice.THREE_MINUTES,
+    TargetDurationChoice.FIVE_MINUTES,
+    TargetDurationChoice.TEN_MINUTES
+)
 
 @Composable
 private fun SelectionDot(

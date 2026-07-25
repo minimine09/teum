@@ -106,6 +106,9 @@ fun DashboardScreen(
     onSelectPackage: (String?) -> Unit,
     selectedInterventionMode: InterventionMode = InterventionMode.NORMAL,
     onInterventionModeChange: (InterventionMode) -> Unit = {},
+    showVulnerableDebugOverride: Boolean = false,
+    forceVulnerableNowForDebug: Boolean = false,
+    onForceVulnerableNowForDebugChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(DashboardTab.Home) }
@@ -185,6 +188,9 @@ fun DashboardScreen(
                 DashboardTab.Settings -> PrivacySettingsScreen(
                     selectedMode = selectedInterventionMode,
                     onModeChange = onInterventionModeChange,
+                    showVulnerableDebugOverride = showVulnerableDebugOverride,
+                    forceVulnerableNowForDebug = forceVulnerableNowForDebug,
+                    onForceVulnerableNowForDebugChange = onForceVulnerableNowForDebugChange,
                     onManageTargetAppsClick = { selectedTab = DashboardTab.TargetApps },
                     onDeleteAllClick = { showDeleteConfirmation = true },
                     showBottomNav = false
