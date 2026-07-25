@@ -1876,12 +1876,15 @@ private fun AppStatisticsFilterCard(
 
 private fun formatDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
-    val minutes = totalSeconds / 60L
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
     val seconds = totalSeconds % 60L
-    return if (minutes > 0L) {
-        "${minutes}분 ${seconds}초"
-    } else {
-        "${seconds}초"
+    return when {
+        hours > 0L && minutes > 0L -> "${hours}시간 ${minutes}분"
+        hours > 0L -> "${hours}시간"
+        minutes > 0L && seconds > 0L -> "${minutes}분 ${seconds}초"
+        minutes > 0L -> "${minutes}분"
+        else -> "${seconds}초"
     }
 }
 
