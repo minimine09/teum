@@ -1108,13 +1108,19 @@ private fun WeeklyAppUsageChartCard(
     appDisplayNames: Map<String, String>,
     modifier: Modifier = Modifier
 ) {
-    val visibleStats = appUsageStats.take(4)
-    val totalUsageMillis = visibleStats.sumOf { it.usageMillis }
+    val usageSlices = remember(appUsageStats, appDisplayNames) {
+        buildAppUsageSlices(
+            appUsageStats = appUsageStats,
+            appDisplayNames = appDisplayNames
+        )
+    }
     val colors = listOf(
         MaterialTheme.colorScheme.primary,
         DashboardSuccess,
         DashboardWarning,
-        DashboardDanger
+        DashboardDanger,
+        Color(0xFF7C83F7),
+        Color(0xFF9AA3B8)
     )
 
     Card(
@@ -1136,18 +1142,8 @@ private fun WeeklyAppUsageChartCard(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(5.dp))
-                Text(
-                    text = if (totalUsageMillis > 0L) formatDuration(totalUsageMillis) else "기록 없음",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 22.sp,
-                    lineHeight = 27.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                if (visibleStats.isEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                if (usageSlices.isEmpty()) {
                     Text(
                         text = "앱별 기록이 아직 없어요.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1155,18 +1151,18 @@ private fun WeeklyAppUsageChartCard(
                         lineHeight = 16.sp
                     )
                 } else {
-                    visibleStats.forEachIndexed { index, stat ->
+                    usageSlices.forEachIndexed { index, slice ->
                         ChartLegendRow(
                             color = colors[index % colors.size],
-                            label = appDisplayNames[stat.packageName] ?: stat.packageName,
-                            value = formatPercent(stat.usageMillis.toDouble() / totalUsageMillis.toDouble())
+                            label = slice.label,
+                            value = "${formatDuration(slice.usageMillis)} · ${formatPercent(slice.ratio)}"
                         )
                     }
                 }
             }
             Spacer(modifier = Modifier.width(14.dp))
             PieChart(
-                values = visibleStats.map { it.usageMillis.toFloat() },
+                values = usageSlices.map { it.usageMillis.toFloat() },
                 colors = colors,
                 modifier = Modifier.size(104.dp)
             )
@@ -1230,9 +1226,13 @@ private fun ChartLegendRow(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = value,
+            modifier = Modifier.weight(0.9f),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End
         )
     }
 }
@@ -1261,6 +1261,42 @@ private fun PieChart(
                 color = DashboardMutedBar,
             )
         }
+    }
+}
+
+private data class AppUsageSlice(
+    val label: String,
+    val usageMillis: Long,
+    val ratio: Double
+)
+
+private fun buildAppUsageSlices(
+    appUsageStats: List<AppUsageStat>,
+    appDisplayNames: Map<String, String>
+): List<AppUsageSlice> {
+    val sortedStats = appUsageStats
+        .filter { it.usageMillis > 0L }
+        .sortedByDescending { it.usageMillis }
+    val totalUsageMillis = sortedStats.sumOf { it.usageMillis }
+    if (totalUsageMillis <= 0L) return emptyList()
+
+    val topStats = sortedStats.take(4)
+    val otherUsageMillis = sortedStats.drop(4).sumOf { it.usageMillis }
+    val displayStats = topStats.map { stat ->
+        appDisplayNames[stat.packageName].orEmpty()
+            .ifBlank { stat.packageName } to stat.usageMillis
+    } + if (otherUsageMillis > 0L) {
+        listOf("기타" to otherUsageMillis)
+    } else {
+        emptyList()
+    }
+
+    return displayStats.map { (label, usageMillis) ->
+        AppUsageSlice(
+            label = label,
+            usageMillis = usageMillis,
+            ratio = usageMillis.toDouble() / totalUsageMillis.toDouble()
+        )
     }
 }
 
@@ -1840,12 +1876,18 @@ private fun AppStatisticsFilterCard(
 
 private fun formatDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
-    val minutes = totalSeconds / 60L
+    val days = totalSeconds / 86_400L
+    val hours = (totalSeconds % 86_400L) / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
     val seconds = totalSeconds % 60L
-    return if (minutes > 0L) {
-        "${minutes}분 ${seconds}초"
-    } else {
-        "${seconds}초"
+    return when {
+        days > 0L && hours > 0L -> "${days}일 ${hours}시간"
+        days > 0L -> "${days}일"
+        hours > 0L && minutes > 0L -> "${hours}시간 ${minutes}분"
+        hours > 0L -> "${hours}시간"
+        minutes > 0L && seconds > 0L -> "${minutes}분 ${seconds}초"
+        minutes > 0L -> "${minutes}분"
+        else -> "${seconds}초"
     }
 }
 
