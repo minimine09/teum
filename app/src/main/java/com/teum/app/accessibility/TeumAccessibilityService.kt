@@ -46,7 +46,7 @@ class TeumAccessibilityService : AccessibilityService() {
     private var currentEntryTimeMillis: Long? = null
     private var currentReopenCheckResult: ReopenCheckResult? = null
     private var currentDebugSessionId: Long? = null
-    private var pendingOutcomeSession: AppSession? = null
+    private var pendingOutcome: PendingOutcome? = null
     private val suppressReentryUntilByPackage = mutableMapOf<String, Long>()
     private val suppressReentryReasonByPackage = mutableMapOf<String, String>()
 
@@ -434,7 +434,58 @@ class TeumAccessibilityService : AccessibilityService() {
         source: String,
         saveReason: String
     ) {
-        pendingOutcomeSession = endedSession
+        TeumLogger.session(
+            debugSessionId = endedSession.debugSessionId,
+            event = "OUTCOME_PREINSERT_REQUESTED",
+            detail = "source=$source reason=$saveReason"
+        )
+
+        serviceScope.launch {
+            try {
+                val sessionLogId = sessionLogRepository.saveEndedSession(endedSession)
+                if (sessionLogId == null) {
+                    Log.e(DB_TAG, "failed to preinsert outcome session package=${endedSession.packageName}")
+                    return@launch
+                }
+
+                TeumLogger.session(
+                    debugSessionId = endedSession.debugSessionId,
+                    event = "OUTCOME_PREINSERT_SAVED",
+                    detail = "sessionLogId=$sessionLogId"
+                )
+                Log.d(
+                    DB_TAG,
+                    "outcome preinsert saved id=$sessionLogId package=${endedSession.packageName} source=$source"
+                )
+
+                if (source == "session_brake_end_now") {
+                    confirmExitAfterIntervention(
+                        session = endedSession,
+                        sessionLogId = sessionLogId,
+                        source = source
+                    )
+                }
+
+                brakeHandler.post {
+                    pendingOutcome = PendingOutcome(
+                        session = endedSession,
+                        sessionLogId = sessionLogId
+                    )
+                    showOutcomeCheckOverlay(
+                        endedSession = endedSession,
+                        source = source
+                    )
+                }
+            } catch (exception: RuntimeException) {
+                Log.e(DB_TAG, "failed to preinsert outcome session package=${endedSession.packageName}", exception)
+            }
+        }
+    }
+
+    private fun showOutcomeCheckOverlay(
+        endedSession: AppSession,
+        source: String
+    ) {
         overlayController.showOutcomeCheck(
             packageName = endedSession.packageName,
             debugSessionId = endedSession.debugSessionId,
@@ -442,29 +493,117 @@ class TeumAccessibilityService : AccessibilityService() {
             intentChoice = endedSession.intentChoice,
             source = source,
             onOutcomeSelected = { outcomeType ->
-                TeumLogger.session(
-                    debugSessionId = endedSession.debugSessionId,
-                    event = "OUTCOME_SELECTED",
-                    detail = "outcome=$outcomeType"
-                )
-                saveEndedSession(
-                    session = endedSession.copy(outcomeType = outcomeType),
-                    reason = saveReason
-                )
-                pendingOutcomeSession = null
+                handleOutcomeSelected(outcomeType)
             },
             onDismissedWithoutChoice = {
-                TeumLogger.session(
-                    debugSessionId = endedSession.debugSessionId,
-                    event = "OUTCOME_DISMISSED"
-                )
-                saveEndedSession(
-                    session = endedSession,
-                    reason = "${saveReason}_dismissed"
-                )
-                pendingOutcomeSession = null
+                handleOutcomeDismissed()
             }
         )
+    }
+
+    private fun handleOutcomeSelected(outcomeType: OutcomeType) {
+        val pending = pendingOutcome ?: return
+        if (pending.handled) {
+            TeumLogger.session(
+                debugSessionId = pending.session.debugSessionId,
+                event = "OUTCOME_IGNORED_ALREADY_HANDLED",
+                detail = "sessionLogId=${pending.sessionLogId} event=selected"
+            )
+            return
+        }
+
+        pending.handled = true
+        pendingOutcome = null
+        TeumLogger.session(
+            debugSessionId = pending.session.debugSessionId,
+            event = "OUTCOME_SELECTED",
+            detail = "outcome=$outcomeType sessionLogId=${pending.sessionLogId}"
+        )
+        updatePendingOutcome(
+            pending = pending,
+            outcomeType = outcomeType,
+            dismissed = false
+        )
+    }
+
+    private fun handleOutcomeDismissed() {
+        val pending = pendingOutcome ?: return
+        if (pending.handled) {
+            TeumLogger.session(
+                debugSessionId = pending.session.debugSessionId,
+                event = "OUTCOME_IGNORED_ALREADY_HANDLED",
+                detail = "sessionLogId=${pending.sessionLogId} event=dismissed"
+            )
+            return
+        }
+
+        pending.handled = true
+        pendingOutcome = null
+        TeumLogger.session(
+            debugSessionId = pending.session.debugSessionId,
+            event = "OUTCOME_DISMISSED",
+            detail = "sessionLogId=${pending.sessionLogId}"
+        )
+        updatePendingOutcome(
+            pending = pending,
+            outcomeType = OutcomeType.ENDED,
+            dismissed = true
+        )
+    }
+
+    private fun updatePendingOutcome(
+        pending: PendingOutcome,
+        outcomeType: OutcomeType,
+        dismissed: Boolean
+    ) {
+        val mapping = outcomeMapping(outcomeType)
+        TeumLogger.session(
+            debugSessionId = pending.session.debugSessionId,
+            event = "OUTCOME_UPDATE_REQUESTED",
+            detail = "sessionLogId=${pending.sessionLogId} outcome=$outcomeType dismissed=$dismissed"
+        )
+
+        serviceScope.launch {
+            try {
+                val success = sessionLogRepository.updateSessionOutcome(
+                    sessionId = pending.sessionLogId,
+                    outcomeType = outcomeType.name,
+                    achieved = mapping.achieved,
+                    drifted = mapping.drifted
+                )
+                TeumLogger.session(
+                    debugSessionId = pending.session.debugSessionId,
+                    event = "OUTCOME_UPDATED",
+                    detail = "sessionLogId=${pending.sessionLogId} success=$success"
+                )
+            } catch (exception: RuntimeException) {
+                Log.e(DB_TAG, "failed to update outcome sessionLogId=${pending.sessionLogId}", exception)
+            }
+        }
+    }
+
+    private fun confirmExitAfterIntervention(
+        session: AppSession,
+        sessionLogId: Long,
+        source: String
+    ) {
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "EXIT_CONFIRM_REQUESTED",
+            detail = "sessionLogId=$sessionLogId source=$source"
+        )
+        serviceScope.launch {
+            try {
+                val success = sessionLogRepository.confirmExitAfterIntervention(sessionLogId)
+                TeumLogger.session(
+                    debugSessionId = session.debugSessionId,
+                    event = "EXIT_CONFIRMED",
+                    detail = "sessionLogId=$sessionLogId success=$success"
+                )
+            } catch (exception: RuntimeException) {
+                Log.e(DB_TAG, "failed to confirm exit sessionLogId=$sessionLogId", exception)
+            }
+        }
     }
 
     private fun shouldShowOutcomeCheckForTargetExit(session: AppSession): Boolean {
@@ -521,10 +660,46 @@ class TeumAccessibilityService : AccessibilityService() {
         sessionNeedsIntentCheck = false
         intentCheckedForCurrentSession = false
         brakeSuppressedForCurrentSession = false
+        if (overlayController.currentOverlayName == "OUTCOME_CHECK") {
+            TeumLogger.overlay(
+                event = "RESET_SKIPPED",
+                detail = "reason=outcome_pending overlay=OUTCOME_CHECK"
+            )
+            return
+        }
         overlayController.dismiss()
     }
 
     private fun ownPackageName(): String = applicationContext.packageName
+
+    private fun outcomeMapping(outcomeType: OutcomeType): OutcomeMapping {
+        return when (outcomeType) {
+            OutcomeType.NECESSARY_USE -> OutcomeMapping(
+                achieved = true,
+                drifted = false
+            )
+            OutcomeType.PURPOSE_DRIFT -> OutcomeMapping(
+                achieved = false,
+                drifted = true
+            )
+            OutcomeType.ENDED,
+            OutcomeType.EXTENDED -> OutcomeMapping(
+                achieved = false,
+                drifted = false
+            )
+        }
+    }
+
+    private data class PendingOutcome(
+        val session: AppSession,
+        val sessionLogId: Long,
+        var handled: Boolean = false
+    )
+
+    private data class OutcomeMapping(
+        val achieved: Boolean,
+        val drifted: Boolean
+    )
 
     private companion object {
         const val TAG = "TeumAccess"
