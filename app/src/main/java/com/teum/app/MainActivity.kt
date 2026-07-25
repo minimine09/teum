@@ -17,6 +17,7 @@ import com.teum.app.core.model.InterventionMode
 import com.teum.app.core.model.PermissionStatus
 import com.teum.app.core.util.PermissionUtils
 import com.teum.app.data.repository.TargetAppRepository
+import com.teum.app.data.repository.UserSettingsRepository
 import com.teum.app.dashboard.AppDisplayNameResolver
 import com.teum.app.dashboard.DashboardScreen
 import com.teum.app.dashboard.DashboardViewModel
@@ -39,6 +40,9 @@ class MainActivity : ComponentActivity() {
     private val targetAppRepository by lazy {
         TargetAppRepository(this)
     }
+    private val userSettingsRepository by lazy {
+        UserSettingsRepository(this)
+    }
     private val dashboardViewModel: DashboardViewModel by viewModels()
     private val appDisplayNameResolver by lazy { AppDisplayNameResolver(this) }
 
@@ -60,7 +64,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             TeumTheme {
                 var launchFlowStep by remember { mutableStateOf(LaunchFlowStep.Onboarding) }
-                var selectedInterventionMode by remember { mutableStateOf(InterventionMode.NORMAL) }
+                var selectedInterventionMode by remember {
+                    mutableStateOf(userSettingsRepository.getInterventionMode())
+                }
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val displayedPackages = targetPackages +
                     dashboardUiState.availablePackages +
@@ -106,6 +112,7 @@ class MainActivity : ComponentActivity() {
                             onModeSelected = { selectedInterventionMode = it },
                             onCompleteClick = {
                                 selectedInterventionMode = it
+                                userSettingsRepository.setInterventionMode(it)
                                 launchFlowStep = LaunchFlowStep.Dashboard
                             }
                         )
@@ -130,7 +137,10 @@ class MainActivity : ComponentActivity() {
                             onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,
                             onSelectPackage = dashboardViewModel::selectPackage,
                             selectedInterventionMode = selectedInterventionMode,
-                            onInterventionModeChange = { selectedInterventionMode = it }
+                            onInterventionModeChange = {
+                                selectedInterventionMode = it
+                                userSettingsRepository.setInterventionMode(it)
+                            }
                         )
                     }
                 }

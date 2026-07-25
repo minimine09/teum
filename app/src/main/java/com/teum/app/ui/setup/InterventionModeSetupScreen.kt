@@ -39,10 +39,8 @@ import com.teum.app.ui.theme.TeumTheme
 
 private val ModeBorder = Color(0xFFE3E7EF)
 private val ModeSoftPurple = Color(0xFFECEEFF)
-private val ModeSoftMint = Color(0xFFE8F8F4)
 private val ModeSoftOrange = Color(0xFFFFF3E4)
 private val ModePurple = Color(0xFF5B5FEA)
-private val ModeMint = Color(0xFF2EC4A6)
 private val ModeOrange = Color(0xFFFF9F43)
 
 @Composable
@@ -65,14 +63,14 @@ fun InterventionModeSetupScreen(
                 .padding(top = 50.dp, bottom = 42.dp)
         ) {
             Text(
-                text = "알림 강도 선택",
+                text = "사용 모드 선택",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "처음에는 보통으로 시작해도 좋아요.",
+                text = "처음에는 보통 모드로 시작해도 좋아요.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
@@ -117,7 +115,7 @@ fun InterventionModeSetupScreen(
             }
             Spacer(modifier = Modifier.height(29.dp))
             Text(
-                text = "선택한 강도는 설정에서 바꿀 수 있어요.",
+                text = "언제든지 변경할 수 있어요.",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
@@ -134,20 +132,18 @@ private fun ModeOptionCard(
     modifier: Modifier = Modifier
 ) {
     val accent = when (mode) {
-        InterventionMode.LOW -> ModeMint
         InterventionMode.NORMAL -> ModePurple
-        InterventionMode.HIGH -> ModeOrange
+        InterventionMode.INTERVENTION -> ModeOrange
     }
     val container = when (mode) {
-        InterventionMode.LOW -> ModeSoftMint
         InterventionMode.NORMAL -> ModeSoftPurple
-        InterventionMode.HIGH -> ModeSoftOrange
+        InterventionMode.INTERVENTION -> ModeSoftOrange
     }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(104.dp)
+            .height(116.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -166,7 +162,7 @@ private fun ModeOptionCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (selected) "✓" else "•",
+                    text = if (selected) "✓" else "○",
                     color = accent,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -184,7 +180,7 @@ private fun ModeOptionCard(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = mode.setupDescription(),
+                    text = mode.description,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     lineHeight = 17.sp
@@ -192,11 +188,6 @@ private fun ModeOptionCard(
             }
         }
     }
-}
-
-private fun InterventionMode.setupDescription(): String = when (this) {
-    InterventionMode.NORMAL -> "앱을 열 때와 시간이 지났을 때 한 번씩 확인해요."
-    else -> description
 }
 
 @Composable
@@ -215,7 +206,7 @@ private fun GuideCard(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "처음 사용한다면 보통을 추천해요.",
+            text = "처음 사용한다면 보통 모드를 추천해요.",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 12.sp,
             lineHeight = 17.sp
@@ -225,10 +216,22 @@ private fun GuideCard(modifier: Modifier = Modifier) {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun InterventionModeSetupScreenPreview() {
+private fun InterventionModeSetupNormalPreview() {
     TeumTheme {
         InterventionModeSetupScreen(
             selectedMode = InterventionMode.NORMAL,
+            onModeSelected = {},
+            onCompleteClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun InterventionModeSetupCarePreview() {
+    TeumTheme {
+        InterventionModeSetupScreen(
+            selectedMode = InterventionMode.INTERVENTION,
             onModeSelected = {},
             onCompleteClick = {}
         )
