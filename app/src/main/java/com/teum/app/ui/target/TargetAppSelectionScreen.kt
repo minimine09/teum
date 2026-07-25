@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import com.teum.app.ui.theme.TeumTheme
 
 private val TargetBorder = Color(0xFFE3E7EF)
-private val TargetGuide = Color(0xFFE8F8F4)
 private val YouTubeTint = Color(0xFFFFEBEE)
 private val InstagramTint = Color(0xFFFFF3E4)
 private val TikTokTint = Color(0xFFEAF2FF)
@@ -107,11 +106,7 @@ fun TargetAppSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(33.dp))
-
-            GuideCard()
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
             Button(
                 onClick = {
@@ -217,31 +212,6 @@ private fun TargetAppRow(
                 )
             )
         }
-    }
-}
-
-@Composable
-private fun GuideCard(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .background(TargetGuide, RoundedCornerShape(20.dp))
-            .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "목표 시간은 앱을 열 때 정해요.",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "여기서는 관리할 앱만 선택합니다.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp
-        )
     }
 }
 
