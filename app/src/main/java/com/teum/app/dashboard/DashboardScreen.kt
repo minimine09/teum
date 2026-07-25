@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +71,8 @@ data class DashboardStats(
     val todaySessionCount: Int = 0,
     val todayOverrunCount: Int = 0,
     val todayFastReopenCount: Int = 0,
-    val todayPurposeDriftCount: Int = 0
+    val todayPurposeDriftCount: Int = 0,
+    val todayClosedAfterInterventionCount: Int = 0
 )
 
 private enum class DashboardTab {
@@ -223,8 +225,7 @@ private fun HomeDashboardContent(
             subtitle = "오늘의 앱 사용 흐름을 확인하세요"
         )
         HomeMainStatCard(dashboardStats)
-        HomeSmallStatsRow(dashboardStats, weeklyReportStats)
-        HomeWeakTimeCard(timeSlotStats)
+        HomeSmallStatsRow(dashboardStats)
         RecentSessionsCard(
             recentSessions = recentSessions,
             appDisplayNames = appDisplayNames,
@@ -242,6 +243,12 @@ private fun SessionHistoryContent(
     selectedPackageName: String?,
     onSelectPackage: (String?) -> Unit
 ) {
+    LaunchedEffect(selectedPackageName, targetPackages) {
+        if (selectedPackageName != null && selectedPackageName !in targetPackages) {
+            onSelectPackage(null)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -255,7 +262,7 @@ private fun SessionHistoryContent(
             subtitle = "앱별 사용 내역을 확인하세요"
         )
         AppStatisticsFilterCard(
-            packages = targetPackages + availablePackages,
+            packages = targetPackages,
             selectedPackageName = selectedPackageName,
             appDisplayNames = appDisplayNames,
             onSelectPackage = onSelectPackage
@@ -528,8 +535,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
 
 @Composable
 private fun HomeSmallStatsRow(
-    dashboardStats: DashboardStats,
-    weeklyReportStats: WeeklyReportStats
+    dashboardStats: DashboardStats
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -549,7 +555,7 @@ private fun HomeSmallStatsRow(
         )
         HomeSmallStatCard(
             label = "알림 후 닫기",
-            value = "${weeklyReportStats.closedAfterInterventionCount}회",
+            value = "${dashboardStats.todayClosedAfterInterventionCount}회",
             color = DashboardSuccess,
             modifier = Modifier.weight(1f)
         )
@@ -785,11 +791,8 @@ private fun RecentSessionItem(
     } else {
         null
     }
-    val overrunStatus = if (metrics.isOverrun) {
-        "${formatDuration(metrics.overrunMillis)} 초과" to DashboardWarning
-    } else {
-        "시간 내 종료" to secondaryTextColor
-    }
+    val overrunStatus = SessionDisplayText.compactOverrun(metrics.overrunMillis) to
+        if (metrics.isOverrun) DashboardWarning else secondaryTextColor
     val reopenStatus = if (session.isFastReopen) {
         val text = session.reopenGapMillis?.let {
             "${formatDuration(it)} 만에 재실행"
@@ -1120,6 +1123,15 @@ private fun WeeklyReportDetailCard(stats: WeeklyReportStats) {
                 label = "목적 이탈",
                 value = formatPercent(stats.purposeDriftRate),
                 subValue = "응답 ${stats.outcomeResponseCount}회 · 연장 ${stats.extensionCount}회"
+            )
+            WeeklySummaryRow(
+                label = "필요한 사용",
+                value = "${stats.necessaryUseCount}회",
+                subValue = if (stats.necessaryUseExcessMillis > 0L) {
+                    "목표 초과 합계 ${formatDuration(stats.necessaryUseExcessMillis)}"
+                } else {
+                    "목표 초과 없음"
+                }
             )
             WeeklySummaryRow(
                 label = "다시 열기",
