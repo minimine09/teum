@@ -34,6 +34,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.teum.app.debug.TeumLogger
 import com.teum.app.session.OutcomeType
 import com.teum.app.ui.intervention.IntentCheckScreen
+import com.teum.app.ui.intervention.OutcomeCheckScreen
+import com.teum.app.ui.intervention.OutcomeSessionUi
 import com.teum.app.ui.intervention.ReopenCheckScreen
 import com.teum.app.ui.intervention.SessionBrakeScreen
 import com.teum.app.ui.theme.TeumTheme
@@ -125,15 +127,20 @@ class OverlayController(context: Context) {
         debugSessionId: Long,
         durationMillis: Long,
         intentChoice: IntentChoice,
+        targetDurationMillis: Long? = null,
+        extensionCount: Int = 0,
         source: String = "target_exit",
         onOutcomeSelected: (OutcomeType) -> Unit,
         onDismissedWithoutChoice: () -> Unit
     ) {
         removeOverlayIfAttached()
 
-        val view = createOutcomeCheckView(
+        val view = createOutcomeCheckComposeView(
             packageName = packageName,
             durationMillis = durationMillis,
+            targetDurationMillis = targetDurationMillis,
+            extensionCount = extensionCount,
+            intentChoice = intentChoice,
             onOutcomeSelected = { outcomeType ->
                 try {
                     onOutcomeSelected(outcomeType)
@@ -155,6 +162,45 @@ class OverlayController(context: Context) {
             event = "SHOW_OUTCOME",
             detail = "package=$packageName source=$source session=S#$debugSessionId duration=$durationMillis intent=${intentChoice.name}"
         )
+    }
+
+    private fun createOutcomeCheckComposeView(
+        packageName: String,
+        durationMillis: Long,
+        targetDurationMillis: Long?,
+        extensionCount: Int,
+        intentChoice: IntentChoice,
+        onOutcomeSelected: (OutcomeType) -> Unit,
+        onDismissedWithoutChoice: () -> Unit
+    ): View {
+        val owner = OverlayViewTreeOwner().apply {
+            onCreate()
+            onStart()
+            onResume()
+        }
+        currentOverlayOwner = owner
+
+        return ComposeView(overlayContext).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                TeumTheme {
+                    OutcomeCheckScreen(
+                        sessionData = OutcomeSessionUi(
+                            appName = displayNameForPackage(packageName),
+                            intentText = intentChoice.label,
+                            actualUsageMillis = durationMillis,
+                            targetDurationMillis = targetDurationMillis ?: 0L,
+                            extensionCount = extensionCount
+                        ),
+                        onOutcomeSelected = onOutcomeSelected,
+                        onDismissClick = onDismissedWithoutChoice
+                    )
+                }
+            }
+        }
     }
 
     fun dismiss(onDismissed: () -> Unit = {}, reason: String = "unspecified") {

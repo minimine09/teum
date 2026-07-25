@@ -491,6 +491,9 @@ class TeumAccessibilityService : AccessibilityService() {
             debugSessionId = endedSession.debugSessionId,
             durationMillis = getSessionDurationMillis(endedSession),
             intentChoice = endedSession.intentChoice,
+            targetDurationMillis = endedSession.targetDurationMillis +
+                endedSession.totalExtensionDurationMillis,
+            extensionCount = endedSession.extensionCount,
             source = source,
             onOutcomeSelected = { outcomeType ->
                 handleOutcomeSelected(outcomeType)
@@ -556,7 +559,6 @@ class TeumAccessibilityService : AccessibilityService() {
         outcomeType: OutcomeType,
         dismissed: Boolean
     ) {
-        val mapping = outcomeMapping(outcomeType)
         TeumLogger.session(
             debugSessionId = pending.session.debugSessionId,
             event = "OUTCOME_UPDATE_REQUESTED",
@@ -567,9 +569,7 @@ class TeumAccessibilityService : AccessibilityService() {
             try {
                 val success = sessionLogRepository.updateSessionOutcome(
                     sessionId = pending.sessionLogId,
-                    outcomeType = outcomeType.name,
-                    achieved = mapping.achieved,
-                    drifted = mapping.drifted
+                    outcomeType = outcomeType
                 )
                 TeumLogger.session(
                     debugSessionId = pending.session.debugSessionId,
@@ -672,33 +672,10 @@ class TeumAccessibilityService : AccessibilityService() {
 
     private fun ownPackageName(): String = applicationContext.packageName
 
-    private fun outcomeMapping(outcomeType: OutcomeType): OutcomeMapping {
-        return when (outcomeType) {
-            OutcomeType.NECESSARY_USE -> OutcomeMapping(
-                achieved = true,
-                drifted = false
-            )
-            OutcomeType.PURPOSE_DRIFT -> OutcomeMapping(
-                achieved = false,
-                drifted = true
-            )
-            OutcomeType.ENDED,
-            OutcomeType.EXTENDED -> OutcomeMapping(
-                achieved = false,
-                drifted = false
-            )
-        }
-    }
-
     private data class PendingOutcome(
         val session: AppSession,
         val sessionLogId: Long,
         var handled: Boolean = false
-    )
-
-    private data class OutcomeMapping(
-        val achieved: Boolean,
-        val drifted: Boolean
     )
 
     private companion object {
