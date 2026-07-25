@@ -863,7 +863,12 @@ class OverlayController(context: Context) {
         return when (packageName) {
             "com.google.android.youtube" -> "YouTube"
             "com.instagram.android" -> "Instagram"
-            else -> packageName
+            else -> runCatching {
+                val applicationInfo = overlayContext.packageManager.getApplicationInfo(packageName, 0)
+                overlayContext.packageManager.getApplicationLabel(applicationInfo).toString()
+                    .takeIf { it.isNotBlank() }
+                    ?: packageName
+            }.getOrDefault(packageName)
         }
     }
 

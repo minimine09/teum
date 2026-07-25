@@ -47,6 +47,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -297,13 +298,14 @@ private fun LegacyOutcomeCheckScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
-                .padding(top = 50.dp, bottom = 79.dp)
+                .padding(top = 50.dp, bottom = 24.dp)
         ) {
             ScreenHeader(title = "Outcome Check", subtitle = "이번 사용을 돌아봐요")
             Spacer(modifier = Modifier.height(23.dp))
             SessionSummaryCard()
-            Spacer(modifier = Modifier.height(38.dp))
+            Spacer(modifier = Modifier.height(30.dp))
             Text(
                 text = "처음 목적을 달성했나요?",
                 color = MaterialTheme.colorScheme.onSurface,
@@ -316,7 +318,7 @@ private fun LegacyOutcomeCheckScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
-            Spacer(modifier = Modifier.height(39.dp))
+            Spacer(modifier = Modifier.height(30.dp))
             Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
                 outcomeOptions.forEachIndexed { index, option ->
                     OutcomeOption(
@@ -326,7 +328,7 @@ private fun LegacyOutcomeCheckScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
             TeumFilledButton(
                 text = "저장하기",
                 onClick = onSaveClick,
@@ -346,6 +348,7 @@ private fun InterventionLayout(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val scrollState = rememberScrollState()
     Surface(
         modifier = modifier.fillMaxSize(),
         color = backgroundColor
@@ -353,11 +356,12 @@ private fun InterventionLayout(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(horizontal = 23.dp)
-                .padding(top = 43.dp)
+                .padding(top = 43.dp, bottom = 24.dp)
         ) {
             ScreenHeader(title = title, subtitle = subtitle)
-            Spacer(modifier = Modifier.height(31.dp))
+            Spacer(modifier = Modifier.height(27.dp))
             content()
         }
     }
@@ -443,13 +447,13 @@ private fun CheckModal(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(618.dp)
+            .heightIn(min = 548.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
-            .padding(horizontal = 24.dp, vertical = 21.dp),
+            .padding(horizontal = 22.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AlertBubble(symbol = symbol, size = 70)
-        Spacer(modifier = Modifier.height(22.dp))
+        AlertBubble(symbol = symbol, size = 64)
+        Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = title,
             color = MaterialTheme.colorScheme.onSurface,
@@ -464,8 +468,8 @@ private fun CheckModal(
             fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(48.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(23.dp)) {
+        Spacer(modifier = Modifier.height(34.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
             options.forEach { option ->
                 ChoiceRow(
                     option = option,
@@ -474,12 +478,12 @@ private fun CheckModal(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(35.dp))
+        Spacer(modifier = Modifier.height(25.dp))
         DurationChoiceSlider(
             selectedDuration = selectedDuration,
             onDurationSelected = onDurationSelected
         )
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TeumFilledButton(
                 text = "시작",
@@ -784,7 +788,7 @@ private fun SessionSummaryCard() {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(127.dp),
+            .heightIn(min = 127.dp),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, BorderSoft)
@@ -820,7 +824,9 @@ private fun SummaryRow(label: String, value: String, valueColor: Color) {
             text = value,
             color = valueColor,
             fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -834,7 +840,7 @@ private fun OutcomeOption(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .heightIn(min = 58.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = option.containerColor),
@@ -856,7 +862,9 @@ private fun OutcomeOption(
                 text = option.title,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

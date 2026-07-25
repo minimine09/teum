@@ -55,6 +55,7 @@ import com.teum.app.core.model.PermissionStatus
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.ui.privacy.PrivacySettingsScreen
 import com.teum.app.ui.target.TargetAppSelectionScreen
+import com.teum.app.ui.target.TargetAppInstalledApp
 import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
@@ -93,6 +94,7 @@ fun DashboardScreen(
     timeSlotStats: List<TimeSlotStat>,
     weeklyReportStats: WeeklyReportStats,
     availablePackages: Set<String>,
+    installedApps: List<TargetAppInstalledApp> = emptyList(),
     selectedPackageName: String?,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
@@ -188,6 +190,7 @@ fun DashboardScreen(
 
                 DashboardTab.TargetApps -> TargetAppSelectionScreen(
                     initialSelectedPackages = targetPackages,
+                    installedApps = installedApps,
                     onCompleteClick = { results ->
                         results.forEach { result ->
                             if (result.enabled) {
@@ -482,7 +485,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
             .fillMaxWidth()
             .height(131.dp)
             .background(DashboardDark, RoundedCornerShape(28.dp))
-            .padding(horizontal = 24.dp, vertical = 24.dp)
+            .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
         Column {
             Text(
@@ -491,13 +494,13 @@ private fun HomeMainStatCard(stats: DashboardStats) {
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${keptCount}회",
                     color = Color.White,
-                    fontSize = 38.sp,
-                    lineHeight = 42.sp,
+                    fontSize = 36.sp,
+                    lineHeight = 44.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.width(16.dp))
@@ -570,7 +573,7 @@ private fun HomeSmallStatCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.height(82.dp),
+        modifier = modifier.heightIn(min = 82.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
@@ -585,14 +588,19 @@ private fun HomeSmallStatCard(
                 text = label,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = value,
                 color = color,
                 fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+                lineHeight = 27.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -611,7 +619,7 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(162.dp),
+            .heightIn(min = 162.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
@@ -629,7 +637,8 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
             Text(
                 text = "${highlightedHour}시쯤 사용이 길어졌어요",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                lineHeight = 16.sp
             )
             Spacer(modifier = Modifier.height(18.dp))
             SimpleBarChart(
@@ -991,7 +1000,7 @@ private fun SimpleBarChart(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp),
+            .heightIn(min = 72.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
@@ -1016,7 +1025,9 @@ private fun SimpleBarChart(
                     text = label,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
