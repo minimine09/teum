@@ -307,7 +307,8 @@ class TeumAccessibilityService : AccessibilityService() {
                 } else {
                     saveEndedSession(
                         session = endedSession,
-                        reason = "end_now"
+                        reason = "end_now",
+                        homeNavigationReason = "non_clear_end_now"
                     )
                 }
 
@@ -350,7 +351,8 @@ class TeumAccessibilityService : AccessibilityService() {
 
     private fun saveEndedSession(
         session: com.teum.app.session.AppSession?,
-        reason: String = "unknown"
+        reason: String = "unknown",
+        homeNavigationReason: String? = null
     ) {
         if (session == null) return
         TeumLogger.session(session.debugSessionId, "DB_SAVE_REQUESTED", "reason=$reason")
@@ -366,9 +368,23 @@ class TeumAccessibilityService : AccessibilityService() {
                         "session saved id=$id package=${session.packageName} duration=$durationMillis overrun=$overrun fastReopen=${session.isFastReopen}"
                     )
                     TeumLogger.session(session.debugSessionId, "DB_SAVED", "id=$id")
+                    if (homeNavigationReason != null) {
+                        requestHomeNavigation(
+                            debugSessionId = session.debugSessionId,
+                            reason = homeNavigationReason,
+                            sessionLogId = id
+                        )
+                    }
                 }
             } catch (exception: RuntimeException) {
                 Log.e(DB_TAG, "failed to save session package=${session.packageName}", exception)
+                if (homeNavigationReason != null) {
+                    requestHomeNavigation(
+                        debugSessionId = session.debugSessionId,
+                        reason = homeNavigationReason,
+                        sessionLogId = null
+                    )
+                }
             }
         }
     }
@@ -469,7 +485,12 @@ class TeumAccessibilityService : AccessibilityService() {
                 brakeHandler.post {
                     pendingOutcome = PendingOutcome(
                         session = endedSession,
-                        sessionLogId = sessionLogId
+                        sessionLogId = sessionLogId,
+                        homeNavigationReason = if (source == "session_brake_end_now") {
+                            "session_brake_end_now_after_outcome"
+                        } else {
+                            null
+                        }
                     )
                     showOutcomeCheckOverlay(
                         endedSession = endedSession,
@@ -576,9 +597,44 @@ class TeumAccessibilityService : AccessibilityService() {
                     event = "OUTCOME_UPDATED",
                     detail = "sessionLogId=${pending.sessionLogId} success=$success"
                 )
+                pending.homeNavigationReason?.let { reason ->
+                    requestHomeNavigation(
+                        debugSessionId = pending.session.debugSessionId,
+                        reason = reason,
+                        sessionLogId = pending.sessionLogId
+                    )
+                }
             } catch (exception: RuntimeException) {
                 Log.e(DB_TAG, "failed to update outcome sessionLogId=${pending.sessionLogId}", exception)
+                pending.homeNavigationReason?.let { reason ->
+                    requestHomeNavigation(
+                        debugSessionId = pending.session.debugSessionId,
+                        reason = reason,
+                        sessionLogId = pending.sessionLogId
+                    )
+                }
             }
+        }
+    }
+
+    private fun requestHomeNavigation(
+        debugSessionId: Long,
+        reason: String,
+        sessionLogId: Long?
+    ) {
+        val sessionLogDetail = sessionLogId?.let { " sessionLogId=$it" }.orEmpty()
+        TeumLogger.session(
+            debugSessionId = debugSessionId,
+            event = "HOME_NAVIGATION_REQUESTED",
+            detail = "reason=$reason$sessionLogDetail"
+        )
+        brakeHandler.post {
+            val success = performGlobalAction(GLOBAL_ACTION_HOME)
+            TeumLogger.session(
+                debugSessionId = debugSessionId,
+                event = "HOME_NAVIGATION_RESULT",
+                detail = "success=$success reason=$reason"
+            )
         }
     }
 
@@ -675,6 +731,7 @@ class TeumAccessibilityService : AccessibilityService() {
     private data class PendingOutcome(
         val session: AppSession,
         val sessionLogId: Long,
+        val homeNavigationReason: String? = null,
         var handled: Boolean = false
     )
 
