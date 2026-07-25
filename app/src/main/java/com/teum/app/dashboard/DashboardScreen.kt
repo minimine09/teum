@@ -314,15 +314,15 @@ private fun WeeklyReportContent(
             color = DashboardDanger
         )
         ReportMetricCard(
-            title = "다시 열기까지",
-            value = stats.averageReopenGapMillis?.let(::formatDuration) ?: "기록 없음",
-            description = "앱을 다시 열기까지 걸린 시간",
+            title = "총 사용시간",
+            value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
+            description = "이번 주 관리 앱을 사용한 시간",
             color = DashboardWarning
         )
         ReportMetricCard(
-            title = "알림 후 닫기",
-            value = "${stats.closedAfterInterventionCount}회",
-            description = "알림 뒤 앱을 닫은 횟수",
+            title = "총 연장횟수",
+            value = "${stats.extensionCount}회",
+            description = "이번 주 사용 시간을 연장한 횟수",
             color = DashboardSuccess
         )
         WeeklyReportDetailCard(stats)
