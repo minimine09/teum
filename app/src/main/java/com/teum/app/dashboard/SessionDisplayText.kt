@@ -32,6 +32,12 @@ object SessionDisplayText {
         else -> "목표 시간을 ${formatDuration(overrunMillis)} 초과했어요"
     }
 
+    fun compactOverrun(overrunMillis: Long): String = when {
+        overrunMillis <= 0L -> "시간 내 종료"
+        overrunMillis < 1_000L -> "1초 미만 초과"
+        else -> "${formatDuration(overrunMillis)} 초과"
+    }
+
     private fun formatDuration(durationMillis: Long): String {
         val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
         val minutes = totalSeconds / 60L

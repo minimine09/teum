@@ -47,6 +47,10 @@ class TeumAccessibilityService : AccessibilityService() {
     private var currentReopenCheckResult: ReopenCheckResult? = null
     private var currentDebugSessionId: Long? = null
     private var pendingOutcome: PendingOutcome? = null
+    private var latestObservedPackage: String? = null
+    private var pendingEnterPackage: String? = null
+    private var pendingEnterRunnable: Runnable? = null
+    private var ignoreTargetEnterUntilMillis: Long = 0L
     private val suppressReentryUntilByPackage = mutableMapOf<String, Long>()
     private val suppressReentryReasonByPackage = mutableMapOf<String, String>()
 
@@ -60,6 +64,7 @@ class TeumAccessibilityService : AccessibilityService() {
 
         val packageName = accessibilityEvent.packageName?.toString() ?: return
         if (packageName == ownPackageName()) return
+        latestObservedPackage = packageName
         if (packageName == currentForegroundPackage) {
             restoreIntentCheckIfNeeded(packageName)
             return
@@ -74,6 +79,7 @@ class TeumAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         cancelBrakeSchedule()
+        cancelPendingTargetEnter(reason = "service_destroyed", currentPackage = latestObservedPackage)
         serviceScope.cancel()
         overlayController.removeOverlayIfAttached()
         super.onDestroy()
@@ -81,55 +87,137 @@ class TeumAccessibilityService : AccessibilityService() {
 
     private fun handleForegroundPackageChanged(packageName: String) {
         val previousPackage = currentForegroundPackage
-        currentForegroundPackage = packageName
-
-        if (previousPackage != null && targetAppRepository.isTargetPackage(previousPackage)) {
-            Log.d(TAG, "target app exited: $previousPackage")
-            TeumLogger.access("EXIT", previousPackage)
-            cancelBrakeSchedule()
-            var endedSession: AppSession? = null
-            if (SessionManager.hasActiveSessionFor(previousPackage)) {
-                if (overlayController.currentOverlayName == "SESSION_BRAKE") {
-                    SessionManager.markInterventionHidden()
-                }
-                endedSession = SessionManager.endSession(
-                    packageName = previousPackage,
-                    reason = "target_exit"
-                )
-                if (endedSession != null) {
-                    suppressReentry(
-                        packageName = previousPackage,
-                        reason = "after_target_exit",
-                        durationMillis = SUPPRESS_REENTRY_AFTER_TARGET_EXIT_MILLIS
-                    )
-                }
-            }
-            resetIntentCheckSession()
-            endedSession?.let(::handleTargetExitEndedSession)
-        }
 
         if (targetAppRepository.isTargetPackage(packageName)) {
-            if (shouldSuppressReentry(packageName)) return
+            if (previousPackage != null &&
+                previousPackage != packageName &&
+                targetAppRepository.isTargetPackage(previousPackage)
+            ) {
+                handleConfirmedTargetExit(previousPackage)
+            }
+            scheduleStableTargetEnter(packageName)
+            return
+        }
 
-            Log.d(TAG, "target app entered: $packageName")
-            TeumLogger.access("ENTER", packageName)
-            val entryTimeMillis = System.currentTimeMillis()
-            saveAppOpenEvent(
-                packageName = packageName,
-                detectedAtMillis = entryTimeMillis
-            )
-            val reopenCheckResult = SessionManager.checkFastReopen(
-                packageName = packageName,
-                currentEntryTimeMillis = entryTimeMillis
-            )
-            startIntentCheckSession(
-                packageName = packageName,
-                entryTimeMillis = entryTimeMillis,
-                reopenCheckResult = reopenCheckResult
-            )
+        cancelPendingTargetEnter(reason = "package_changed", currentPackage = packageName)
+        currentForegroundPackage = packageName
+        if (previousPackage != null && targetAppRepository.isTargetPackage(previousPackage)) {
+            handleConfirmedTargetExit(previousPackage)
         } else {
             resetIntentCheckSession()
         }
+    }
+
+    private fun handleConfirmedTargetExit(packageName: String) {
+        Log.d(TAG, "target app exited: $packageName")
+        TeumLogger.access("EXIT", packageName)
+        cancelBrakeSchedule()
+        var endedSession: AppSession? = null
+        if (SessionManager.hasActiveSessionFor(packageName)) {
+            if (overlayController.currentOverlayName == "SESSION_BRAKE") {
+                SessionManager.markInterventionHidden()
+            }
+            endedSession = SessionManager.endSession(
+                packageName = packageName,
+                reason = "target_exit"
+            )
+            if (endedSession != null) {
+                suppressReentry(
+                    packageName = packageName,
+                    reason = "after_target_exit",
+                    durationMillis = SUPPRESS_REENTRY_AFTER_TARGET_EXIT_MILLIS
+                )
+            }
+        }
+        resetIntentCheckSession()
+        endedSession?.let(::handleTargetExitEndedSession)
+    }
+
+    private fun scheduleStableTargetEnter(packageName: String) {
+        if (shouldIgnoreEnterForOutcome(packageName)) return
+        if (shouldIgnoreEnterForHomeNavigation(packageName)) return
+
+        pendingEnterPackage?.let { pendingPackage ->
+            if (pendingPackage != packageName) {
+                cancelPendingTargetEnter(reason = "package_changed", currentPackage = packageName)
+            }
+        }
+
+        TeumLogger.flow("[ACCESS] ENTER_CANDIDATE package=$packageName")
+        pendingEnterPackage = packageName
+        pendingEnterRunnable?.let(brakeHandler::removeCallbacks)
+        val runnable = Runnable {
+            confirmStableTargetEnter(packageName)
+        }
+        pendingEnterRunnable = runnable
+        TeumLogger.flow(
+            "[ACCESS] ENTER_CONFIRM_SCHEDULED package=$packageName delay=$ENTER_CONFIRM_DELAY_MILLIS"
+        )
+        brakeHandler.postDelayed(runnable, ENTER_CONFIRM_DELAY_MILLIS)
+    }
+
+    private fun confirmStableTargetEnter(packageName: String) {
+        if (pendingEnterPackage != packageName) return
+        pendingEnterPackage = null
+        pendingEnterRunnable = null
+
+        if (shouldIgnoreEnterForOutcome(packageName)) return
+        if (shouldIgnoreEnterForHomeNavigation(packageName)) return
+
+        val latestPackage = currentStablePackageName()
+        if (latestPackage != packageName) {
+            TeumLogger.flow(
+                "[ACCESS] ENTER_IGNORED_NOT_STABLE package=$packageName current=$latestPackage"
+            )
+            return
+        }
+
+        if (shouldSuppressReentry(packageName)) return
+
+        currentForegroundPackage = packageName
+        TeumLogger.flow("[ACCESS] ENTER_CONFIRMED package=$packageName")
+        Log.d(TAG, "target app entered: $packageName")
+        TeumLogger.access("ENTER", packageName)
+        val entryTimeMillis = System.currentTimeMillis()
+        saveAppOpenEvent(
+            packageName = packageName,
+            detectedAtMillis = entryTimeMillis
+        )
+        val reopenCheckResult = SessionManager.checkFastReopen(
+            packageName = packageName,
+            currentEntryTimeMillis = entryTimeMillis
+        )
+        startIntentCheckSession(
+            packageName = packageName,
+            entryTimeMillis = entryTimeMillis,
+            reopenCheckResult = reopenCheckResult
+        )
+    }
+
+    private fun cancelPendingTargetEnter(reason: String, currentPackage: String?) {
+        val pendingPackage = pendingEnterPackage ?: return
+        pendingEnterRunnable?.let(brakeHandler::removeCallbacks)
+        pendingEnterPackage = null
+        pendingEnterRunnable = null
+        TeumLogger.flow(
+            "[ACCESS] ENTER_CANCELLED package=$pendingPackage reason=$reason current=$currentPackage"
+        )
+    }
+
+    private fun shouldIgnoreEnterForOutcome(packageName: String): Boolean {
+        if (overlayController.currentOverlayName != "OUTCOME_CHECK") return false
+        TeumLogger.flow("[ACCESS] ENTER_IGNORED package=$packageName reason=outcome_check_showing")
+        return true
+    }
+
+    private fun shouldIgnoreEnterForHomeNavigation(packageName: String): Boolean {
+        val nowMillis = System.currentTimeMillis()
+        if (nowMillis >= ignoreTargetEnterUntilMillis) return false
+        val remainingMillis = ignoreTargetEnterUntilMillis - nowMillis
+        TeumLogger.flow(
+            "[ACCESS] ENTER_IGNORED package=$packageName reason=home_navigation_guard remainingMs=$remainingMillis"
+        )
+        return true
     }
 
     private fun startIntentCheckSession(
@@ -341,6 +429,10 @@ class TeumAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun currentStablePackageName(): String? {
+        return rootInActiveWindow?.packageName?.toString() ?: latestObservedPackage
+    }
+
     private fun handleBrakeExtension(packageName: String, durationMillis: Long) {
         SessionManager.markInterventionHidden()
         SessionManager.extendCurrentSession(durationMillis)
@@ -410,26 +502,11 @@ class TeumAccessibilityService : AccessibilityService() {
     }
 
     private fun handleTargetExitEndedSession(endedSession: AppSession) {
-        val durationMillis = getSessionDurationMillis(endedSession)
-        val shouldShowOutcomeCheck = shouldShowOutcomeCheckForTargetExit(endedSession)
         if (endedSession.intentChoice != IntentChoice.CLEAR_PURPOSE) {
             TeumLogger.session(
                 debugSessionId = endedSession.debugSessionId,
                 event = "OUTCOME_SKIPPED",
                 detail = "reason=intent_not_clear_purpose intent=${endedSession.intentChoice.name}"
-            )
-            saveEndedSession(
-                session = endedSession,
-                reason = "target_exit_without_outcome"
-            )
-            return
-        }
-
-        if (!shouldShowOutcomeCheck) {
-            TeumLogger.session(
-                debugSessionId = endedSession.debugSessionId,
-                event = "OUTCOME_SKIPPED",
-                detail = "reason=duration_too_short duration=$durationMillis"
             )
             saveEndedSession(
                 session = endedSession,
@@ -473,14 +550,6 @@ class TeumAccessibilityService : AccessibilityService() {
                     DB_TAG,
                     "outcome preinsert saved id=$sessionLogId package=${endedSession.packageName} source=$source"
                 )
-
-                if (source == "session_brake_end_now") {
-                    confirmExitAfterIntervention(
-                        session = endedSession,
-                        sessionLogId = sessionLogId,
-                        source = source
-                    )
-                }
 
                 brakeHandler.post {
                     pendingOutcome = PendingOutcome(
@@ -568,11 +637,18 @@ class TeumAccessibilityService : AccessibilityService() {
             event = "OUTCOME_DISMISSED",
             detail = "sessionLogId=${pending.sessionLogId}"
         )
-        updatePendingOutcome(
-            pending = pending,
-            outcomeType = OutcomeType.ENDED,
-            dismissed = true
+        TeumLogger.session(
+            debugSessionId = pending.session.debugSessionId,
+            event = "OUTCOME_DISMISS_LEFT_UNANSWERED",
+            detail = "sessionLogId=${pending.sessionLogId}"
         )
+        pending.homeNavigationReason?.let { reason ->
+            requestHomeNavigation(
+                debugSessionId = pending.session.debugSessionId,
+                reason = reason,
+                sessionLogId = pending.sessionLogId
+            )
+        }
     }
 
     private fun updatePendingOutcome(
@@ -622,6 +698,8 @@ class TeumAccessibilityService : AccessibilityService() {
         reason: String,
         sessionLogId: Long?
     ) {
+        cancelPendingTargetEnter(reason = "home_navigation", currentPackage = latestObservedPackage)
+        ignoreTargetEnterUntilMillis = System.currentTimeMillis() + HOME_NAVIGATION_ENTER_GUARD_MILLIS
         val sessionLogDetail = sessionLogId?.let { " sessionLogId=$it" }.orEmpty()
         TeumLogger.session(
             debugSessionId = debugSessionId,
@@ -630,29 +708,46 @@ class TeumAccessibilityService : AccessibilityService() {
         )
         brakeHandler.post {
             val success = performGlobalAction(GLOBAL_ACTION_HOME)
+            if (success) {
+                ignoreTargetEnterUntilMillis =
+                    System.currentTimeMillis() + HOME_NAVIGATION_ENTER_GUARD_MILLIS
+            }
             TeumLogger.session(
                 debugSessionId = debugSessionId,
                 event = "HOME_NAVIGATION_RESULT",
                 detail = "success=$success reason=$reason"
             )
+            if (success && sessionLogId != null) {
+                confirmExitAfterIntervention(
+                    debugSessionId = debugSessionId,
+                    sessionLogId = sessionLogId,
+                    reason = "home_navigation_success"
+                )
+            } else if (!success && sessionLogId != null) {
+                TeumLogger.session(
+                    debugSessionId = debugSessionId,
+                    event = "EXIT_CONFIRM_SKIPPED",
+                    detail = "reason=home_navigation_failed sessionLogId=$sessionLogId"
+                )
+            }
         }
     }
 
     private fun confirmExitAfterIntervention(
-        session: AppSession,
+        debugSessionId: Long,
         sessionLogId: Long,
-        source: String
+        reason: String
     ) {
         TeumLogger.session(
-            debugSessionId = session.debugSessionId,
+            debugSessionId = debugSessionId,
             event = "EXIT_CONFIRM_REQUESTED",
-            detail = "sessionLogId=$sessionLogId source=$source"
+            detail = "sessionLogId=$sessionLogId reason=$reason"
         )
         serviceScope.launch {
             try {
                 val success = sessionLogRepository.confirmExitAfterIntervention(sessionLogId)
                 TeumLogger.session(
-                    debugSessionId = session.debugSessionId,
+                    debugSessionId = debugSessionId,
                     event = "EXIT_CONFIRMED",
                     detail = "sessionLogId=$sessionLogId success=$success"
                 )
@@ -663,8 +758,7 @@ class TeumAccessibilityService : AccessibilityService() {
     }
 
     private fun shouldShowOutcomeCheckForTargetExit(session: AppSession): Boolean {
-        return session.intentChoice == IntentChoice.CLEAR_PURPOSE &&
-            getSessionDurationMillis(session) >= MIN_DURATION_FOR_OUTCOME_CHECK_MILLIS
+        return session.intentChoice == IntentChoice.CLEAR_PURPOSE
     }
 
     private fun shouldShowOutcomeCheckForEndNow(session: AppSession): Boolean {
@@ -742,7 +836,7 @@ class TeumAccessibilityService : AccessibilityService() {
         const val BRAKE_RETRY_DELAY_MILLIS = 1_000L
         const val SUPPRESS_REENTRY_AFTER_END_MILLIS = 10_000L
         const val SUPPRESS_REENTRY_AFTER_TARGET_EXIT_MILLIS = 1_500L
-        // Demo value. For production UX, consider 10_000L.
-        const val MIN_DURATION_FOR_OUTCOME_CHECK_MILLIS = 3_000L
+        const val ENTER_CONFIRM_DELAY_MILLIS = 400L
+        const val HOME_NAVIGATION_ENTER_GUARD_MILLIS = 2_000L
     }
 }
