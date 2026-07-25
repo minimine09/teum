@@ -1280,8 +1280,8 @@ private fun buildAppUsageSlices(
     val totalUsageMillis = sortedStats.sumOf { it.usageMillis }
     if (totalUsageMillis <= 0L) return emptyList()
 
-    val topStats = sortedStats.take(5)
-    val otherUsageMillis = sortedStats.drop(5).sumOf { it.usageMillis }
+    val topStats = sortedStats.take(4)
+    val otherUsageMillis = sortedStats.drop(4).sumOf { it.usageMillis }
     val displayStats = topStats.map { stat ->
         appDisplayNames[stat.packageName].orEmpty()
             .ifBlank { stat.packageName } to stat.usageMillis
