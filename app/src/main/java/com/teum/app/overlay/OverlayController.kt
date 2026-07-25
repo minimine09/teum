@@ -57,6 +57,7 @@ class OverlayController(context: Context) {
         packageName: String,
         mode: IntentCheckMode = IntentCheckMode.NORMAL,
         reopenGapMillis: Long? = null,
+        interventionActive: Boolean = false,
         debugSessionId: Long? = null,
         source: String = "target_enter",
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
@@ -69,6 +70,7 @@ class OverlayController(context: Context) {
             packageName = packageName,
             mode = mode,
             reopenGapMillis = reopenGapMillis,
+            interventionActive = interventionActive,
             debugSessionId = debugSessionId,
             onIntentConfirmed = { choice, targetDurationMillis ->
                 Log.d(TAG, "intent selected: ${choice.name} target=$targetDurationMillis for $packageName")
@@ -90,6 +92,8 @@ class OverlayController(context: Context) {
         packageName: String,
         elapsedMillis: Long,
         targetDurationMillis: Long,
+        interventionActive: Boolean = false,
+        extensionLimitReached: Boolean = false,
         debugSessionId: Long? = null,
         source: String = "session_brake",
         onBrakeChoice: (BrakeChoice) -> Unit,
@@ -101,6 +105,8 @@ class OverlayController(context: Context) {
             packageName = packageName,
             elapsedMillis = elapsedMillis,
             targetDurationMillis = targetDurationMillis,
+            interventionActive = interventionActive,
+            extensionLimitReached = extensionLimitReached,
             debugSessionId = debugSessionId,
             onBrakeChoice = { choice ->
                 Log.d(BRAKE_TAG, "choice selected ${choice.name} package=$packageName")
@@ -129,6 +135,7 @@ class OverlayController(context: Context) {
         intentChoice: IntentChoice,
         targetDurationMillis: Long? = null,
         extensionCount: Int = 0,
+        interventionActive: Boolean = false,
         source: String = "target_exit",
         onOutcomeSelected: (OutcomeType) -> Unit,
         onDismissedWithoutChoice: () -> Unit
@@ -140,6 +147,7 @@ class OverlayController(context: Context) {
             durationMillis = durationMillis,
             targetDurationMillis = targetDurationMillis,
             extensionCount = extensionCount,
+            interventionActive = interventionActive,
             intentChoice = intentChoice,
             onOutcomeSelected = { outcomeType ->
                 try {
@@ -169,6 +177,7 @@ class OverlayController(context: Context) {
         durationMillis: Long,
         targetDurationMillis: Long?,
         extensionCount: Int,
+        interventionActive: Boolean,
         intentChoice: IntentChoice,
         onOutcomeSelected: (OutcomeType) -> Unit,
         onDismissedWithoutChoice: () -> Unit
@@ -196,7 +205,8 @@ class OverlayController(context: Context) {
                             extensionCount = extensionCount
                         ),
                         onOutcomeSelected = onOutcomeSelected,
-                        onDismissClick = onDismissedWithoutChoice
+                        onDismissClick = onDismissedWithoutChoice,
+                        interventionActive = interventionActive
                     )
                 }
             }
@@ -257,6 +267,7 @@ class OverlayController(context: Context) {
         packageName: String,
         mode: IntentCheckMode,
         reopenGapMillis: Long?,
+        interventionActive: Boolean,
         debugSessionId: Long?,
         onIntentConfirmed: (IntentChoice, Long) -> Unit,
         onCloseNowSelected: () -> Unit
@@ -322,6 +333,7 @@ class OverlayController(context: Context) {
                         ReopenCheckScreen(
                             appName = displayNameForPackage(packageName),
                             reopenGapMillis = reopenGapMillis,
+                            interventionActive = interventionActive,
                             selectedIntent = selectedIntentChoice,
                             selectedDuration = selectedDurationChoice,
                             onIntentSelected = { selectIntent(it) },
@@ -332,6 +344,7 @@ class OverlayController(context: Context) {
                     } else {
                         IntentCheckScreen(
                             appName = displayNameForPackage(packageName),
+                            interventionActive = interventionActive,
                             selectedIntent = selectedIntentChoice,
                             selectedDuration = selectedDurationChoice,
                             onIntentSelected = { selectIntent(it) },
@@ -349,6 +362,8 @@ class OverlayController(context: Context) {
         packageName: String,
         elapsedMillis: Long,
         targetDurationMillis: Long,
+        interventionActive: Boolean,
+        extensionLimitReached: Boolean,
         debugSessionId: Long?,
         onBrakeChoice: (BrakeChoice) -> Unit,
         onExtendDurationSelected: (Long) -> Unit
@@ -393,6 +408,8 @@ class OverlayController(context: Context) {
                         appName = displayNameForPackage(packageName),
                         elapsedMillis = elapsedMillis,
                         targetDurationMillis = targetDurationMillis,
+                        interventionActive = interventionActive,
+                        extensionLimitReached = extensionLimitReached,
                         onEndClick = { chooseBrake(BrakeChoice.END_NOW) },
                         onExtendClick = { extendBrake(it) }
                     )

@@ -4,7 +4,15 @@ data class DailyOverrunStat(
     val dayOfWeek: Int,
     val label: String,
     val sessionCount: Int,
-    val overrunCount: Int
+    val overrunCount: Int,
+    val openCount: Int = sessionCount,
+    val extensionCount: Int = 0,
+    val usageMillis: Long = 0L
+)
+
+data class AppUsageStat(
+    val packageName: String,
+    val usageMillis: Long
 )
 
 data class WeeklyReportStats(
@@ -20,5 +28,6 @@ data class WeeklyReportStats(
     val closedAfterInterventionCount: Int = 0,
     val averageReopenGapMillis: Long? = null,
     val mostVulnerableHourSlot: Int? = null,
-    val dailyOverrunStats: List<DailyOverrunStat> = emptyList()
+    val dailyOverrunStats: List<DailyOverrunStat> = emptyList(),
+    val appUsageStats: List<AppUsageStat> = emptyList()
 )

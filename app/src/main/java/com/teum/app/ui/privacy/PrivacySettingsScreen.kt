@@ -3,8 +3,6 @@ package com.teum.app.ui.privacy
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -36,11 +37,12 @@ import com.teum.app.core.model.InterventionMode
 import com.teum.app.ui.theme.TeumTheme
 
 private val PrivacyBorder = Color(0xFFE3E7EF)
-private val PrivacyDark = Color(0xFF121622)
-private val PrivacyDarkText = Color(0xFFC3CADB)
 private val PrivacyDanger = Color(0xFFF05D5E)
 private val PrivacyDangerContainer = Color(0xFFFDEDEE)
 private val PrivacyPill = Color(0xFFF1F3F7)
+private val PrivacyCare = Color(0xFFFF9F43)
+private val PrivacyCareContainer = Color(0xFFFFF3E4)
+private val PrivacyNormalContainer = Color(0xFFECEEFF)
 
 @Composable
 fun PrivacySettingsScreen(
@@ -55,7 +57,7 @@ fun PrivacySettingsScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        val bottomPadding = if (showBottomNav) 24.dp else 96.dp
+        val bottomPadding = if (showBottomNav) 96.dp else 24.dp
 
         Column(
             modifier = Modifier
@@ -66,19 +68,6 @@ fun PrivacySettingsScreen(
         ) {
             Header()
             Spacer(modifier = Modifier.height(20.dp))
-
-            ServerCard()
-            Spacer(modifier = Modifier.height(18.dp))
-            InfoCard(
-                title = "수집 데이터",
-                body = "앱 이름 · 시작/종료 시각 · 사용 시간\n목적 선택 · 사용 후 선택 · 다시 열기까지 걸린 시간"
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            InfoCard(
-                title = "수집하지 않는 데이터",
-                body = "메시지 내용 · 영상 내용 · 검색어 · 화면 캡처\n키보드 입력 · 연락처 · 위치 정보"
-            )
-            Spacer(modifier = Modifier.height(15.dp))
             ModeCard(
                 selectedMode = selectedMode,
                 onModeChange = onModeChange
@@ -86,7 +75,6 @@ fun PrivacySettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             ManageTargetAppsCard(onClick = onManageTargetAppsClick)
             Spacer(modifier = Modifier.height(23.dp))
-
             Button(
                 onClick = onDeleteAllClick,
                 modifier = Modifier
@@ -103,13 +91,6 @@ fun PrivacySettingsScreen(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
-            }
-
-            if (showBottomNav) {
-                Spacer(modifier = Modifier.height(24.dp))
-                PrivacyBottomNav()
-            } else {
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -144,7 +125,7 @@ private fun ManageTargetAppsCard(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "관리할 앱을 다시 고를 수 있어요.",
+                    text = "틈이 확인할 앱을 다시 고를 수 있어요.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -170,69 +151,10 @@ private fun Header(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "개인정보와 알림 방식을 관리해요",
+            text = "개인정보와 사용 모드를 관리해요",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp
         )
-    }
-}
-
-@Composable
-private fun ServerCard(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(114.dp)
-            .background(PrivacyDark, RoundedCornerShape(26.dp))
-            .padding(horizontal = 24.dp, vertical = 28.dp)
-    ) {
-        Text(
-            text = "서버 전송 없음",
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "앱 사용 기록의 기본 정보만 기기에 저장하고\n기기 내부에서 통계 지표를 계산합니다.",
-            color = PrivacyDarkText,
-            fontSize = 12.sp,
-            lineHeight = 17.sp
-        )
-    }
-}
-
-@Composable
-private fun InfoCard(
-    title: String,
-    body: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(130.dp),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, PrivacyBorder)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 26.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
-                lineHeight = 17.sp
-            )
-        }
     }
 }
 
@@ -243,121 +165,112 @@ private fun ModeCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(119.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, PrivacyBorder)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "알림 강도",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "ⓘ",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 16.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Text(
+                text = "사용 모드",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 InterventionMode.entries.forEach { mode ->
-                    ModePill(
-                        text = mode.label,
+                    ModeOptionRow(
+                        mode = mode,
                         selected = selectedMode == mode,
                         onClick = { onModeChange(mode) }
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "언제든지 변경할 수 있어요.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
         }
     }
 }
 
 @Composable
-private fun ModePill(
-    text: String,
+private fun ModeOptionRow(
+    mode: InterventionMode,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .size(width = 66.dp, height = 34.dp)
-            .background(
-                color = if (selected) MaterialTheme.colorScheme.primary else PrivacyPill,
-                shape = RoundedCornerShape(17.dp)
-            )
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
+    val accent = if (mode.isIntervention) PrivacyCare else MaterialTheme.colorScheme.primary
+    val container = if (mode.isIntervention) PrivacyCareContainer else PrivacyNormalContainer
 
-@Composable
-private fun PrivacyBottomNav(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(58.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(26.dp))
-            .padding(horizontal = 26.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .background(
+                color = if (selected) container else PrivacyPill,
+                shape = RoundedCornerShape(18.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NavItem(icon = "⌂", label = "홈")
-        NavItem(icon = "•", label = "기록")
-        NavItem(icon = "▤", label = "리포트")
-        NavItem(icon = "⚙", label = "설정", selected = true)
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(if (selected) accent else Color.White, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(Color.White, CircleShape)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = mode.label,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = mode.description,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+        }
     }
 }
 
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun NavItem(
-    icon: String,
-    label: String,
-    selected: Boolean = false
-) {
-    val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = icon,
-            color = color,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = label,
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+private fun PrivacySettingsNormalPreview() {
+    TeumTheme {
+        PrivacySettingsScreen(
+            selectedMode = InterventionMode.NORMAL,
+            onModeChange = {},
+            onDeleteAllClick = {}
         )
     }
 }
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
-private fun PrivacySettingsScreenPreview() {
+private fun PrivacySettingsCarePreview() {
     TeumTheme {
         PrivacySettingsScreen(
-            selectedMode = InterventionMode.NORMAL,
+            selectedMode = InterventionMode.INTERVENTION,
             onModeChange = {},
             onDeleteAllClick = {}
         )

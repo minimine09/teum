@@ -46,7 +46,8 @@ object WeeklyReportAnalyzer {
             closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
             averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
             mostVulnerableHourSlot = mostVulnerableHourSlot,
-            dailyOverrunStats = calculateDailyOverrunStats(sessions)
+            dailyOverrunStats = calculateDailyOverrunStats(sessions),
+            appUsageStats = calculateAppUsageStats(sessions)
         )
     }
 
@@ -65,9 +66,27 @@ object WeeklyReportAnalyzer {
                 dayOfWeek = dayOfWeek,
                 label = label,
                 sessionCount = daySessions.size,
-                overrunCount = daySessions.count { it.overrun }
+                overrunCount = daySessions.count { it.overrun },
+                openCount = daySessions.size,
+                extensionCount = daySessions.sumOf { it.extensionCount },
+                usageMillis = daySessions.sumOf { SessionMetricsResolver.resolve(it).usageMillis }
             )
         }
+    }
+
+    private fun calculateAppUsageStats(
+        sessions: List<SessionLogEntity>
+    ): List<AppUsageStat> {
+        return sessions
+            .groupBy { it.packageName }
+            .map { (packageName, appSessions) ->
+                AppUsageStat(
+                    packageName = packageName,
+                    usageMillis = appSessions.sumOf { SessionMetricsResolver.resolve(it).usageMillis }
+                )
+            }
+            .filter { it.usageMillis > 0L }
+            .sortedByDescending { it.usageMillis }
     }
 
     private fun rate(count: Int, total: Int): Double {

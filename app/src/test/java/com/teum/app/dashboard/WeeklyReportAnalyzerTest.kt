@@ -65,6 +65,42 @@ class WeeklyReportAnalyzerTest {
         assertEquals(30_000L, report.necessaryUseExcessMillis)
     }
 
+    @Test fun calculatesWeeklyChartBreakdowns() {
+        val report = report(listOf(
+            session(
+                Calendar.MONDAY,
+                9,
+                extensions = 2,
+                packageName = "youtube",
+                durationMillis = 120_000L
+            ),
+            session(
+                Calendar.MONDAY,
+                10,
+                extensions = 1,
+                packageName = "youtube",
+                durationMillis = 60_000L
+            ),
+            session(
+                Calendar.TUESDAY,
+                9,
+                packageName = "chrome",
+                durationMillis = 30_000L
+            )
+        ))
+
+        val monday = report.dailyOverrunStats.first { it.dayOfWeek == Calendar.MONDAY }
+        val tuesday = report.dailyOverrunStats.first { it.dayOfWeek == Calendar.TUESDAY }
+        assertEquals(2, monday.openCount)
+        assertEquals(3, monday.extensionCount)
+        assertEquals(180_000L, monday.usageMillis)
+        assertEquals(1, tuesday.openCount)
+        assertEquals(30_000L, tuesday.usageMillis)
+        assertEquals(listOf("youtube", "chrome"), report.appUsageStats.map { it.packageName })
+        assertEquals(180_000L, report.appUsageStats.first { it.packageName == "youtube" }.usageMillis)
+        assertEquals(30_000L, report.appUsageStats.first { it.packageName == "chrome" }.usageMillis)
+    }
+
     private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(
         sessions = s,
         timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(s),
@@ -82,10 +118,11 @@ class WeeklyReportAnalyzerTest {
     )
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
-        closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L): SessionLogEntity {
+        closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L,
+        packageName:String="target",durationMillis:Long=60_000L): SessionLogEntity {
         val start=time(day,hour)
-        return SessionLogEntity(packageName="target",entryDetectedAtMillis=start,startedAtMillis=start,
-            endedAtMillis=start+60_000,durationMillis=60_000,targetDurationMillis=60_000,intentChoice=intent,
+        return SessionLogEntity(packageName=packageName,entryDetectedAtMillis=start,startedAtMillis=start,
+            endedAtMillis=start+durationMillis,durationMillis=durationMillis,targetDurationMillis=60_000,intentChoice=intent,
             outcomeType=outcome,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
             closedAfterIntervention=closed,overrun=overrun,extensionCount=extensions,isFastReopen=fast,
             reopenGapMillis=gap,necessaryUseExcessMillis=necessaryUseExcessMillis,createdAtMillis=start)

@@ -59,6 +59,8 @@ import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
 private val InterventionBackground = Color(0xFFECEEFF)
+private val CareBackground = Color(0xFFFFF5E8)
+private val CareAccent = Color(0xFFFF9F43)
 private val BrakeBackground = Color(0xFFFFF8F2)
 private val BorderSoft = Color(0xFFE3E7EF)
 private val PurpleChoice = Color(0xFFFBE5FF)
@@ -76,6 +78,7 @@ private val Warning = Color(0xFFFF9F43)
 fun IntentCheckScreen(
     appName: String = "Instagram",
     recentOpenCountText: String? = null,
+    interventionActive: Boolean = false,
     selectedIntent: IntentChoice?,
     selectedDuration: TargetDurationChoice?,
     onIntentSelected: (IntentChoice) -> Unit,
@@ -84,18 +87,25 @@ fun IntentCheckScreen(
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
+    val descriptionText = if (interventionActive) {
+        "이 시간대에는 사용이 길어지기 쉬웠어요.\n오늘은 조금 짧게 틈을 만들어볼까요?"
+    } else {
+        recentOpenCountText ?: "최근 24시간 내 $appName 실행을 감지했어요."
+    }
+
     InterventionLayout(
         title = "Intent Check",
         subtitle = "열기 전에 잠깐 확인해요",
-        backgroundColor = InterventionBackground,
+        backgroundColor = if (interventionActive) CareBackground else InterventionBackground,
         modifier = modifier
     ) {
         CheckModal(
             symbol = "?",
             title = "${appName}을 왜 열었나요?",
-            description = recentOpenCountText ?: "최근 24시간 내 $appName 실행을 감지했어요.",
+            description = descriptionText,
             options = listOf(
-                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적", PurpleChoice, MaterialTheme.colorScheme.primary),
+                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적", PurpleChoice, accentColor),
                 IntentOptionUi(IntentChoice.MINDFUL_REST, "인지된 휴식", MintChoice, Success),
                 IntentOptionUi(IntentChoice.UNCONSCIOUS_OPEN, "무의식 실행", NeutralChoice, NeutralDot)
             ),
@@ -104,7 +114,8 @@ fun IntentCheckScreen(
             onIntentSelected = onIntentSelected,
             onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
-            onCloseClick = onCloseClick
+            onCloseClick = onCloseClick,
+            accentColor = accentColor
         )
     }
 }
@@ -113,6 +124,7 @@ fun IntentCheckScreen(
 fun ReopenCheckScreen(
     appName: String = "Instagram",
     reopenGapMillis: Long? = null,
+    interventionActive: Boolean = false,
     selectedIntent: IntentChoice?,
     selectedDuration: TargetDurationChoice?,
     onIntentSelected: (IntentChoice) -> Unit,
@@ -121,10 +133,12 @@ fun ReopenCheckScreen(
     onCloseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
+
     InterventionLayout(
         title = "Reopen Check",
         subtitle = null,
-        backgroundColor = InterventionBackground,
+        backgroundColor = if (interventionActive) CareBackground else InterventionBackground,
         modifier = modifier
     ) {
         CheckModal(
@@ -132,7 +146,7 @@ fun ReopenCheckScreen(
             title = "방금 다시 열었어요",
             description = reopenGapMillis?.let { "마지막 실행: ${formatDurationMillis(it)} 전" } ?: "마지막 실행: 짧은 시간 전",
             options = listOf(
-                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적으로 계속", PurpleChoice, MaterialTheme.colorScheme.primary),
+                IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적으로 계속", PurpleChoice, accentColor),
                 IntentOptionUi(IntentChoice.MINDFUL_REST, "인지된 휴식", MintChoice, Success),
                 IntentOptionUi(IntentChoice.UNCONSCIOUS_OPEN, "무의식 실행", NeutralChoice, NeutralDot)
             ),
@@ -141,7 +155,8 @@ fun ReopenCheckScreen(
             onIntentSelected = onIntentSelected,
             onDurationSelected = onDurationSelected,
             onStartClick = onStartClick,
-            onCloseClick = onCloseClick
+            onCloseClick = onCloseClick,
+            accentColor = accentColor
         )
     }
 }
@@ -151,6 +166,8 @@ fun SessionBrakeScreen(
     appName: String = "YouTube",
     elapsedMillis: Long? = null,
     targetDurationMillis: Long? = null,
+    interventionActive: Boolean = false,
+    extensionLimitReached: Boolean = false,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
@@ -165,6 +182,8 @@ fun SessionBrakeScreen(
             appName = appName,
             elapsedMillis = elapsedMillis,
             targetDurationMillis = targetDurationMillis,
+            interventionActive = interventionActive,
+            extensionLimitReached = extensionLimitReached,
             onEndClick = onEndClick,
             onExtendClick = onExtendClick,
             modifier = Modifier
@@ -180,6 +199,8 @@ fun SessionBrakeContent(
     appName: String = "YouTube",
     elapsedMillis: Long? = null,
     targetDurationMillis: Long? = null,
+    interventionActive: Boolean = false,
+    extensionLimitReached: Boolean = false,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
@@ -193,15 +214,27 @@ fun SessionBrakeContent(
     } else {
         null
     }
+    val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
+    val brakeGuidanceText = when {
+        interventionActive && extensionLimitReached ->
+            "오늘 이 시간대의 연장은 여기까지예요.\n처음 목적을 마무리했다면 나와볼까요?"
+        interventionActive ->
+            "조심 모드가 켜져 있어요.\n이 시간대에는 연장이 1회까지만 가능해요."
+        else ->
+            "조금 더 사용할지, 여기서 멈출지 짧게 확인해요."
+    }
 
     Column(
         modifier = modifier
-            .background(InterventionBackground, RoundedCornerShape(34.dp))
+            .background(
+                if (interventionActive) CareBackground else InterventionBackground,
+                RoundedCornerShape(34.dp)
+            )
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 31.dp, vertical = 34.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AlertBubble(symbol = "!", size = 90)
+        AlertBubble(symbol = "!", size = 90, color = accentColor)
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "예상 시간을 초과했어요",
@@ -238,7 +271,7 @@ fun SessionBrakeContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "조금 더 사용할지, 여기서 멈출지 짧게 확인해요.",
+            text = brakeGuidanceText,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp,
             textAlign = TextAlign.Center
@@ -259,7 +292,7 @@ fun SessionBrakeContent(
                     isExtensionExpanded = true
                 }
             },
-            color = MaterialTheme.colorScheme.primary
+            color = accentColor
         )
         if (isExtensionExpanded) {
             Spacer(modifier = Modifier.height(24.dp))
@@ -442,7 +475,8 @@ private fun CheckModal(
     onIntentSelected: (IntentChoice) -> Unit,
     onDurationSelected: (TargetDurationChoice) -> Unit,
     onStartClick: () -> Unit,
-    onCloseClick: () -> Unit
+    onCloseClick: () -> Unit,
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Column(
         modifier = Modifier
@@ -452,7 +486,7 @@ private fun CheckModal(
             .padding(horizontal = 22.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AlertBubble(symbol = symbol, size = 64)
+        AlertBubble(symbol = symbol, size = 64, color = accentColor)
         Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = title,
@@ -488,7 +522,7 @@ private fun CheckModal(
             TeumFilledButton(
                 text = "시작",
                 onClick = onStartClick,
-                color = MaterialTheme.colorScheme.primary,
+                color = accentColor,
                 modifier = Modifier.weight(1f),
                 height = 44,
                 enabled = selectedIntent != null &&
@@ -518,7 +552,11 @@ private fun CheckModal(
 }
 
 @Composable
-private fun AlertBubble(symbol: String, size: Int) {
+private fun AlertBubble(
+    symbol: String,
+    size: Int,
+    color: Color = Color(0xFF8491FF)
+) {
     Box(
         modifier = Modifier
             .size(size.dp)
@@ -527,7 +565,7 @@ private fun AlertBubble(symbol: String, size: Int) {
     ) {
         Text(
             text = symbol,
-            color = Color(0xFF8491FF),
+            color = color,
             fontSize = if (size > 80) 48.sp else 36.sp,
             fontWeight = FontWeight.Bold
         )
@@ -875,9 +913,12 @@ fun OutcomeCheckScreen(
     sessionData: OutcomeSessionUi,
     onOutcomeSelected: (OutcomeType) -> Unit,
     onDismissClick: () -> Unit,
+    interventionActive: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var selectedOutcomeType by remember { mutableStateOf<OutcomeType?>(null) }
+    val outcomeAccent = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
+    val outcomeBackground = if (interventionActive) Color(0xFFFFFBF5) else Color(0xFFF7F9FC)
     val outcomeOptions = listOf(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
@@ -902,7 +943,7 @@ fun OutcomeCheckScreen(
                 title = "목적 이탈",
                 description = "처음 목적과 무관한 자극으로 이동",
                 containerColor = BlueChoice,
-                dotColor = MaterialTheme.colorScheme.primary
+                dotColor = outcomeAccent
             ),
             outcomeType = OutcomeType.PURPOSE_DRIFT
         ),
@@ -919,7 +960,7 @@ fun OutcomeCheckScreen(
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = Color(0xFFF7F9FC)
+        color = outcomeBackground
     ) {
         Column(
             modifier = Modifier
@@ -967,7 +1008,7 @@ fun OutcomeCheckScreen(
             TeumFilledButton(
                 text = "기록 저장",
                 onClick = { selectedOutcomeType?.let(onOutcomeSelected) },
-                color = MaterialTheme.colorScheme.primary,
+                color = outcomeAccent,
                 height = 49,
                 enabled = selectedOutcomeType != null
             )
@@ -1161,11 +1202,44 @@ private fun IntentCheckMindfulRestPreview() {
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable
+private fun IntentCheckCareModePreview() {
+    TeumTheme {
+        var selectedIntent by remember { mutableStateOf<IntentChoice?>(IntentChoice.CLEAR_PURPOSE) }
+        var selectedDuration by remember { mutableStateOf<TargetDurationChoice?>(TargetDurationChoice.ONE_MINUTE) }
+        IntentCheckScreen(
+            interventionActive = true,
+            selectedIntent = selectedIntent,
+            selectedDuration = selectedDuration,
+            onIntentSelected = { selectedIntent = it },
+            onDurationSelected = { selectedDuration = it },
+            onStartClick = {},
+            onCloseClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
 private fun SessionBrakeScreenPreview() {
     TeumTheme {
         SessionBrakeScreen(
             elapsedMillis = 74_000L,
             targetDurationMillis = 60_000L,
+            onEndClick = {},
+            onExtendClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun SessionBrakeCareModePreview() {
+    TeumTheme {
+        SessionBrakeScreen(
+            elapsedMillis = 74_000L,
+            targetDurationMillis = 60_000L,
+            interventionActive = true,
+            extensionLimitReached = true,
             onEndClick = {},
             onExtendClick = {}
         )
@@ -1184,6 +1258,25 @@ private fun OutcomeCheckScreenPreview() {
                 targetDurationMillis = 300_000L,
                 extensionCount = 2
             ),
+            onOutcomeSelected = {},
+            onDismissClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun OutcomeCheckCareModePreview() {
+    TeumTheme {
+        OutcomeCheckScreen(
+            sessionData = OutcomeSessionUi(
+                appName = "Instagram",
+                intentText = "명확한 목적",
+                actualUsageMillis = 420_000L,
+                targetDurationMillis = 300_000L,
+                extensionCount = 1
+            ),
+            interventionActive = true,
             onOutcomeSelected = {},
             onDismissClick = {}
         )

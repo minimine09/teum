@@ -1,11 +1,13 @@
 package com.teum.app.dashboard
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -177,6 +179,7 @@ fun DashboardScreen(
 
                 DashboardTab.Report -> WeeklyReportContent(
                     stats = weeklyReportStats,
+                    appDisplayNames = appDisplayNames,
                     onDeleteAllSessionLogs = { showDeleteConfirmation = true }
                 )
 
@@ -286,6 +289,7 @@ private fun SessionHistoryContent(
 @Composable
 private fun WeeklyReportContent(
     stats: WeeklyReportStats,
+    appDisplayNames: Map<String, String>,
     onDeleteAllSessionLogs: () -> Unit
 ) {
     Column(
@@ -301,7 +305,10 @@ private fun WeeklyReportContent(
             subtitle = "이번 주 사용 패턴을 정리했어요"
         )
         ReportVulnerableTimeCard(stats)
-        WeeklyOverrunBars(stats.dailyOverrunStats)
+        WeeklyReportCharts(
+            stats = stats,
+            appDisplayNames = appDisplayNames
+        )
         ReportMetricCard(
             title = "목적 이탈률",
             value = formatPercent(stats.purposeDriftRate),
@@ -580,19 +587,19 @@ private fun HomeSmallStatCard(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 18.dp),
-            verticalArrangement = Arrangement.Center
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(
                 text = label,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
+                lineHeight = 14.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = value,
                 color = color,
@@ -991,11 +998,291 @@ private fun WeeklyOverrunBars(dailyStats: List<DailyOverrunStat>) {
 }
 
 @Composable
+private fun WeeklyReportCharts(
+    stats: WeeklyReportStats,
+    appDisplayNames: Map<String, String>
+) {
+    val dayStats = stats.dailyOverrunStats
+    val maxOpenCount = dayStats.maxOfOrNull { it.openCount }?.takeIf { it > 0 } ?: 1
+    val maxExtensionCount = dayStats.maxOfOrNull { it.extensionCount }?.takeIf { it > 0 } ?: 1
+    val maxUsageMillis = dayStats.maxOfOrNull { it.usageMillis }?.takeIf { it > 0L } ?: 1L
+    val chartScrollState = rememberScrollState()
+
+    val activePage = if (chartScrollState.maxValue > 0) {
+        ((chartScrollState.value.toFloat() / chartScrollState.maxValue.toFloat()) * 3f)
+            .roundToInt()
+            .coerceIn(0, 3)
+    } else {
+        0
+    }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val cardWidth = maxWidth
+            Row(
+                modifier = Modifier.horizontalScroll(chartScrollState),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                WeeklyBarChartCard(
+                    title = "요일별 오픈 횟수",
+                    summary = "${dayStats.sumOf { it.openCount }}회",
+                    labels = dayStats.map { it.label },
+                    values = dayStats.map { it.openCount.toDouble() / maxOpenCount },
+                    highlightedIndex = dayStats.indexOfMaxInt { it.openCount },
+                    barColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.width(cardWidth)
+                )
+                WeeklyBarChartCard(
+                    title = "요일별 연장 횟수",
+                    summary = "${dayStats.sumOf { it.extensionCount }}회",
+                    labels = dayStats.map { it.label },
+                    values = dayStats.map { it.extensionCount.toDouble() / maxExtensionCount },
+                    highlightedIndex = dayStats.indexOfMaxInt { it.extensionCount },
+                    barColor = DashboardWarning,
+                    modifier = Modifier.width(cardWidth)
+                )
+                WeeklyBarChartCard(
+                    title = "요일별 사용 시간",
+                    summary = formatDuration(dayStats.sumOf { it.usageMillis }),
+                    labels = dayStats.map { it.label },
+                    values = dayStats.map { it.usageMillis.toDouble() / maxUsageMillis.toDouble() },
+                    highlightedIndex = dayStats.indexOfMaxLong { it.usageMillis },
+                    barColor = DashboardSuccess,
+                    modifier = Modifier.width(cardWidth)
+                )
+                WeeklyAppUsageChartCard(
+                    appUsageStats = stats.appUsageStats,
+                    appDisplayNames = appDisplayNames,
+                    modifier = Modifier.width(cardWidth)
+                )
+            }
+        }
+        ChartPageIndicator(
+            pageCount = 4,
+            activePage = activePage
+        )
+    }
+}
+
+@Composable
+private fun WeeklyBarChartCard(
+    title: String,
+    summary: String,
+    labels: List<String>,
+    values: List<Double>,
+    highlightedIndex: Int,
+    barColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.heightIn(min = 190.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, DashboardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)
+        ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = summary,
+                color = barColor,
+                fontSize = 24.sp,
+                lineHeight = 29.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(17.dp))
+            SimpleBarChart(
+                labels = labels,
+                values = values,
+                highlightedIndex = highlightedIndex.coerceAtLeast(0),
+                barWidth = 28,
+                highlightedColor = barColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeeklyAppUsageChartCard(
+    appUsageStats: List<AppUsageStat>,
+    appDisplayNames: Map<String, String>,
+    modifier: Modifier = Modifier
+) {
+    val visibleStats = appUsageStats.take(4)
+    val totalUsageMillis = visibleStats.sumOf { it.usageMillis }
+    val colors = listOf(
+        MaterialTheme.colorScheme.primary,
+        DashboardSuccess,
+        DashboardWarning,
+        DashboardDanger
+    )
+
+    Card(
+        modifier = modifier.heightIn(min = 190.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, DashboardBorder)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "앱별 사용시간",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+                Text(
+                    text = if (totalUsageMillis > 0L) formatDuration(totalUsageMillis) else "기록 없음",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 22.sp,
+                    lineHeight = 27.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                if (visibleStats.isEmpty()) {
+                    Text(
+                        text = "앱별 기록이 아직 없어요.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                } else {
+                    visibleStats.forEachIndexed { index, stat ->
+                        ChartLegendRow(
+                            color = colors[index % colors.size],
+                            label = appDisplayNames[stat.packageName] ?: stat.packageName,
+                            value = formatPercent(stat.usageMillis.toDouble() / totalUsageMillis.toDouble())
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            PieChart(
+                values = visibleStats.map { it.usageMillis.toFloat() },
+                colors = colors,
+                modifier = Modifier.size(104.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartPageIndicator(
+    pageCount: Int,
+    activePage: Int
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(pageCount) { index ->
+            Box(
+                modifier = Modifier
+                    .size(
+                        width = if (index == activePage) 16.dp else 6.dp,
+                        height = 6.dp
+                    )
+                    .background(
+                        color = if (index == activePage) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            DashboardMutedBar
+                        },
+                        shape = CircleShape
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartLegendRow(
+    color: Color,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(color, CircleShape)
+        )
+        Spacer(modifier = Modifier.width(7.dp))
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = value,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun PieChart(
+    values: List<Float>,
+    colors: List<Color>,
+    modifier: Modifier = Modifier
+) {
+    val total = values.sum().takeIf { it > 0f } ?: 1f
+    Canvas(modifier = modifier) {
+        var startAngle = -90f
+        values.forEachIndexed { index, value ->
+            val sweepAngle = 360f * (value / total)
+            drawArc(
+                color = colors[index % colors.size],
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = true
+            )
+            startAngle += sweepAngle
+        }
+        if (values.isEmpty()) {
+            drawCircle(
+                color = DashboardMutedBar,
+            )
+        }
+    }
+}
+
+@Composable
 private fun SimpleBarChart(
     labels: List<String>,
     values: List<Double>,
     highlightedIndex: Int,
-    barWidth: Int
+    barWidth: Int,
+    highlightedColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Row(
         modifier = Modifier
@@ -1013,7 +1300,7 @@ private fun SimpleBarChart(
                         .size(width = barWidth.dp, height = barHeight)
                         .background(
                             color = if (index == highlightedIndex) {
-                                MaterialTheme.colorScheme.primary
+                                highlightedColor
                             } else {
                                 DashboardMutedBar
                             },
@@ -1032,6 +1319,22 @@ private fun SimpleBarChart(
             }
         }
     }
+}
+
+private fun List<DailyOverrunStat>.indexOfMaxInt(
+    selector: (DailyOverrunStat) -> Int
+): Int {
+    return mapIndexed { index, item -> index to selector(item) }
+        .maxByOrNull { it.second }
+        ?.first ?: 0
+}
+
+private fun List<DailyOverrunStat>.indexOfMaxLong(
+    selector: (DailyOverrunStat) -> Long
+): Int {
+    return mapIndexed { index, item -> index to selector(item) }
+        .maxByOrNull { it.second }
+        ?.first ?: 0
 }
 
 @Composable
