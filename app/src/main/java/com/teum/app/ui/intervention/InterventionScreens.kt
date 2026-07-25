@@ -278,7 +278,7 @@ fun SessionBrakeContent(
 }
 
 @Composable
-fun OutcomeCheckScreen(
+private fun LegacyOutcomeCheckScreen(
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -364,12 +364,24 @@ private fun InterventionLayout(
 }
 
 @Composable
-private fun ScreenHeader(title: String, subtitle: String?) {
+private fun ScreenHeader(
+    title: String,
+    subtitle: String?,
+    onBackClick: (() -> Unit)? = null
+) {
     Row(verticalAlignment = Alignment.Top) {
-        Box(
-            modifier = Modifier
+        val backModifier = if (onBackClick != null) {
+            Modifier
                 .size(30.dp)
-                .background(MaterialTheme.colorScheme.surface, CircleShape),
+                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                .clickable(onClick = onBackClick)
+        } else {
+            Modifier
+                .size(30.dp)
+                .background(MaterialTheme.colorScheme.surface, CircleShape)
+        }
+        Box(
+            modifier = backModifier,
             contentAlignment = Alignment.Center
         ) {
             BackChevron()
@@ -822,9 +834,9 @@ private fun OutcomeOption(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(67.dp)
+            .height(58.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = option.containerColor),
         border = if (selected) BorderStroke(1.4.dp, option.dotColor) else null
     ) {
@@ -837,22 +849,15 @@ private fun OutcomeOption(
             SelectionDot(
                 color = option.dotColor,
                 selected = selected,
-                size = 24
+                size = 21
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    text = option.title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = option.description,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
-                )
-            }
+            Text(
+                text = option.title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -860,7 +865,7 @@ private fun OutcomeOption(
 @Composable
 fun OutcomeCheckScreen(
     sessionData: OutcomeSessionUi,
-    onSaveClick: (OutcomeType) -> Unit,
+    onOutcomeSelected: (OutcomeType) -> Unit,
     onDismissClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -868,8 +873,8 @@ fun OutcomeCheckScreen(
     val outcomeOptions = listOf(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
-                title = "목적 달성",
-                description = "처음 목적대로 필요한 사용을 마쳤어요.",
+                title = "목적 달성함",
+                description = "필요한 사용 또는 계획된 휴식",
                 containerColor = MintChoice,
                 dotColor = Success
             ),
@@ -878,25 +883,25 @@ fun OutcomeCheckScreen(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
                 title = "필요한 사용",
-                description = "예상보다 길었지만 실제로 필요한 사용이었어요.",
-                containerColor = BlueChoice,
-                dotColor = MaterialTheme.colorScheme.primary
+                description = "릴스·추천 피드 등으로 이동",
+                containerColor = DangerChoice,
+                dotColor = Danger
             ),
             outcomeType = OutcomeType.NECESSARY_USE
         ),
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
-                title = "목적 이탈",
-                description = "릴스·추천 피드 등 목적과 다른 사용으로 이어졌어요.",
-                containerColor = DangerChoice,
-                dotColor = Danger
+                title = "목적에서 이탈함",
+                description = "자료 확인, 연락 등 예외 처리",
+                containerColor = BlueChoice,
+                dotColor = MaterialTheme.colorScheme.primary
             ),
             outcomeType = OutcomeType.PURPOSE_DRIFT
         ),
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
-                title = "계속 스크롤",
-                description = "무의식적으로 이어진 사용으로 기록해요.",
+                title = "무의식 사용",
+                description = "세션 과몰입으로 기록",
                 containerColor = OrangeChoice,
                 dotColor = Warning
             ),
@@ -906,54 +911,54 @@ fun OutcomeCheckScreen(
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = Color(0xFFF7F9FC)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 50.dp, bottom = 79.dp)
+                .padding(top = 50.dp, bottom = 24.dp)
         ) {
-            ScreenHeader(title = "사용 후 확인", subtitle = "이번 사용을 돌아봐요")
-            Spacer(modifier = Modifier.height(23.dp))
-            OutcomeSessionSummaryCard(sessionData = sessionData)
-            Spacer(modifier = Modifier.height(38.dp))
-            Text(
-                text = "처음 목적을 달성했나요?",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+            ScreenHeader(
+                title = "Outcome Check",
+                subtitle = "목적과 실제 결과 연결",
+                onBackClick = onDismissClick
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "다음 리포트에 반영돼요.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.height(39.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                outcomeOptions.forEach { option ->
-                    OutcomeOption(
-                        option = option.ui,
-                        selected = selectedOutcomeType == option.outcomeType,
-                        onClick = { selectedOutcomeType = option.outcomeType }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            OutlinedButton(
-                onClick = onDismissClick,
+            Spacer(modifier = Modifier.height(22.dp))
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(49.dp),
-                shape = RoundedCornerShape(16.dp)
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text("지금은 닫기")
+                OutcomeSessionSummaryCard(sessionData = sessionData)
+                Spacer(modifier = Modifier.height(26.dp))
+                Text(
+                    text = "처음 목적을 달성했나요?",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "결과 응답은 다음 리포트와 개입 강도에 반영됩니다.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    outcomeOptions.forEach { option ->
+                        OutcomeOption(
+                            option = option.ui,
+                            selected = selectedOutcomeType == option.outcomeType,
+                            onClick = { selectedOutcomeType = option.outcomeType }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(18.dp))
             }
-            Spacer(modifier = Modifier.height(12.dp))
             TeumFilledButton(
-                text = "저장하기",
-                onClick = { selectedOutcomeType?.let(onSaveClick) },
+                text = "기록 저장",
+                onClick = { selectedOutcomeType?.let(onOutcomeSelected) },
                 color = MaterialTheme.colorScheme.primary,
                 height = 49,
                 enabled = selectedOutcomeType != null
@@ -969,13 +974,13 @@ private fun OutcomeSessionSummaryCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, BorderSoft)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 17.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "이번 사용 요약",
@@ -1171,7 +1176,7 @@ private fun OutcomeCheckScreenPreview() {
                 targetDurationMillis = 300_000L,
                 extensionCount = 2
             ),
-            onSaveClick = {},
+            onOutcomeSelected = {},
             onDismissClick = {}
         )
     }
