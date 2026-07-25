@@ -1876,10 +1876,13 @@ private fun AppStatisticsFilterCard(
 
 private fun formatDuration(durationMillis: Long): String {
     val totalSeconds = (durationMillis / 1_000L).coerceAtLeast(0L)
-    val hours = totalSeconds / 3_600L
+    val days = totalSeconds / 86_400L
+    val hours = (totalSeconds % 86_400L) / 3_600L
     val minutes = (totalSeconds % 3_600L) / 60L
     val seconds = totalSeconds % 60L
     return when {
+        days > 0L && hours > 0L -> "${days}일 ${hours}시간"
+        days > 0L -> "${days}일"
         hours > 0L && minutes > 0L -> "${hours}시간 ${minutes}분"
         hours > 0L -> "${hours}시간"
         minutes > 0L && seconds > 0L -> "${minutes}분 ${seconds}초"
