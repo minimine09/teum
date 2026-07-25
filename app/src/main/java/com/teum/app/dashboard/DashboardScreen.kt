@@ -255,7 +255,7 @@ private fun SessionHistoryContent(
             subtitle = "앱별 사용 내역을 확인하세요"
         )
         AppStatisticsFilterCard(
-            packages = targetPackages + availablePackages,
+            packages = targetPackages,
             selectedPackageName = selectedPackageName,
             appDisplayNames = appDisplayNames,
             onSelectPackage = onSelectPackage
@@ -786,7 +786,7 @@ private fun RecentSessionItem(
         null
     }
     val overrunStatus = if (metrics.isOverrun) {
-        "${formatDuration(metrics.overrunMillis)} 초과" to DashboardWarning
+        formatRecentSessionOverrun(metrics.overrunMillis) to DashboardWarning
     } else {
         "시간 내 종료" to secondaryTextColor
     }
@@ -1532,6 +1532,14 @@ private fun formatDuration(durationMillis: Long): String {
         "${minutes}분 ${seconds}초"
     } else {
         "${seconds}초"
+    }
+}
+
+private fun formatRecentSessionOverrun(overrunMillis: Long): String {
+    return if (overrunMillis < 1_000L) {
+        "1초 미만 초과"
+    } else {
+        "${formatDuration(overrunMillis)} 초과"
     }
 }
 

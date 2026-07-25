@@ -84,7 +84,7 @@ fun IntentCheckScreen(
     modifier: Modifier = Modifier
 ) {
     InterventionLayout(
-        title = "열기 전 확인",
+        title = "Intent Check",
         subtitle = "열기 전에 잠깐 확인해요",
         backgroundColor = InterventionBackground,
         modifier = modifier
@@ -121,7 +121,7 @@ fun ReopenCheckScreen(
     modifier: Modifier = Modifier
 ) {
     InterventionLayout(
-        title = "다시 열기 확인",
+        title = "Reopen Check",
         subtitle = null,
         backgroundColor = InterventionBackground,
         modifier = modifier
@@ -300,7 +300,7 @@ private fun LegacyOutcomeCheckScreen(
                 .padding(horizontal = 24.dp)
                 .padding(top = 50.dp, bottom = 79.dp)
         ) {
-            ScreenHeader(title = "사용 후 확인", subtitle = "이번 사용을 돌아봐요")
+            ScreenHeader(title = "Outcome Check", subtitle = "이번 사용을 돌아봐요")
             Spacer(modifier = Modifier.height(23.dp))
             SessionSummaryCard()
             Spacer(modifier = Modifier.height(38.dp))
@@ -873,8 +873,8 @@ fun OutcomeCheckScreen(
     val outcomeOptions = listOf(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
-                title = "목적 달성함",
-                description = "필요한 사용 또는 계획된 휴식",
+                title = "목적 달성",
+                description = "처음 목적을 완료함",
                 containerColor = MintChoice,
                 dotColor = Success
             ),
@@ -883,7 +883,7 @@ fun OutcomeCheckScreen(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
                 title = "필요한 사용",
-                description = "릴스·추천 피드 등으로 이동",
+                description = "처음 목적과 달라졌지만 의식적으로 필요한 사용",
                 containerColor = DangerChoice,
                 dotColor = Danger
             ),
@@ -891,8 +891,8 @@ fun OutcomeCheckScreen(
         ),
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
-                title = "목적에서 이탈함",
-                description = "자료 확인, 연락 등 예외 처리",
+                title = "목적 이탈",
+                description = "처음 목적과 무관한 자극으로 이동",
                 containerColor = BlueChoice,
                 dotColor = MaterialTheme.colorScheme.primary
             ),
@@ -901,7 +901,7 @@ fun OutcomeCheckScreen(
         OutcomeSelectionOptionUi(
             ui = OutcomeOptionUi(
                 title = "무의식 사용",
-                description = "세션 과몰입으로 기록",
+                description = "어느 순간 무의식적으로 계속 사용",
                 containerColor = OrangeChoice,
                 dotColor = Warning
             ),
