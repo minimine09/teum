@@ -35,10 +35,8 @@ import com.teum.app.ui.theme.TeumTheme
 
 private val PermissionBlue = Color(0xFF5B5FEA)
 private val PermissionMint = Color(0xFF2EC4A6)
-private val PermissionOrange = Color(0xFFFF9F43)
 private val PermissionBlueContainer = Color(0xFFECEEFF)
 private val PermissionMintContainer = Color(0xFFE8F8F4)
-private val PermissionOrangeContainer = Color(0xFFFFF3E4)
 private val PermissionBorder = Color(0xFFE3E7EF)
 private val PermissionReady = Color(0xFF2EC4A6)
 private val PermissionMissing = Color(0xFFF05D5E)
@@ -101,21 +99,7 @@ fun PermissionSetupScreen(
                     containerColor = PermissionMintContainer,
                     onClick = onOpenOverlaySettings
                 )
-                PermissionCard(
-                    title = "로컬 저장",
-                    description = "사용 기록의 기본 정보만 기기 안에 저장해요.",
-                    badgeText = "자동",
-                    statusText = "준비됨",
-                    granted = true,
-                    color = PermissionOrange,
-                    containerColor = PermissionOrangeContainer,
-                    onClick = null
-                )
             }
-
-            Spacer(modifier = Modifier.height(33.dp))
-
-            NotCollectedCard()
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -259,31 +243,6 @@ private fun PermissionBadge(
             color = color,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun NotCollectedCard(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(111.dp)
-            .background(PermissionBlueContainer, RoundedCornerShape(22.dp))
-            .padding(horizontal = 24.dp, vertical = 26.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "수집하지 않는 데이터",
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "메시지 내용 · 영상 내용 · 검색어 · 화면 캡처 · 연락처 · 위치 정보",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 12.sp,
-            lineHeight = 17.sp
         )
     }
 }
