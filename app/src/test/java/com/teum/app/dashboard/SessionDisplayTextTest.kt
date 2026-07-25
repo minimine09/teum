@@ -33,5 +33,8 @@ class SessionDisplayTextTest {
         assertEquals("목표 시간 안에 종료했어요", SessionDisplayText.overrun(0L))
         assertEquals("목표 시간을 1초 미만 초과했어요", SessionDisplayText.overrun(37L))
         assertEquals("목표 시간을 1분 5초 초과했어요", SessionDisplayText.overrun(65_000L))
+        assertEquals("시간 내 종료", SessionDisplayText.compactOverrun(0L))
+        assertEquals("1초 미만 초과", SessionDisplayText.compactOverrun(37L))
+        assertEquals("1분 5초 초과", SessionDisplayText.compactOverrun(65_000L))
     }
 }

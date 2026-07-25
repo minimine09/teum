@@ -20,8 +20,15 @@ class DashboardDataFilterTest {
     @Test
     fun todayStatsExcludeOlderSessionsAndCountSelectedData() {
         val sessions = listOf(
-            session("youtube", 99, overrun = true, fast = true, drifted = true),
-            session("youtube", 100),
+            session(
+                "youtube",
+                99,
+                overrun = true,
+                fast = true,
+                drifted = true,
+                closedAfterIntervention = true
+            ),
+            session("youtube", 100, closedAfterIntervention = true),
             session("youtube", 200, overrun = true, fast = true, drifted = true)
         )
 
@@ -31,6 +38,7 @@ class DashboardDataFilterTest {
         assertEquals(1, stats.todayOverrunCount)
         assertEquals(1, stats.todayFastReopenCount)
         assertEquals(1, stats.todayPurposeDriftCount)
+        assertEquals(1, stats.todayClosedAfterInterventionCount)
     }
 
     private fun open(packageName: String) = AppOpenEventEntity(
@@ -43,7 +51,8 @@ class DashboardDataFilterTest {
         startedAt: Long,
         overrun: Boolean = false,
         fast: Boolean = false,
-        drifted: Boolean? = null
+        drifted: Boolean? = null,
+        closedAfterIntervention: Boolean? = null
     ) = SessionLogEntity(
         packageName = packageName,
         entryDetectedAtMillis = startedAt,
@@ -54,6 +63,7 @@ class DashboardDataFilterTest {
         intentChoice = "CLEAR_PURPOSE",
         outcomeType = null,
         purposeDrifted = drifted,
+        closedAfterIntervention = closedAfterIntervention,
         overrun = overrun,
         extensionCount = 0,
         isFastReopen = fast,

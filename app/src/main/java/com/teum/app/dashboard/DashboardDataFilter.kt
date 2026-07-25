@@ -27,7 +27,9 @@ object DashboardDataFilter {
             todaySessionCount = todaySessions.size,
             todayOverrunCount = todaySessions.count { it.overrun },
             todayFastReopenCount = todaySessions.count { it.isFastReopen },
-            todayPurposeDriftCount = todaySessions.count { it.purposeDrifted == true }
+            todayPurposeDriftCount = todaySessions.count { it.purposeDrifted == true },
+            todayClosedAfterInterventionCount =
+                todaySessions.count { it.closedAfterIntervention == true }
         )
     }
 }
