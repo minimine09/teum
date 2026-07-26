@@ -37,6 +37,11 @@ private enum class LaunchFlowStep {
     Dashboard
 }
 
+private enum class PermissionSetupEntryPoint {
+    InitialSetup,
+    DashboardRecovery
+}
+
 class MainActivity : ComponentActivity() {
     private val targetAppRepository by lazy {
         TargetAppRepository(this)
@@ -68,7 +73,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TeumTheme {
-                var launchFlowStep by remember { mutableStateOf(LaunchFlowStep.Onboarding) }
+                var launchFlowStep by remember {
+                    mutableStateOf(
+                        if (userSettingsRepository.isSetupCompleted()) {
+                            LaunchFlowStep.Dashboard
+                        } else {
+                            LaunchFlowStep.Onboarding
+                        }
+                    )
+                }
+                var permissionSetupEntryPoint by remember {
+                    mutableStateOf(PermissionSetupEntryPoint.InitialSetup)
+                }
                 var selectedInterventionMode by remember {
                     mutableStateOf(userSettingsRepository.getInterventionMode())
                 }
@@ -81,7 +97,10 @@ class MainActivity : ComponentActivity() {
                 when (launchFlowStep) {
                     LaunchFlowStep.Onboarding -> {
                         OnboardingScreen(
-                            onStartClick = { launchFlowStep = LaunchFlowStep.PermissionSetup }
+                            onStartClick = {
+                                permissionSetupEntryPoint = PermissionSetupEntryPoint.InitialSetup
+                                launchFlowStep = LaunchFlowStep.PermissionSetup
+                            }
                         )
                     }
 
@@ -90,7 +109,17 @@ class MainActivity : ComponentActivity() {
                             permissionStatus = permissionStatus,
                             onOpenAccessibilitySettings = ::openAccessibilitySettings,
                             onOpenOverlaySettings = ::openOverlaySettings,
-                            onContinueClick = { launchFlowStep = LaunchFlowStep.TargetAppSelection }
+                            onContinueClick = {
+                                launchFlowStep = when (permissionSetupEntryPoint) {
+                                    PermissionSetupEntryPoint.InitialSetup -> LaunchFlowStep.TargetAppSelection
+                                    PermissionSetupEntryPoint.DashboardRecovery -> LaunchFlowStep.Dashboard
+                                }
+                            },
+                            onLaterClick = if (permissionSetupEntryPoint == PermissionSetupEntryPoint.DashboardRecovery) {
+                                { launchFlowStep = LaunchFlowStep.Dashboard }
+                            } else {
+                                null
+                            }
                         )
                     }
 
@@ -118,6 +147,7 @@ class MainActivity : ComponentActivity() {
                             onCompleteClick = {
                                 selectedInterventionMode = it
                                 userSettingsRepository.setInterventionMode(it)
+                                userSettingsRepository.setSetupCompleted(true)
                                 launchFlowStep = LaunchFlowStep.Dashboard
                             }
                         )
@@ -137,6 +167,10 @@ class MainActivity : ComponentActivity() {
                             selectedPackageName = dashboardUiState.selectedPackageName,
                             onOpenAccessibilitySettings = ::openAccessibilitySettings,
                             onOpenOverlaySettings = ::openOverlaySettings,
+                            onRecoverPermissionsClick = {
+                                permissionSetupEntryPoint = PermissionSetupEntryPoint.DashboardRecovery
+                                launchFlowStep = LaunchFlowStep.PermissionSetup
+                            },
                             onAddTargetPackage = ::addTargetPackage,
                             onRemoveTargetPackage = ::removeTargetPackage,
                             onDeleteAllSessionLogs = dashboardViewModel::deleteAllSessionLogs,

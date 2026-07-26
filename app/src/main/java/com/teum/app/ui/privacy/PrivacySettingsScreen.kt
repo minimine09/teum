@@ -36,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teum.app.core.model.InterventionMode
+import com.teum.app.core.model.PermissionStatus
 import com.teum.app.ui.theme.TeumTheme
 
 private val PrivacyBorder = Color(0xFFE3E7EF)
@@ -53,6 +54,8 @@ fun PrivacySettingsScreen(
     showVulnerableDebugOverride: Boolean = false,
     forceVulnerableNowForDebug: Boolean = false,
     onForceVulnerableNowForDebugChange: (Boolean) -> Unit = {},
+    permissionStatus: PermissionStatus,
+    onPermissionSettingsClick: () -> Unit,
     onManageTargetAppsClick: () -> Unit = {},
     onDeleteAllClick: () -> Unit,
     showBottomNav: Boolean = true,
@@ -76,6 +79,11 @@ fun PrivacySettingsScreen(
             ModeCard(
                 selectedMode = selectedMode,
                 onModeChange = onModeChange
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            PermissionSettingsCard(
+                permissionStatus = permissionStatus,
+                onClick = onPermissionSettingsClick
             )
             if (showVulnerableDebugOverride) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -105,6 +113,78 @@ fun PrivacySettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PermissionSettingsCard(
+    permissionStatus: PermissionStatus,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, PrivacyBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "권한 설정",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "앱 사용 감지와 확인 화면에 필요한 권한을 관리해요.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                lineHeight = 17.sp
+            )
+            PermissionStatusLine(
+                label = "접근성 권한",
+                ready = permissionStatus.isAccessibilityEnabled
+            )
+            PermissionStatusLine(
+                label = "화면 위 표시 권한",
+                ready = permissionStatus.canDrawOverlays
+            )
+            Text(
+                text = "권한 확인 및 변경",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionStatusLine(
+    label: String,
+    ready: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
+        Text(
+            text = if (ready) "완료" else "설정 필요",
+            color = if (ready) PrivacyCare else PrivacyDanger,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -325,6 +405,11 @@ private fun PrivacySettingsNormalPreview() {
         PrivacySettingsScreen(
             selectedMode = InterventionMode.NORMAL,
             onModeChange = {},
+            permissionStatus = PermissionStatus(
+                isAccessibilityEnabled = true,
+                canDrawOverlays = true
+            ),
+            onPermissionSettingsClick = {},
             onDeleteAllClick = {}
         )
     }
@@ -337,6 +422,11 @@ private fun PrivacySettingsCarePreview() {
         PrivacySettingsScreen(
             selectedMode = InterventionMode.INTERVENTION,
             onModeChange = {},
+            permissionStatus = PermissionStatus(
+                isAccessibilityEnabled = false,
+                canDrawOverlays = true
+            ),
+            onPermissionSettingsClick = {},
             onDeleteAllClick = {}
         )
     }
