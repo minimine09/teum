@@ -100,6 +100,7 @@ fun DashboardScreen(
     selectedPackageName: String?,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
+    onRecoverPermissionsClick: () -> Unit,
     onAddTargetPackage: (String) -> Unit,
     onRemoveTargetPackage: (String) -> Unit,
     onDeleteAllSessionLogs: () -> Unit,
@@ -164,11 +165,13 @@ fun DashboardScreen(
         ) {
             when (selectedTab) {
                 DashboardTab.Home -> HomeDashboardContent(
+                    permissionStatus = permissionStatus,
                     appDisplayNames = appDisplayNames,
                     dashboardStats = dashboardStats,
                     recentSessions = recentSessions,
                     timeSlotStats = timeSlotStats,
-                    weeklyReportStats = weeklyReportStats
+                    weeklyReportStats = weeklyReportStats,
+                    onRecoverPermissionsClick = onRecoverPermissionsClick
                 )
 
                 DashboardTab.Session -> SessionHistoryContent(
@@ -191,6 +194,8 @@ fun DashboardScreen(
                     showVulnerableDebugOverride = showVulnerableDebugOverride,
                     forceVulnerableNowForDebug = forceVulnerableNowForDebug,
                     onForceVulnerableNowForDebugChange = onForceVulnerableNowForDebugChange,
+                    permissionStatus = permissionStatus,
+                    onPermissionSettingsClick = onRecoverPermissionsClick,
                     onManageTargetAppsClick = { selectedTab = DashboardTab.TargetApps },
                     onDeleteAllClick = { showDeleteConfirmation = true },
                     showBottomNav = false
@@ -217,12 +222,17 @@ fun DashboardScreen(
 
 @Composable
 private fun HomeDashboardContent(
+    permissionStatus: PermissionStatus,
     appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
     recentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
-    weeklyReportStats: WeeklyReportStats
+    weeklyReportStats: WeeklyReportStats,
+    onRecoverPermissionsClick: () -> Unit
 ) {
+    val hasRequiredPermissions = permissionStatus.isAccessibilityEnabled &&
+        permissionStatus.canDrawOverlays
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -235,6 +245,9 @@ private fun HomeDashboardContent(
             title = "오늘의 사용",
             subtitle = "오늘의 앱 사용 흐름을 확인하세요"
         )
+        if (!hasRequiredPermissions) {
+            PermissionRecoveryCard(onClick = onRecoverPermissionsClick)
+        }
         HomeMainStatCard(dashboardStats)
         HomeSmallStatsRow(dashboardStats)
         RecentSessionsCard(
@@ -242,6 +255,51 @@ private fun HomeDashboardContent(
             appDisplayNames = appDisplayNames,
             maxItems = 3
         )
+    }
+}
+
+@Composable
+private fun PermissionRecoveryCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E4)),
+        border = BorderStroke(1.dp, DashboardWarning.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "틈이 현재 일시 중지되어 있어요",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "필수 권한이 꺼져 있어 앱 사용 감지와 확인 화면이 동작하지 않습니다.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                lineHeight = 17.sp
+            )
+            Button(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DashboardWarning)
+            ) {
+                Text(
+                    text = "권한 다시 설정",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
@@ -1997,6 +2055,7 @@ private fun DashboardScreenPreview() {
             selectedPackageName = null,
             onOpenAccessibilitySettings = {},
             onOpenOverlaySettings = {},
+            onRecoverPermissionsClick = {},
             onAddTargetPackage = {},
             onRemoveTargetPackage = {},
             onDeleteAllSessionLogs = {},

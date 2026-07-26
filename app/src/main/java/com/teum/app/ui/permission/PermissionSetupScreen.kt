@@ -1,5 +1,6 @@
 package com.teum.app.ui.permission
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,10 +50,15 @@ fun PermissionSetupScreen(
     onOpenAccessibilitySettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onContinueClick: () -> Unit,
+    onLaterClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val requiredPermissionsReady = permissionStatus.isAccessibilityEnabled &&
         permissionStatus.canDrawOverlays
+
+    if (onLaterClick != null) {
+        BackHandler(onBack = onLaterClick)
+    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -134,6 +141,19 @@ fun PermissionSetupScreen(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+            if (onLaterClick != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(
+                    onClick = onLaterClick,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = "나중에 하기",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(29.dp))
             Text(
