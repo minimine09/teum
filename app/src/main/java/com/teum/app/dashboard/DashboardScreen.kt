@@ -811,7 +811,18 @@ private fun RecentSessionItem(
     } else {
         "재실행 없음" to secondaryTextColor
     }
+    val interventionPolicyStatus = SessionPolicyDisplayText.status(
+        modeAtStart = session.modeAtStart,
+        interventionAppliedAtStart = session.interventionAppliedAtStart
+    )?.let { status ->
+        status to if (session.interventionAppliedAtStart) {
+            DashboardWarning
+        } else {
+            secondaryTextColor
+        }
+    }
     val sessionStatuses = buildList {
+        interventionPolicyStatus?.let(::add)
         outcomeStatus?.let(::add)
         add(overrunStatus)
         add(reopenStatus)
@@ -962,6 +973,31 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 fontSize = 13.sp,
                 lineHeight = 17.sp
             )
+            if (hourSlot != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "이 시간대에는 조심 모드를 켜 사용 시간과 연장을 줄여보세요.",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            if (
+                stats.cautionModeSessionCount > 0 ||
+                stats.vulnerableTimeSessionCount > 0 ||
+                stats.interventionAppliedSessionCount > 0
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "조심 모드 세션 ${stats.cautionModeSessionCount}개 · " +
+                        "취약 시간 세션 ${stats.vulnerableTimeSessionCount}개 · " +
+                        "개입 적용 ${stats.interventionAppliedSessionCount}개",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            }
         }
     }
 }

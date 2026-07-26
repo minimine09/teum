@@ -46,6 +46,9 @@ object WeeklyReportAnalyzer {
             closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
             averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
             mostVulnerableHourSlot = mostVulnerableHourSlot,
+            cautionModeSessionCount = sessions.count { it.modeAtStart == CAUTION_MODE },
+            vulnerableTimeSessionCount = sessions.count { it.isVulnerableTimeAtStart },
+            interventionAppliedSessionCount = sessions.count { it.interventionAppliedAtStart },
             dailyOverrunStats = calculateDailyOverrunStats(sessions),
             appUsageStats = calculateAppUsageStats(sessions)
         )
@@ -95,6 +98,7 @@ object WeeklyReportAnalyzer {
 
     private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
     private const val NECESSARY_USE = "NECESSARY_USE"
+    private const val CAUTION_MODE = "CAUTION"
     private val DAYS = listOf(
         Calendar.MONDAY to "월",
         Calendar.TUESDAY to "화",
