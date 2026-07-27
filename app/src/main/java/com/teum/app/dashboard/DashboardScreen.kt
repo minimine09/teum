@@ -824,7 +824,10 @@ private fun RecentSessionsCard(
                 displayedSessions.forEach { session ->
                     RecentSessionItem(
                         session = session,
-                        appDisplayName = appDisplayNames[session.packageName] ?: session.packageName
+                        appDisplayName = session.appDisplayName
+                            ?.takeIf { it.isNotBlank() }
+                            ?: appDisplayNames[session.packageName]
+                            ?: session.packageName
                     )
                 }
             }
@@ -1385,8 +1388,12 @@ private fun buildAppUsageSlices(
     val topStats = sortedStats.take(4)
     val otherUsageMillis = sortedStats.drop(4).sumOf { it.usageMillis }
     val displayStats = topStats.map { stat ->
-        appDisplayNames[stat.packageName].orEmpty()
-            .ifBlank { stat.packageName } to stat.usageMillis
+        (
+            stat.appDisplayName
+                ?.takeIf { it.isNotBlank() }
+                ?: appDisplayNames[stat.packageName].orEmpty()
+                    .ifBlank { stat.packageName }
+            ) to stat.usageMillis
     } + if (otherUsageMillis > 0L) {
         listOf("기타" to otherUsageMillis)
     } else {

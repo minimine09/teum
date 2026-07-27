@@ -12,7 +12,8 @@ data class DailyOverrunStat(
 
 data class AppUsageStat(
     val packageName: String,
-    val usageMillis: Long
+    val usageMillis: Long,
+    val appDisplayName: String? = null
 )
 
 data class WeeklyReportStats(

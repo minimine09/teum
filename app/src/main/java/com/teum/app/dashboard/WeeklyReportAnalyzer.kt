@@ -92,7 +92,14 @@ object WeeklyReportAnalyzer {
             .map { (packageName, appSessions) ->
                 AppUsageStat(
                     packageName = packageName,
-                    usageMillis = appSessions.sumOf { SessionMetricsResolver.resolve(it).usageMillis }
+                    usageMillis = appSessions.sumOf {
+                        SessionMetricsResolver.resolve(it).usageMillis
+                    },
+                    appDisplayName = appSessions
+                        .asSequence()
+                        .sortedByDescending { it.endedAtMillis }
+                        .mapNotNull { it.appDisplayName?.takeIf(String::isNotBlank) }
+                        .firstOrNull()
                 )
             }
             .filter { it.usageMillis > 0L }
