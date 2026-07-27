@@ -1,5 +1,7 @@
 package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -10,7 +12,7 @@ class SessionPolicyDisplayTextTest {
         assertEquals(
             "조심 모드 적용",
             SessionPolicyDisplayText.status(
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 interventionAppliedAtStart = true
             )
         )
@@ -21,7 +23,7 @@ class SessionPolicyDisplayTextTest {
         assertEquals(
             "조심 모드 대기",
             SessionPolicyDisplayText.status(
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 interventionAppliedAtStart = false
             )
         )
@@ -32,7 +34,7 @@ class SessionPolicyDisplayTextTest {
         assertEquals(
             "일반 모드",
             SessionPolicyDisplayText.status(
-                modeAtStart = "NORMAL",
+                modeAtStart = InterventionMode.NORMAL.name,
                 interventionAppliedAtStart = false
             )
         )

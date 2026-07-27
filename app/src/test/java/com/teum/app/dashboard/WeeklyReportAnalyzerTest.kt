@@ -1,5 +1,6 @@
 ﻿package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
@@ -106,19 +107,19 @@ class WeeklyReportAnalyzerTest {
             session(
                 Calendar.MONDAY,
                 22,
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 isVulnerableTimeAtStart = true,
                 interventionAppliedAtStart = true
             ),
             session(
                 Calendar.TUESDAY,
                 12,
-                modeAtStart = "CAUTION"
+                modeAtStart = InterventionMode.INTERVENTION.name
             ),
             session(
                 Calendar.WEDNESDAY,
                 22,
-                modeAtStart = "NORMAL",
+                modeAtStart = InterventionMode.NORMAL.name,
                 isVulnerableTimeAtStart = true
             )
         ))

@@ -3,7 +3,11 @@ package com.teum.app.data.repository
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.data.local.TeumDatabase
+import com.teum.app.dashboard.SessionPolicyDisplayText
+import com.teum.app.dashboard.VulnerabilityAnalyzer
+import com.teum.app.dashboard.WeeklyReportAnalyzer
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
 import kotlinx.coroutines.runBlocking
@@ -26,7 +30,7 @@ class SessionPolicyPersistenceInstrumentedTest {
     }
 
     @Test
-    fun saveEndedSession_persistsPolicyStateAtSessionStart() = runBlocking {
+    fun saveEndedSession_preservesActualInterventionModeContractForDashboard() = runBlocking {
         val startedAtMillis = 10_000L
         val packageName = "com.google.android.youtube"
 
@@ -38,7 +42,7 @@ class SessionPolicyPersistenceInstrumentedTest {
                 startedAtMillis = startedAtMillis,
                 intentChoice = IntentChoice.CLEAR_PURPOSE,
                 targetDurationMillis = 60_000L,
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 isVulnerableTimeAtStart = true,
                 interventionAppliedAtStart = true,
                 endedAtMillis = startedAtMillis + 30_000L
@@ -51,8 +55,32 @@ class SessionPolicyPersistenceInstrumentedTest {
             beforeMillis = startedAtMillis + 30_001L
         )
         assertNotNull(saved)
-        assertEquals("CAUTION", saved?.modeAtStart)
+        assertEquals(InterventionMode.INTERVENTION.name, saved?.modeAtStart)
         assertTrue(saved?.isVulnerableTimeAtStart == true)
         assertTrue(saved?.interventionAppliedAtStart == true)
+
+        val savedSession = requireNotNull(saved)
+        val report = WeeklyReportAnalyzer.calculate(
+            sessions = listOf(savedSession),
+            timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
+                sessions = listOf(savedSession)
+            ),
+            reopenLogs = emptyList()
+        )
+        assertEquals(1, report.cautionModeSessionCount)
+        assertEquals(
+            "조심 모드 적용",
+            SessionPolicyDisplayText.status(
+                modeAtStart = savedSession.modeAtStart,
+                interventionAppliedAtStart = savedSession.interventionAppliedAtStart
+            )
+        )
+        assertEquals(
+            "조심 모드 대기",
+            SessionPolicyDisplayText.status(
+                modeAtStart = savedSession.modeAtStart,
+                interventionAppliedAtStart = false
+            )
+        )
     }
 }
