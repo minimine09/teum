@@ -61,6 +61,7 @@ class TeumAccessibilityService : AccessibilityService() {
     private var latestObservedPackage: String? = null
     private var pendingEnterPackage: String? = null
     private var pendingEnterRunnable: Runnable? = null
+    private var latestConfirmedEnterToken: Long = 0L
     private var ignoreTargetEnterUntilMillis: Long = 0L
     private val suppressReentryUntilByPackage = mutableMapOf<String, Long>()
     private val suppressReentryReasonByPackage = mutableMapOf<String, String>()
@@ -111,6 +112,7 @@ class TeumAccessibilityService : AccessibilityService() {
         }
 
         cancelPendingTargetEnter(reason = "package_changed", currentPackage = packageName)
+        latestConfirmedEnterToken++
         currentForegroundPackage = packageName
         if (previousPackage != null && targetAppRepository.isTargetPackage(previousPackage)) {
             handleConfirmedTargetExit(previousPackage)
@@ -186,13 +188,70 @@ class TeumAccessibilityService : AccessibilityService() {
         if (shouldSuppressReentry(packageName)) return
 
         val entryTimeMillis = System.currentTimeMillis()
+        val enterToken = ++latestConfirmedEnterToken
         serviceScope.launch {
             val policySnapshot = resolvePolicySnapshot(entryTimeMillis)
+            TeumLogger.reopen("CHECK_REQUEST source=room package=$packageName entryAt=$entryTimeMillis")
+            val roomReopenCheckResult = try {
+                sessionLogRepository.checkReopen(
+                    packageName = packageName,
+                    currentEntryTimeMillis = entryTimeMillis
+                )
+            } catch (exception: RuntimeException) {
+                Log.e(DB_TAG, "failed to check room reopen package=$packageName", exception)
+                TeumLogger.reopen("NORMAL source=room_fallback reason=check_failed package=$packageName")
+                com.teum.app.data.repository.ReopenCheckResult(
+                    previousSessionId = null,
+                    previousEndTimeMillis = null,
+                    gapTimeMillis = null,
+                    isFastReopen = false
+                )
+            }
+            val reopenCheckResult = roomReopenCheckResult.toSessionReopenCheckResult()
+            if (roomReopenCheckResult.isFastReopen) {
+                TeumLogger.reopen(
+                    "FAST source=room package=$packageName gapMillis=${roomReopenCheckResult.gapTimeMillis} " +
+                        "previousSessionId=${roomReopenCheckResult.previousSessionId}"
+                )
+            } else {
+                TeumLogger.reopen("NORMAL source=room package=$packageName")
+            }
+            TeumLogger.reopen(
+                "CHECK_RESULT_MAPPED source=room isFastReopen=${reopenCheckResult.isFastReopen} " +
+                    "gapMillis=${reopenCheckResult.gapMillis}"
+            )
             brakeHandler.post {
-                if (currentStablePackageName() != packageName) {
-                    TeumLogger.flow(
-                        "[ACCESS] ENTER_IGNORED_NOT_STABLE package=$packageName current=${currentStablePackageName()}"
+                if (latestConfirmedEnterToken != enterToken) {
+                    TeumLogger.reopen(
+                        "CHECK_ABORTED reason=stale_enter_token package=$packageName"
                     )
+                    return@post
+                }
+                if (currentStablePackageName() != packageName) {
+                    TeumLogger.reopen(
+                        "CHECK_ABORTED reason=foreground_changed package=$packageName " +
+                            "current=${currentStablePackageName()}"
+                    )
+                    return@post
+                }
+                if (shouldIgnoreEnterForOutcome(packageName)) {
+                    TeumLogger.reopen(
+                        "CHECK_ABORTED reason=overlay_showing overlay=${overlayController.currentOverlayName}"
+                    )
+                    return@post
+                }
+                if (overlayController.overlayShowing) {
+                    TeumLogger.reopen(
+                        "CHECK_ABORTED reason=overlay_showing overlay=${overlayController.currentOverlayName}"
+                    )
+                    return@post
+                }
+                if (shouldIgnoreEnterForHomeNavigation(packageName)) {
+                    TeumLogger.reopen("CHECK_ABORTED reason=home_navigation_guard package=$packageName")
+                    return@post
+                }
+                if (shouldSuppressReentry(packageName)) {
+                    TeumLogger.reopen("CHECK_ABORTED reason=suppressed package=$packageName")
                     return@post
                 }
 
@@ -204,10 +263,6 @@ class TeumAccessibilityService : AccessibilityService() {
                 saveAppOpenEvent(
                     packageName = packageName,
                     detectedAtMillis = entryTimeMillis
-                )
-                val reopenCheckResult = SessionManager.checkFastReopen(
-                    packageName = packageName,
-                    currentEntryTimeMillis = entryTimeMillis
                 )
                 startIntentCheckSession(
                     packageName = packageName,
@@ -941,6 +996,14 @@ class TeumAccessibilityService : AccessibilityService() {
                 TargetDurationChoice.ONE_HOUR -> "60m"
             }
         }
+    }
+
+    private fun com.teum.app.data.repository.ReopenCheckResult.toSessionReopenCheckResult(): ReopenCheckResult {
+        return ReopenCheckResult(
+            isFastReopen = isFastReopen,
+            gapMillis = gapTimeMillis,
+            previousEndTimeMillis = previousEndTimeMillis
+        )
     }
 
     private fun suppressReentry(
