@@ -79,12 +79,26 @@ interface SessionLogDao {
         """
         UPDATE session_logs
         SET closedAfterIntervention = 1,
-            interventionExitConfirmedAtMillis = :confirmedAtMillis
+            interventionExitConfirmedAtMillis = :confirmedAtMillis,
+            overrunMillis = CASE
+                WHEN intentChoice = :clearPurpose
+                    AND outcomeType = :purposeAchieved
+                    THEN 0
+                ELSE overrunMillis
+            END,
+            overrun = CASE
+                WHEN intentChoice = :clearPurpose
+                    AND outcomeType = :purposeAchieved
+                    THEN 0
+                ELSE overrun
+            END
         WHERE id = :sessionId
         """
     )
     suspend fun confirmExitAfterIntervention(
         sessionId: Long,
-        confirmedAtMillis: Long
+        confirmedAtMillis: Long,
+        clearPurpose: String,
+        purposeAchieved: String
     ): Int
 }
