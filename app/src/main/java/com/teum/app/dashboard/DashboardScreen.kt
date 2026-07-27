@@ -847,6 +847,7 @@ private fun RecentSessionItem(
 ) {
     val metrics = SessionMetricsResolver.resolve(session)
     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    val sessionTimeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
     val intentColor = when (session.intentChoice) {
         "CLEAR_PURPOSE" -> MaterialTheme.colorScheme.primary
         "MINDFUL_REST" -> DashboardSuccess
@@ -893,10 +894,10 @@ private fun RecentSessionItem(
         "조심 모드 개입 적용" to DashboardWarning
     }
     val sessionStatuses = buildList {
-        interventionPolicyStatus?.let(::add)
         outcomeStatus?.let(::add)
         overrunStatus?.let(::add)
         reopenStatus?.let(::add)
+        interventionPolicyStatus?.let(::add)
     }
 
     Card(
@@ -908,52 +909,43 @@ private fun RecentSessionItem(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(intentColor, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = appDisplayName,
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = formatSessionStartedAt(session.startedAtMillis),
-                    color = secondaryTextColor,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SessionIntentDot(intentColor)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    RecentSessionAppName(
+                        appDisplayName = appDisplayName,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = formatSessionStartedAt(session.startedAtMillis),
+                        color = sessionTimeColor,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                RecentSessionIntentText(
                     text = SessionDisplayText.intent(session.intentChoice),
                     color = intentColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.padding(start = 16.dp)
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${formatDuration(metrics.usageMillis)} 사용",
+                    modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 18.sp,
                     lineHeight = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
@@ -1007,6 +999,49 @@ private fun RecentSessionItem(
             }
         }
     }
+}
+
+@Composable
+private fun SessionIntentDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(color, CircleShape)
+    )
+}
+
+@Composable
+private fun RecentSessionAppName(
+    appDisplayName: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = appDisplayName,
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun RecentSessionIntentText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        modifier = modifier.fillMaxWidth(),
+        color = color,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Start
+    )
 }
 
 @Composable
