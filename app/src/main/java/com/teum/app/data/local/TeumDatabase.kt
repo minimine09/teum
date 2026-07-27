@@ -8,24 +8,28 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.teum.app.data.local.dao.AppOpenEventDao
 import com.teum.app.data.local.dao.ReopenLogDao
+import com.teum.app.data.local.dao.SelfControlEventDao
 import com.teum.app.data.local.dao.SessionLogDao
 import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
+import com.teum.app.data.local.entity.SelfControlEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 
 @Database(
     entities = [
         SessionLogEntity::class,
         AppOpenEventEntity::class,
-        ReopenLogEntity::class
+        ReopenLogEntity::class,
+        SelfControlEventEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class TeumDatabase : RoomDatabase() {
     abstract fun sessionLogDao(): SessionLogDao
     abstract fun appOpenEventDao(): AppOpenEventDao
     abstract fun reopenLogDao(): ReopenLogDao
+    abstract fun selfControlEventDao(): SelfControlEventDao
 
     companion object {
         @Volatile
@@ -44,7 +48,8 @@ abstract class TeumDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                     .build()
                     .also { database ->
@@ -201,6 +206,26 @@ abstract class TeumDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "ALTER TABLE session_logs ADD COLUMN appDisplayName TEXT"
+                )
+            }
+        }
+
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS self_control_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        appDisplayName TEXT,
+                        eventType TEXT NOT NULL,
+                        occurredAtMillis INTEGER NOT NULL,
+                        modeAtTime TEXT,
+                        isVulnerableTimeAtTime INTEGER NOT NULL,
+                        interventionActiveAtTime INTEGER NOT NULL,
+                        source TEXT
+                    )
+                    """.trimIndent()
                 )
             }
         }
