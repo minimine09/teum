@@ -60,6 +60,10 @@ import com.teum.app.ui.privacy.PrivacySettingsScreen
 import com.teum.app.ui.target.TargetAppSelectionScreen
 import com.teum.app.ui.target.TargetAppInstalledApp
 import com.teum.app.ui.theme.TeumTheme
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private val DashboardBorder = Color(0xFFE3E7EF)
@@ -87,6 +91,11 @@ private enum class DashboardTab {
     Report,
     Settings,
     TargetApps
+}
+
+private enum class RecentSessionDisplayMode {
+    Compact,
+    Detailed
 }
 
 @Composable
@@ -257,7 +266,8 @@ private fun HomeDashboardContent(
         RecentSessionsCard(
             recentSessions = recentSessions,
             appDisplayNames = appDisplayNames,
-            maxItems = 3
+            maxItems = 3,
+            displayMode = RecentSessionDisplayMode.Compact
         )
     }
 }
@@ -348,7 +358,8 @@ private fun SessionHistoryContent(
         RecentSessionsCard(
             recentSessions = recentSessions,
             appDisplayNames = appDisplayNames,
-            maxItems = 10
+            maxItems = 10,
+            displayMode = RecentSessionDisplayMode.Detailed
         )
     }
 }
@@ -433,22 +444,9 @@ private fun SessionHistorySummaryCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "선택한 앱의 최근 기록",
+                        text = "최근 최대 10개 기록 요약",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .background(DashboardPill, RoundedCornerShape(15.dp))
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "${recentSessions.size}개",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -458,13 +456,13 @@ private fun SessionHistorySummaryCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 SessionSummaryMiniStat(
-                    label = "전체",
+                    label = "사용 세션",
                     value = "${recentSessions.size}회",
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 SessionSummaryMiniStat(
-                    label = "초과",
+                    label = "목표 초과",
                     value = "${overrunCount}회",
                     color = DashboardWarning,
                     modifier = Modifier.weight(1f)
@@ -784,7 +782,8 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
 private fun RecentSessionsCard(
     recentSessions: List<SessionLogEntity>,
     appDisplayNames: Map<String, String>,
-    maxItems: Int
+    maxItems: Int,
+    displayMode: RecentSessionDisplayMode
 ) {
     val displayedSessions = recentSessions.take(maxItems)
 
@@ -831,7 +830,8 @@ private fun RecentSessionsCard(
                         appDisplayName = session.appDisplayName
                             ?.takeIf { it.isNotBlank() }
                             ?: appDisplayNames[session.packageName]
-                            ?: session.packageName
+                            ?: session.packageName,
+                        displayMode = displayMode
                     )
                 }
             }
@@ -842,10 +842,12 @@ private fun RecentSessionsCard(
 @Composable
 private fun RecentSessionItem(
     session: SessionLogEntity,
-    appDisplayName: String
+    appDisplayName: String,
+    displayMode: RecentSessionDisplayMode
 ) {
     val metrics = SessionMetricsResolver.resolve(session)
     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    val sessionTimeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
     val intentColor = when (session.intentChoice) {
         "CLEAR_PURPOSE" -> MaterialTheme.colorScheme.primary
         "MINDFUL_REST" -> DashboardSuccess
@@ -857,42 +859,45 @@ private fun RecentSessionItem(
             session.outcomeType == "PURPOSE_ACHIEVED" || session.outcomeAchieved == true ->
                 "목적 달성" to DashboardSuccess
             session.outcomeType == "NECESSARY_USE" ->
-                "필요한 사용" to DashboardSuccess
+                "필요한 사용" to MaterialTheme.colorScheme.primary
             session.outcomeType == "CONTINUED_SCROLLING" ->
-                "무의식 사용 지속" to DashboardDanger
+                "무의식 사용 지속" to DashboardWarning
             session.outcomeType == "PURPOSE_DRIFT" || session.purposeDrifted == true ->
                 "목적 이탈" to DashboardDanger
-            else ->
+            displayMode == RecentSessionDisplayMode.Detailed ->
                 "결과 미확인" to secondaryTextColor
+            else ->
+                null
         }
     } else {
         null
     }
-    val overrunStatus = SessionDisplayText.compactOverrun(metrics.overrunMillis) to
-        if (metrics.isOverrun) DashboardWarning else secondaryTextColor
+    val overrunStatus = if (metrics.isOverrun) {
+        SessionDisplayText.compactOverrun(metrics.overrunMillis) to DashboardWarning
+    } else {
+        null
+    }
     val reopenStatus = if (session.isFastReopen) {
         val text = session.reopenGapMillis?.let {
-            "${formatDuration(it)} 만에 재실행"
-        } ?: "빠른 재실행"
+            "${formatDuration(it)} 만에 빠른 재진입"
+        } ?: "빠른 재진입"
         text to MaterialTheme.colorScheme.primary
     } else {
-        "재실행 없음" to secondaryTextColor
+        null
     }
     val interventionPolicyStatus = SessionPolicyDisplayText.status(
         modeAtStart = session.modeAtStart,
         interventionAppliedAtStart = session.interventionAppliedAtStart
-    )?.let { status ->
-        status to if (session.interventionAppliedAtStart) {
-            DashboardWarning
-        } else {
-            secondaryTextColor
-        }
+    )?.takeIf {
+        session.interventionAppliedAtStart
+    }?.let {
+        "조심 모드 개입 적용" to DashboardWarning
     }
     val sessionStatuses = buildList {
-        interventionPolicyStatus?.let(::add)
         outcomeStatus?.let(::add)
-        add(overrunStatus)
-        add(reopenStatus)
+        overrunStatus?.let(::add)
+        reopenStatus?.let(::add)
+        interventionPolicyStatus?.let(::add)
     }
 
     Card(
@@ -904,44 +909,43 @@ private fun RecentSessionItem(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(intentColor, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = appDisplayName,
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SessionIntentDot(intentColor)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    RecentSessionAppName(
+                        appDisplayName = appDisplayName,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = formatSessionStartedAt(session.startedAtMillis),
+                        color = sessionTimeColor,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                RecentSessionIntentText(
                     text = SessionDisplayText.intent(session.intentChoice),
                     color = intentColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.padding(start = 16.dp)
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${formatDuration(metrics.usageMillis)} 사용",
+                    modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 18.sp,
                     lineHeight = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
@@ -952,38 +956,40 @@ private fun RecentSessionItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = buildAnnotatedString {
-                    sessionStatuses.forEachIndexed { index, (text, color) ->
-                        if (index > 0) {
-                            withStyle(SpanStyle(color = secondaryTextColor)) {
-                                append(" · ")
+            if (sessionStatuses.isNotEmpty()) {
+                Text(
+                    text = buildAnnotatedString {
+                        sessionStatuses.forEachIndexed { index, (text, color) ->
+                            if (index > 0) {
+                                withStyle(SpanStyle(color = secondaryTextColor)) {
+                                    append(" · ")
+                                }
+                            }
+                            withStyle(
+                                SpanStyle(
+                                    color = color,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            ) {
+                                append(text)
                             }
                         }
-                        withStyle(
-                            SpanStyle(
-                                color = color,
-                                fontWeight = FontWeight.Medium
-                            )
-                        ) {
-                            append(text)
-                        }
-                    }
-                },
-                fontSize = 11.sp,
-                lineHeight = 17.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (session.closedAfterIntervention == true) {
+                    },
+                    fontSize = 11.sp,
+                    lineHeight = 17.sp,
+                    maxLines = if (displayMode == RecentSessionDisplayMode.Compact) 2 else 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (displayMode == RecentSessionDisplayMode.Detailed && session.closedAfterIntervention == true) {
                 Text(
-                    text = "자기점검 화면 이후 앱을 닫았어요",
+                    text = "자기점검 후 앱을 종료했어요",
                     color = secondaryTextColor,
                     fontSize = 11.sp,
                     lineHeight = 15.sp
                 )
             }
-            if (metrics.extensionCount > 0) {
+            if (displayMode == RecentSessionDisplayMode.Detailed && metrics.extensionCount > 0) {
                 Text(
                     text = "사용 시간을 ${metrics.extensionCount}회 연장했어요",
                     color = secondaryTextColor,
@@ -991,18 +997,51 @@ private fun RecentSessionItem(
                     lineHeight = 15.sp
                 )
             }
-            if (metrics.interventionVisibleMillis > 0L) {
-                Text(
-                    text = "상세: 전체 ${formatDuration(metrics.totalDurationMillis)} · 확인 화면 ${formatDuration(metrics.interventionVisibleMillis)}",
-                    color = secondaryTextColor,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
     }
+}
+
+@Composable
+private fun SessionIntentDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .background(color, CircleShape)
+    )
+}
+
+@Composable
+private fun RecentSessionAppName(
+    appDisplayName: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = appDisplayName,
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun RecentSessionIntentText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        modifier = modifier.fillMaxWidth(),
+        color = color,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.Start
+    )
 }
 
 @Composable
@@ -1812,6 +1851,28 @@ private fun formatDuration(durationMillis: Long): String {
         minutes > 0L -> "${minutes}분"
         else -> "${seconds}초"
     }
+}
+
+private fun formatSessionStartedAt(startedAtMillis: Long): String {
+    val started = Calendar.getInstance().apply {
+        timeInMillis = startedAtMillis
+    }
+    val today = Calendar.getInstance()
+    val yesterday = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, -1)
+    }
+    val timeText = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(startedAtMillis))
+
+    return when {
+        started.isSameDay(today) -> "오늘 $timeText"
+        started.isSameDay(yesterday) -> "어제 $timeText"
+        else -> SimpleDateFormat("M월 d일 HH:mm", Locale.KOREA).format(Date(startedAtMillis))
+    }
+}
+
+private fun Calendar.isSameDay(other: Calendar): Boolean {
+    return get(Calendar.YEAR) == other.get(Calendar.YEAR) &&
+        get(Calendar.DAY_OF_YEAR) == other.get(Calendar.DAY_OF_YEAR)
 }
 
 private fun formatPercent(rate: Double): String {
