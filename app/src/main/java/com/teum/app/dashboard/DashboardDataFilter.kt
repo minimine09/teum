@@ -27,9 +27,19 @@ object DashboardDataFilter {
             todaySessionCount = todaySessions.size,
             todayOverrunCount = todaySessions.count { it.overrun },
             todayFastReopenCount = todaySessions.count { it.isFastReopen },
+            todayPurposeKeptCount = todaySessions.count { session ->
+                session.intentChoice == CLEAR_PURPOSE &&
+                    session.outcomeType in PURPOSE_KEPT_OUTCOMES
+            },
             todayPurposeDriftCount = todaySessions.count { it.purposeDrifted == true },
             todayClosedAfterInterventionCount =
                 todaySessions.count { it.closedAfterIntervention == true }
         )
     }
+
+    private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
+    private val PURPOSE_KEPT_OUTCOMES = setOf(
+        "PURPOSE_ACHIEVED",
+        "NECESSARY_USE"
+    )
 }

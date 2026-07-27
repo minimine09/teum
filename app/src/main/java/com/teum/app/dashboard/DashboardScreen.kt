@@ -75,6 +75,7 @@ data class DashboardStats(
     val todaySessionCount: Int = 0,
     val todayOverrunCount: Int = 0,
     val todayFastReopenCount: Int = 0,
+    val todayPurposeKeptCount: Int = 0,
     val todayPurposeDriftCount: Int = 0,
     val todayClosedAfterInterventionCount: Int = 0
 )
@@ -534,7 +535,6 @@ private fun DashboardHeader(
 
 @Composable
 private fun HomeMainStatCard(stats: DashboardStats) {
-    val keptCount = (stats.todaySessionCount - stats.todayPurposeDriftCount).coerceAtLeast(0)
     val overrunRate = if (stats.todaySessionCount == 0) {
         0
     } else {
@@ -558,7 +558,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
             Spacer(modifier = Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${keptCount}회",
+                    text = "${stats.todayPurposeKeptCount}회",
                     color = Color.White,
                     fontSize = 36.sp,
                     lineHeight = 44.sp,
@@ -2038,6 +2038,7 @@ private fun DashboardScreenPreview() {
                 todaySessionCount = 10,
                 todayOverrunCount = 2,
                 todayFastReopenCount = 1,
+                todayPurposeKeptCount = 5,
                 todayPurposeDriftCount = 2
             ),
             recentSessions = emptyList(),
