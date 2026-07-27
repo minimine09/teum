@@ -28,6 +28,25 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
     }
 
+    @Test fun averageGapUsesAllSessionsAsDenominator() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9, gap = 30_000L),
+            session(Calendar.MONDAY, 10),
+            session(Calendar.MONDAY, 11)
+        ))
+
+        assertEquals(10_000L, report.averageReopenGapMillis)
+    }
+
+    @Test fun sessionsWithoutReopenHaveZeroAverageGap() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9),
+            session(Calendar.MONDAY, 10)
+        ))
+
+        assertEquals(0L, report.averageReopenGapMillis)
+    }
+
     @Test fun purposeDriftRateUsesAllClearPurposeSessionsWhileResponsesStaySeparate() {
         val report = report(listOf(
             session(Calendar.TUESDAY,13,answered=true,drifted=true,closed=true),
