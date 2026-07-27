@@ -195,8 +195,7 @@ fun TargetAppSelectionScreen(
                         appItems.map { item ->
                             TargetAppSelectionResult(
                                 packageName = item.packageName,
-                                enabled = checkedStates[item.packageName] == true,
-                                defaultDurationMillis = item.defaultDurationMillis
+                                enabled = checkedStates[item.packageName] == true
                             )
                         }
                     )
@@ -518,7 +517,6 @@ private data class TargetAppUi(
     val initial: String,
     val name: String,
     val description: String,
-    val defaultDurationMillis: Long,
     val initiallyChecked: Boolean,
     val iconColor: Color,
     val iconContainerColor: Color,
@@ -532,7 +530,6 @@ private data class TargetAppUi(
                 initial = packageName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                 name = packageName,
                 description = "설치되지 않음",
-                defaultDurationMillis = defaultDurationFor(packageName),
                 initiallyChecked = true,
                 iconColor = mutedColor,
                 iconContainerColor = NeutralTint,
@@ -551,8 +548,7 @@ data class TargetAppInstalledApp(
 
 data class TargetAppSelectionResult(
     val packageName: String,
-    val enabled: Boolean,
-    val defaultDurationMillis: Long
+    val enabled: Boolean
 )
 
 private fun TargetAppInstalledApp.toTargetAppUi(
@@ -566,7 +562,6 @@ private fun TargetAppInstalledApp.toTargetAppUi(
         initial = appName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
         name = appName,
         description = descriptionForPackage(packageName, recommended),
-        defaultDurationMillis = defaultDurationFor(packageName),
         initiallyChecked = false,
         iconColor = tint.iconColor ?: if (recommended) primaryColor else mutedColor,
         iconContainerColor = tint.containerColor,
@@ -609,17 +604,6 @@ private fun descriptionForPackage(packageName: String, recommended: Boolean): St
     "com.google.android.apps.youtube.music",
     "com.reddit.frontpage" -> "콘텐츠 사용 앱"
     else -> if (recommended) "추천 앱" else packageName
-}
-
-private fun defaultDurationFor(packageName: String): Long = when (packageName) {
-    "com.zhiliaoapp.musically" -> 180_000L
-    "com.android.chrome",
-    "com.sec.android.app.sbrowser",
-    "org.mozilla.firefox",
-    "com.brave.browser",
-    "com.naver.whale",
-    "com.netflix.mediaclient" -> 600_000L
-    else -> 300_000L
 }
 
 private fun tintForPackage(packageName: String): TargetTint = when (packageName) {
