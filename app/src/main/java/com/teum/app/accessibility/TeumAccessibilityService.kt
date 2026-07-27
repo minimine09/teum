@@ -298,7 +298,7 @@ class TeumAccessibilityService : AccessibilityService() {
             mode = intentCheckMode,
             reopenGapMillis = currentReopenCheckResult?.gapMillis,
             interventionActive = currentPolicySnapshot.interventionActive,
-            availableDurations = availableDurationsForPolicy(currentPolicySnapshot),
+            availableDurations = getAvailableIntentDurations(currentPolicySnapshot.mode),
             debugSessionId = currentDebugSessionId,
             source = intentCheckSource,
             onIntentConfirmed = { intentChoice, targetDurationMillis ->
@@ -376,12 +376,25 @@ class TeumAccessibilityService : AccessibilityService() {
             return
         }
 
+        val availableExtensionDurations = getAvailableExtensionDurations(session)
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "AVAILABLE_EXTENSION_DURATIONS",
+            detail = "mode=${session.modeAtStart} durations=${formatDurationChoices(availableExtensionDurations)}"
+        )
+        TeumLogger.session(
+            debugSessionId = session.debugSessionId,
+            event = "EXTENSION_DURATION_LIMIT_APPLIED",
+            detail = "max=${availableExtensionDurations.last().name} mode=${session.modeAtStart}"
+        )
+
         overlayController.showSessionBrake(
             packageName = session.packageName,
             elapsedMillis = SessionManager.getElapsedMillis(),
             targetDurationMillis = session.currentLimitDurationMillis,
             interventionActive = session.interventionAppliedAtStart,
             extensionLimitReached = isExtensionLimitReached(session),
+            availableExtensionDurations = availableExtensionDurations,
             debugSessionId = session.debugSessionId,
             source = "session_brake",
             onBrakeChoice = { choice ->
@@ -467,14 +480,19 @@ class TeumAccessibilityService : AccessibilityService() {
 
     private fun handleBrakeExtension(packageName: String, durationMillis: Long) {
         val session = SessionManager.getCurrentSession() ?: return
-        val maxExtensions = maxExtensionCountForSession(session)
+        val maxExtensions = getMaxExtensionCount(session)
+        val limitResult = if (maxExtensions != null && session.extensionCount >= maxExtensions) {
+            "blocked"
+        } else {
+            "allowed"
+        }
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
             event = "EXTENSION_LIMIT_CHECK",
             detail = "mode=${session.modeAtStart} vulnerable=${session.isVulnerableTimeAtStart} " +
-                "extensionCount=${session.extensionCount} max=$maxExtensions"
+                "extensionCount=${session.extensionCount} max=${maxExtensions ?: "none"} result=$limitResult"
         )
-        if (session.interventionAppliedAtStart && session.extensionCount >= maxExtensions) {
+        if (maxExtensions != null && session.extensionCount >= maxExtensions) {
             TeumLogger.session(
                 debugSessionId = session.debugSessionId,
                 event = "EXTENSION_BLOCKED",
@@ -485,7 +503,8 @@ class TeumAccessibilityService : AccessibilityService() {
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
             event = "EXTENSION_ALLOWED",
-            detail = "reason=${if (session.interventionAppliedAtStart) "within_vulnerable_time_limit" else "normal_mode"}"
+            detail = "reason=${if (session.interventionAppliedAtStart) "vulnerable_time_limit_remaining" else "unlimited"} " +
+                "extensionCount=${session.extensionCount} max=${maxExtensions ?: "none"}"
         )
         SessionManager.markInterventionHidden()
         SessionManager.extendCurrentSession(durationMillis)
@@ -833,46 +852,95 @@ class TeumAccessibilityService : AccessibilityService() {
             isVulnerableTime = isVulnerableTime,
             interventionActive = interventionActive
         )
-        val durations = availableDurationsForPolicy(snapshot)
+        val intentDurations = getAvailableIntentDurations(mode)
 
         TeumLogger.flow(
             "[POLICY] MODE_RESOLVED mode=${mode.name} vulnerable=$isVulnerableTime " +
                 "interventionActive=$interventionActive"
         )
         TeumLogger.flow(
-            "[POLICY] AVAILABLE_DURATIONS durations=${durations.joinToString(",") { it.name }} " +
-                "reason=${if (interventionActive) "vulnerable_time_intervention_mode" else "normal_or_not_vulnerable"}"
+            "[POLICY] AVAILABLE_INTENT_DURATIONS mode=${mode.name} " +
+                "durations=${formatDurationChoices(intentDurations)}"
         )
-        if (interventionActive) {
-            TeumLogger.flow(
-                "[POLICY] DURATION_LIMIT_APPLIED max=${TargetDurationChoice.FIVE_MINUTES.name} " +
-                    "reason=vulnerable_time_intervention_mode"
-            )
-        }
+        TeumLogger.flow(
+            "[POLICY] INTENT_DURATION_LIMIT_APPLIED max=${intentDurations.last().name} mode=${mode.name}"
+        )
 
         return snapshot
     }
 
-    private fun availableDurationsForPolicy(policySnapshot: PolicySnapshot): List<TargetDurationChoice> {
-        return if (policySnapshot.interventionActive) {
+    private fun getAvailableIntentDurations(mode: InterventionMode): List<TargetDurationChoice> {
+        return if (mode.isIntervention) {
             listOf(
                 TargetDurationChoice.TEST_FIVE_SECONDS,
                 TargetDurationChoice.ONE_MINUTE,
                 TargetDurationChoice.THREE_MINUTES,
-                TargetDurationChoice.FIVE_MINUTES
+                TargetDurationChoice.FIVE_MINUTES,
+                TargetDurationChoice.TEN_MINUTES,
+                TargetDurationChoice.FIFTEEN_MINUTES,
+                TargetDurationChoice.THIRTY_MINUTES
             )
         } else {
-            TargetDurationChoice.entries.toList()
+            listOf(
+                TargetDurationChoice.TEST_FIVE_SECONDS,
+                TargetDurationChoice.ONE_MINUTE,
+                TargetDurationChoice.THREE_MINUTES,
+                TargetDurationChoice.FIVE_MINUTES,
+                TargetDurationChoice.TEN_MINUTES,
+                TargetDurationChoice.FIFTEEN_MINUTES,
+                TargetDurationChoice.THIRTY_MINUTES,
+                TargetDurationChoice.ONE_HOUR
+            )
         }
     }
 
-    private fun maxExtensionCountForSession(session: AppSession): Int {
-        return if (session.interventionAppliedAtStart) 1 else Int.MAX_VALUE
+    private fun getAvailableExtensionDurations(session: AppSession): List<TargetDurationChoice> {
+        val mode = InterventionMode.entries.firstOrNull { it.name == session.modeAtStart }
+            ?: InterventionMode.NORMAL
+        return if (mode.isIntervention) {
+            listOf(
+                TargetDurationChoice.TEST_FIVE_SECONDS,
+                TargetDurationChoice.ONE_MINUTE,
+                TargetDurationChoice.THREE_MINUTES,
+                TargetDurationChoice.FIVE_MINUTES,
+                TargetDurationChoice.TEN_MINUTES,
+                TargetDurationChoice.FIFTEEN_MINUTES
+            )
+        } else {
+            listOf(
+                TargetDurationChoice.TEST_FIVE_SECONDS,
+                TargetDurationChoice.ONE_MINUTE,
+                TargetDurationChoice.THREE_MINUTES,
+                TargetDurationChoice.FIVE_MINUTES,
+                TargetDurationChoice.TEN_MINUTES,
+                TargetDurationChoice.FIFTEEN_MINUTES,
+                TargetDurationChoice.THIRTY_MINUTES
+            )
+        }
+    }
+
+    private fun getMaxExtensionCount(session: AppSession): Int? {
+        return if (session.interventionAppliedAtStart) 3 else null
     }
 
     private fun isExtensionLimitReached(session: AppSession): Boolean {
-        return session.interventionAppliedAtStart &&
-            session.extensionCount >= maxExtensionCountForSession(session)
+        val maxExtensions = getMaxExtensionCount(session) ?: return false
+        return session.extensionCount >= maxExtensions
+    }
+
+    private fun formatDurationChoices(durations: List<TargetDurationChoice>): String {
+        return durations.joinToString(",") { choice ->
+            when (choice) {
+                TargetDurationChoice.TEST_FIVE_SECONDS -> "5s"
+                TargetDurationChoice.ONE_MINUTE -> "1m"
+                TargetDurationChoice.THREE_MINUTES -> "3m"
+                TargetDurationChoice.FIVE_MINUTES -> "5m"
+                TargetDurationChoice.TEN_MINUTES -> "10m"
+                TargetDurationChoice.FIFTEEN_MINUTES -> "15m"
+                TargetDurationChoice.THIRTY_MINUTES -> "30m"
+                TargetDurationChoice.ONE_HOUR -> "60m"
+            }
+        }
     }
 
     private fun suppressReentry(

@@ -96,6 +96,7 @@ class OverlayController(context: Context) {
         targetDurationMillis: Long,
         interventionActive: Boolean = false,
         extensionLimitReached: Boolean = false,
+        availableExtensionDurations: List<TargetDurationChoice> = TargetDurationChoice.entries,
         debugSessionId: Long? = null,
         source: String = "session_brake",
         onBrakeChoice: (BrakeChoice) -> Unit,
@@ -109,6 +110,7 @@ class OverlayController(context: Context) {
             targetDurationMillis = targetDurationMillis,
             interventionActive = interventionActive,
             extensionLimitReached = extensionLimitReached,
+            availableExtensionDurations = availableExtensionDurations,
             debugSessionId = debugSessionId,
             onBrakeChoice = { choice ->
                 Log.d(BRAKE_TAG, "choice selected ${choice.name} package=$packageName")
@@ -369,6 +371,7 @@ class OverlayController(context: Context) {
         targetDurationMillis: Long,
         interventionActive: Boolean,
         extensionLimitReached: Boolean,
+        availableExtensionDurations: List<TargetDurationChoice>,
         debugSessionId: Long?,
         onBrakeChoice: (BrakeChoice) -> Unit,
         onExtendDurationSelected: (Long) -> Unit
@@ -415,6 +418,7 @@ class OverlayController(context: Context) {
                         targetDurationMillis = targetDurationMillis,
                         interventionActive = interventionActive,
                         extensionLimitReached = extensionLimitReached,
+                        availableExtensionDurations = availableExtensionDurations,
                         onEndClick = { chooseBrake(BrakeChoice.END_NOW) },
                         onExtendClick = { extendBrake(it) }
                     )
