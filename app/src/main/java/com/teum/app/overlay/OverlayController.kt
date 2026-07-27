@@ -299,7 +299,7 @@ class OverlayController(context: Context) {
                     if (selectedIntentChoice == choice) return
                     selectedIntentChoice = choice
                     Log.d(TAG, "intent choice selected: ${choice.name}")
-                    debugSessionId?.let {
+                    debugSessionId?.takeIf { choice != IntentChoice.CLOSE_NOW }?.let {
                         TeumLogger.session(
                             debugSessionId = it,
                             event = "INTENT_SELECTED",

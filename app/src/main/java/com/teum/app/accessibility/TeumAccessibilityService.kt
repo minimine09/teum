@@ -6,11 +6,12 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.teum.app.core.model.InterventionMode
-import com.teum.app.debug.TeumLogger
 import com.teum.app.data.repository.SessionLogRepository
+import com.teum.app.data.repository.SessionLogRepository.Companion.EVENT_CLOSE_NOW_BEFORE_SESSION
 import com.teum.app.data.repository.TargetAppRepository
 import com.teum.app.data.repository.UserSettingsRepository
 import com.teum.app.data.repository.VulnerableTimeRepository
+import com.teum.app.debug.TeumLogger
 import com.teum.app.overlay.BrakeChoice
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.overlay.IntentCheckMode
@@ -378,9 +379,10 @@ class TeumAccessibilityService : AccessibilityService() {
                 scheduleBrakeForCurrentSession()
             },
             onCloseNowSelected = {
-                intentCheckedForCurrentSession = true
-                sessionNeedsIntentCheck = false
-                brakeSuppressedForCurrentSession = true
+                handleCloseNowSelected(
+                    packageName = packageName,
+                    mode = intentCheckMode
+                )
             },
             onDismissed = {
                 // Keep the intent check from reappearing after the user has made a choice.
@@ -407,6 +409,79 @@ class TeumAccessibilityService : AccessibilityService() {
             detail = "delay=$delayMillis"
         )
         brakeHandler.postDelayed(brakeRunnable, delayMillis)
+    }
+
+    private fun handleCloseNowSelected(
+        packageName: String,
+        mode: IntentCheckMode
+    ) {
+        val sourceTag = if (mode == IntentCheckMode.FAST_REOPEN) "REOPEN" else "INTENT"
+        val source = if (mode == IntentCheckMode.FAST_REOPEN) {
+            "reopen_close_now"
+        } else {
+            "intent_close_now"
+        }
+        val policySnapshot = currentPolicySnapshot
+        TeumLogger.flow("[$sourceTag] CLOSE_NOW_SELECTED package=$packageName mode=$mode")
+
+        intentCheckedForCurrentSession = true
+        sessionNeedsIntentCheck = false
+        brakeSuppressedForCurrentSession = true
+        activeTargetPackage = null
+        currentEntryTimeMillis = null
+        currentReopenCheckResult = null
+        currentDebugSessionId = null
+        currentPolicySnapshot = PolicySnapshot()
+        latestConfirmedEnterToken++
+        cancelBrakeSchedule()
+        cancelPendingTargetEnter(reason = "close_now", currentPackage = latestObservedPackage)
+
+        suppressReentry(
+            packageName = packageName,
+            reason = "after_close_now",
+            durationMillis = SUPPRESS_REENTRY_AFTER_CLOSE_NOW_MILLIS
+        )
+        saveCloseNowBeforeSessionEventAndNavigateHome(
+            packageName = packageName,
+            source = source,
+            policySnapshot = policySnapshot
+        )
+    }
+
+    private fun saveCloseNowBeforeSessionEventAndNavigateHome(
+        packageName: String,
+        source: String,
+        policySnapshot: PolicySnapshot
+    ) {
+        serviceScope.launch {
+            try {
+                TeumLogger.flow(
+                    "[SELF_CONTROL] EVENT_SAVE_REQUESTED " +
+                        "type=$EVENT_CLOSE_NOW_BEFORE_SESSION package=$packageName"
+                )
+                val id = sessionLogRepository.saveCloseNowBeforeSessionEvent(
+                    packageName = packageName,
+                    modeAtTime = policySnapshot.mode.name,
+                    isVulnerableTimeAtTime = policySnapshot.isVulnerableTime,
+                    interventionActiveAtTime = policySnapshot.interventionActive,
+                    source = source
+                )
+                TeumLogger.flow(
+                    "[SELF_CONTROL] EVENT_SAVED " +
+                        "type=$EVENT_CLOSE_NOW_BEFORE_SESSION id=$id package=$packageName"
+                )
+            } catch (exception: Exception) {
+                Log.e(DB_TAG, "failed to save close now event package=$packageName", exception)
+                TeumLogger.flow(
+                    "[SELF_CONTROL] EVENT_SAVE_FAILED " +
+                        "type=$EVENT_CLOSE_NOW_BEFORE_SESSION package=$packageName"
+                )
+            }
+            requestHomeNavigationBeforeSession(
+                packageName = packageName,
+                reason = "close_now_before_session"
+            )
+        }
     }
 
     private fun cancelBrakeSchedule() {
@@ -861,6 +936,27 @@ class TeumAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun requestHomeNavigationBeforeSession(
+        packageName: String,
+        reason: String
+    ) {
+        cancelPendingTargetEnter(reason = "home_navigation", currentPackage = latestObservedPackage)
+        ignoreTargetEnterUntilMillis = System.currentTimeMillis() + HOME_NAVIGATION_ENTER_GUARD_MILLIS
+        TeumLogger.flow(
+            "[HOME] HOME_NAVIGATION_REQUESTED reason=$reason package=$packageName"
+        )
+        brakeHandler.post {
+            val success = performGlobalAction(GLOBAL_ACTION_HOME)
+            if (success) {
+                ignoreTargetEnterUntilMillis =
+                    System.currentTimeMillis() + HOME_NAVIGATION_ENTER_GUARD_MILLIS
+            }
+            TeumLogger.flow(
+                "[HOME] HOME_NAVIGATION_RESULT success=$success reason=$reason package=$packageName"
+            )
+        }
+    }
+
     private fun confirmExitAfterIntervention(
         debugSessionId: Long,
         sessionLogId: Long,
@@ -1083,6 +1179,7 @@ class TeumAccessibilityService : AccessibilityService() {
         const val THREE_MINUTES_MILLIS = 180_000L
         const val BRAKE_RETRY_DELAY_MILLIS = 1_000L
         const val SUPPRESS_REENTRY_AFTER_END_MILLIS = 10_000L
+        const val SUPPRESS_REENTRY_AFTER_CLOSE_NOW_MILLIS = 10_000L
         const val SUPPRESS_REENTRY_AFTER_TARGET_EXIT_MILLIS = 1_500L
         const val ENTER_CONFIRM_DELAY_MILLIS = 400L
         const val HOME_NAVIGATION_ENTER_GUARD_MILLIS = 2_000L

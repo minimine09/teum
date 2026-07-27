@@ -6,6 +6,7 @@ import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
+import com.teum.app.data.local.entity.SelfControlEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.overlay.IntentChoice
 import com.teum.app.session.AppSession
@@ -20,6 +21,7 @@ class SessionLogRepository(context: Context) {
     private val sessionLogDao = database.sessionLogDao()
     private val appOpenEventDao = database.appOpenEventDao()
     private val reopenLogDao = database.reopenLogDao()
+    private val selfControlEventDao = database.selfControlEventDao()
 
     suspend fun saveAppOpenEvent(
         packageName: String,
@@ -29,6 +31,28 @@ class SessionLogRepository(context: Context) {
             AppOpenEventEntity(
                 packageName = packageName,
                 detectedAtMillis = detectedAtMillis
+            )
+        )
+    }
+
+    suspend fun saveCloseNowBeforeSessionEvent(
+        packageName: String,
+        occurredAtMillis: Long = System.currentTimeMillis(),
+        modeAtTime: String?,
+        isVulnerableTimeAtTime: Boolean,
+        interventionActiveAtTime: Boolean,
+        source: String?
+    ): Long {
+        return selfControlEventDao.insertSelfControlEvent(
+            SelfControlEventEntity(
+                packageName = packageName,
+                appDisplayName = resolveAppDisplayName(packageName),
+                eventType = EVENT_CLOSE_NOW_BEFORE_SESSION,
+                occurredAtMillis = occurredAtMillis,
+                modeAtTime = modeAtTime,
+                isVulnerableTimeAtTime = isVulnerableTimeAtTime,
+                interventionActiveAtTime = interventionActiveAtTime,
+                source = source
             )
         )
     }
@@ -205,10 +229,20 @@ class SessionLogRepository(context: Context) {
         return reopenLogDao.observeReopenLogsSince(sinceMillis, packageName)
     }
 
+    fun observeTodayCloseNowBeforeSessionCount(
+        startOfDayMillis: Long = startOfTodayMillis()
+    ): Flow<Int> {
+        return selfControlEventDao.observeEventCountByTypeSince(
+            eventType = EVENT_CLOSE_NOW_BEFORE_SESSION,
+            sinceMillis = startOfDayMillis
+        )
+    }
+
     suspend fun deleteAllSessionLogs() {
         database.withTransaction {
             sessionLogDao.deleteAllSessionLogs()
             appOpenEventDao.deleteAllAppOpenEvents()
+            selfControlEventDao.deleteAllSelfControlEvents()
         }
     }
 
@@ -243,6 +277,7 @@ class SessionLogRepository(context: Context) {
 
     companion object {
         const val DEFAULT_REOPEN_THRESHOLD_MILLIS = 5L * 60L * 1_000L
+        const val EVENT_CLOSE_NOW_BEFORE_SESSION = "CLOSE_NOW_BEFORE_SESSION"
 
         fun startOfTodayMillis(): Long {
             return Calendar.getInstance().apply {
