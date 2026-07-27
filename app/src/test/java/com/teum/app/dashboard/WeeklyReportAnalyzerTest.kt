@@ -1,5 +1,6 @@
 ﻿package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
@@ -25,6 +26,25 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.fastReopenCount); assertEquals(30_000L, report.averageReopenGapMillis)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.MONDAY }.overrunCount)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
+    }
+
+    @Test fun averageGapUsesAllSessionsAsDenominator() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9, gap = 30_000L),
+            session(Calendar.MONDAY, 10),
+            session(Calendar.MONDAY, 11)
+        ))
+
+        assertEquals(10_000L, report.averageReopenGapMillis)
+    }
+
+    @Test fun sessionsWithoutReopenHaveZeroAverageGap() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9),
+            session(Calendar.MONDAY, 10)
+        ))
+
+        assertEquals(0L, report.averageReopenGapMillis)
     }
 
     @Test fun purposeDriftRateUsesAllClearPurposeSessionsWhileResponsesStaySeparate() {
@@ -101,24 +121,43 @@ class WeeklyReportAnalyzerTest {
         assertEquals(30_000L, report.appUsageStats.first { it.packageName == "chrome" }.usageMillis)
     }
 
+    @Test fun appUsageUsesNewestSavedDisplayNameForEachPackage() {
+        val report = report(listOf(
+            session(
+                Calendar.MONDAY,
+                9,
+                packageName = "com.example.video",
+                appDisplayName = "이전 이름"
+            ),
+            session(
+                Calendar.TUESDAY,
+                9,
+                packageName = "com.example.video",
+                appDisplayName = "새 앱 이름"
+            )
+        ))
+
+        assertEquals("새 앱 이름", report.appUsageStats.single().appDisplayName)
+    }
+
     @Test fun summarizesSavedInterventionPolicyState() {
         val report = report(listOf(
             session(
                 Calendar.MONDAY,
                 22,
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 isVulnerableTimeAtStart = true,
                 interventionAppliedAtStart = true
             ),
             session(
                 Calendar.TUESDAY,
                 12,
-                modeAtStart = "CAUTION"
+                modeAtStart = InterventionMode.INTERVENTION.name
             ),
             session(
                 Calendar.WEDNESDAY,
                 22,
-                modeAtStart = "NORMAL",
+                modeAtStart = InterventionMode.NORMAL.name,
                 isVulnerableTimeAtStart = true
             )
         ))
@@ -146,11 +185,12 @@ class WeeklyReportAnalyzerTest {
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
         closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L,
-        packageName:String="target",durationMillis:Long=60_000L,
+        packageName:String="target",appDisplayName:String?=null,durationMillis:Long=60_000L,
         modeAtStart:String?=null,isVulnerableTimeAtStart:Boolean=false,
         interventionAppliedAtStart:Boolean=false): SessionLogEntity {
         val start=time(day,hour)
-        return SessionLogEntity(packageName=packageName,entryDetectedAtMillis=start,startedAtMillis=start,
+        return SessionLogEntity(packageName=packageName,appDisplayName=appDisplayName,
+            entryDetectedAtMillis=start,startedAtMillis=start,
             endedAtMillis=start+durationMillis,durationMillis=durationMillis,targetDurationMillis=60_000,intentChoice=intent,
             modeAtStart=modeAtStart,isVulnerableTimeAtStart=isVulnerableTimeAtStart,
             interventionAppliedAtStart=interventionAppliedAtStart,

@@ -28,8 +28,20 @@ class DashboardDataFilterTest {
                 drifted = true,
                 closedAfterIntervention = true
             ),
-            session("youtube", 100, closedAfterIntervention = true),
-            session("youtube", 200, overrun = true, fast = true, drifted = true)
+            session(
+                "youtube",
+                100,
+                outcomeType = "PURPOSE_ACHIEVED",
+                closedAfterIntervention = true
+            ),
+            session(
+                "youtube",
+                200,
+                overrun = true,
+                fast = true,
+                drifted = true,
+                outcomeType = "PURPOSE_DRIFT"
+            )
         )
 
         val stats = DashboardDataFilter.todayStats(sessions, startOfTodayMillis = 100)
@@ -37,8 +49,36 @@ class DashboardDataFilterTest {
         assertEquals(2, stats.todaySessionCount)
         assertEquals(1, stats.todayOverrunCount)
         assertEquals(1, stats.todayFastReopenCount)
+        assertEquals(1, stats.todayPurposeKeptCount)
         assertEquals(1, stats.todayPurposeDriftCount)
         assertEquals(1, stats.todayClosedAfterInterventionCount)
+    }
+
+    @Test
+    fun todayPurposeKeptCountsOnlySuccessfulClearPurposeOutcomes() {
+        val sessions = listOf(
+            session("youtube", 100, outcomeType = "PURPOSE_ACHIEVED"),
+            session("youtube", 101, outcomeType = "NECESSARY_USE"),
+            session("youtube", 102, outcomeType = "PURPOSE_DRIFT", drifted = true),
+            session("youtube", 103),
+            session(
+                "youtube",
+                104,
+                intentChoice = "MINDFUL_REST",
+                outcomeType = "PURPOSE_ACHIEVED"
+            ),
+            session(
+                "youtube",
+                105,
+                intentChoice = "UNCONSCIOUS_OPEN",
+                outcomeType = "NECESSARY_USE"
+            )
+        )
+
+        val stats = DashboardDataFilter.todayStats(sessions, startOfTodayMillis = 100)
+
+        assertEquals(6, stats.todaySessionCount)
+        assertEquals(2, stats.todayPurposeKeptCount)
     }
 
     private fun open(packageName: String) = AppOpenEventEntity(
@@ -52,7 +92,9 @@ class DashboardDataFilterTest {
         overrun: Boolean = false,
         fast: Boolean = false,
         drifted: Boolean? = null,
-        closedAfterIntervention: Boolean? = null
+        closedAfterIntervention: Boolean? = null,
+        intentChoice: String = "CLEAR_PURPOSE",
+        outcomeType: String? = null
     ) = SessionLogEntity(
         packageName = packageName,
         entryDetectedAtMillis = startedAt,
@@ -60,8 +102,8 @@ class DashboardDataFilterTest {
         endedAtMillis = startedAt + 1,
         durationMillis = 1,
         targetDurationMillis = 1,
-        intentChoice = "CLEAR_PURPOSE",
-        outcomeType = null,
+        intentChoice = intentChoice,
+        outcomeType = outcomeType,
         purposeDrifted = drifted,
         closedAfterIntervention = closedAfterIntervention,
         overrun = overrun,

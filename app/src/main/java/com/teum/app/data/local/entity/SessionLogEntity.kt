@@ -8,6 +8,7 @@ data class SessionLogEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0L,
     val packageName: String,
+    val appDisplayName: String? = null,
     val entryDetectedAtMillis: Long,
     val startedAtMillis: Long,
     val endedAtMillis: Long,

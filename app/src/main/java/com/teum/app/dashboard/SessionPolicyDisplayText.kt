@@ -1,5 +1,7 @@
 package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
+
 object SessionPolicyDisplayText {
     fun status(
         modeAtStart: String?,
@@ -7,11 +9,9 @@ object SessionPolicyDisplayText {
     ): String? {
         return when {
             interventionAppliedAtStart -> "조심 모드 적용"
-            modeAtStart == CAUTION_MODE -> "조심 모드 대기"
+            modeAtStart == InterventionMode.INTERVENTION.name -> "조심 모드 대기"
             modeAtStart != null -> "일반 모드"
             else -> null
         }
     }
-
-    private const val CAUTION_MODE = "CAUTION"
 }
