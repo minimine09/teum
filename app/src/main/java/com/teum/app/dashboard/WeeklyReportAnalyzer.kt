@@ -1,5 +1,6 @@
 package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import java.util.Calendar
@@ -22,7 +23,7 @@ object WeeklyReportAnalyzer {
         val necessaryUseSessions = clearPurposeSessions.filter { session ->
             session.outcomeType == NECESSARY_USE
         }
-        val reopenGaps = reopenLogs.map { it.gapTimeMillis }
+        val totalReopenGapMillis = reopenLogs.sumOf { it.gapTimeMillis }
         val mostVulnerableHourSlot = timeSlotStats
             .filter { it.sessionCount > 0 }
             .maxWithOrNull(
@@ -44,9 +45,15 @@ object WeeklyReportAnalyzer {
                 it.necessaryUseExcessMillis
             },
             closedAfterInterventionCount = sessions.count { it.closedAfterIntervention == true },
-            averageReopenGapMillis = if (reopenGaps.isEmpty()) null else reopenGaps.average().toLong(),
+            averageReopenGapMillis = if (totalSessionCount == 0) {
+                null
+            } else {
+                totalReopenGapMillis / totalSessionCount
+            },
             mostVulnerableHourSlot = mostVulnerableHourSlot,
-            cautionModeSessionCount = sessions.count { it.modeAtStart == CAUTION_MODE },
+            cautionModeSessionCount = sessions.count {
+                it.modeAtStart == InterventionMode.INTERVENTION.name
+            },
             vulnerableTimeSessionCount = sessions.count { it.isVulnerableTimeAtStart },
             interventionAppliedSessionCount = sessions.count { it.interventionAppliedAtStart },
             dailyOverrunStats = calculateDailyOverrunStats(sessions),
@@ -98,7 +105,6 @@ object WeeklyReportAnalyzer {
 
     private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
     private const val NECESSARY_USE = "NECESSARY_USE"
-    private const val CAUTION_MODE = "CAUTION"
     private val DAYS = listOf(
         Calendar.MONDAY to "월",
         Calendar.TUESDAY to "화",

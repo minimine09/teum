@@ -221,7 +221,9 @@ class SessionLogRepository(context: Context) {
     ): Boolean {
         return sessionLogDao.confirmExitAfterIntervention(
             sessionId = sessionId,
-            confirmedAtMillis = confirmedAtMillis
+            confirmedAtMillis = confirmedAtMillis,
+            clearPurpose = IntentChoice.CLEAR_PURPOSE.name,
+            purposeAchieved = OutcomeType.PURPOSE_ACHIEVED.name
         ) == 1
     }
 

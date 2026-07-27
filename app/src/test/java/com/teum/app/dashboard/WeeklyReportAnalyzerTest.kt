@@ -1,5 +1,6 @@
 ﻿package com.teum.app.dashboard
 
+import com.teum.app.core.model.InterventionMode
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
@@ -25,6 +26,25 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.fastReopenCount); assertEquals(30_000L, report.averageReopenGapMillis)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.MONDAY }.overrunCount)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
+    }
+
+    @Test fun averageGapUsesAllSessionsAsDenominator() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9, gap = 30_000L),
+            session(Calendar.MONDAY, 10),
+            session(Calendar.MONDAY, 11)
+        ))
+
+        assertEquals(10_000L, report.averageReopenGapMillis)
+    }
+
+    @Test fun sessionsWithoutReopenHaveZeroAverageGap() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9),
+            session(Calendar.MONDAY, 10)
+        ))
+
+        assertEquals(0L, report.averageReopenGapMillis)
     }
 
     @Test fun purposeDriftRateUsesAllClearPurposeSessionsWhileResponsesStaySeparate() {
@@ -106,19 +126,19 @@ class WeeklyReportAnalyzerTest {
             session(
                 Calendar.MONDAY,
                 22,
-                modeAtStart = "CAUTION",
+                modeAtStart = InterventionMode.INTERVENTION.name,
                 isVulnerableTimeAtStart = true,
                 interventionAppliedAtStart = true
             ),
             session(
                 Calendar.TUESDAY,
                 12,
-                modeAtStart = "CAUTION"
+                modeAtStart = InterventionMode.INTERVENTION.name
             ),
             session(
                 Calendar.WEDNESDAY,
                 22,
-                modeAtStart = "NORMAL",
+                modeAtStart = InterventionMode.NORMAL.name,
                 isVulnerableTimeAtStart = true
             )
         ))
