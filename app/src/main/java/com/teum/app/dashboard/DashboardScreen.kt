@@ -5,9 +5,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -69,6 +70,7 @@ private val DashboardPill = Color(0xFFF1F3F7)
 private val DashboardSuccess = Color(0xFF2EC4A6)
 private val DashboardDanger = Color(0xFFF05D5E)
 private val DashboardWarning = Color(0xFFFF9F43)
+private val WeeklyChartCardHeight = 220.dp
 
 data class DashboardStats(
     val todaySessionCount: Int = 0,
@@ -380,15 +382,15 @@ private fun WeeklyReportContent(
             color = DashboardDanger
         )
         ReportMetricCard(
-            title = "총 사용시간",
+            title = "총 사용 시간",
             value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
             description = "이번 주 관리 앱을 사용한 시간",
             color = DashboardWarning
         )
         ReportMetricCard(
-            title = "총 연장횟수",
+            title = "총 연장 횟수",
             value = "${stats.extensionCount}회",
-            description = "이번 주 사용 시간을 연장한 횟수",
+            description = "목표 시간 이후 더 사용한 횟수",
             color = DashboardSuccess
         )
         WeeklyReportDetailCard(stats)
@@ -704,7 +706,10 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
             SimpleBarChart(
                 labels = displayHours.map { it.toString().padStart(2, '0') },
                 values = displayHours.map { (scoreByHour[it] ?: 0.0) / maxScore },
-                highlightedIndex = displayHours.indexOf(highlightedHour),
+                highlightedIndices = displayHours.indexOf(highlightedHour)
+                    .takeIf { it >= 0 }
+                    ?.let(::setOf)
+                    .orEmpty(),
                 barWidth = 40
             )
         }
@@ -1003,7 +1008,7 @@ private fun RecentSessionItem(
 @Composable
 private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
     val hourSlot = stats.mostVulnerableHourSlot
-    val timeRange = hourSlot?.let(::formatHourRange) ?: "데이터 없음"
+    val timeRange = hourSlot?.let(::formatHourRange)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1021,43 +1026,45 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = timeRange,
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 32.sp,
-                lineHeight = 36.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "초과율 ${formatPercent(stats.overrunRate)} · 빠른 재진입 ${stats.fastReopenCount}회",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
-                lineHeight = 17.sp
-            )
-            if (hourSlot != null) {
+            if (timeRange == null) {
+                Text(
+                    text = "아직 분석할 기록이 부족해요",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "사용 기록이 쌓이면 자주 흔들리는 시간을 알려드릴게요.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            } else {
+                Text(
+                    text = timeRange,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 32.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "초과율 ${formatPercent(stats.overrunRate)} · 빠른 재진입 ${stats.fastReopenCount}회",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "이 시간대에는 조심 모드를 켜 사용 시간과 연장을 줄여보세요.",
+                    text = "이 시간대에는 사용 시간을 조금 짧게 잡아보세요.",
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.Medium
-                )
-            }
-            if (
-                stats.cautionModeSessionCount > 0 ||
-                stats.vulnerableTimeSessionCount > 0 ||
-                stats.interventionAppliedSessionCount > 0
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "조심 모드 세션 ${stats.cautionModeSessionCount}개 · " +
-                        "취약 시간 세션 ${stats.vulnerableTimeSessionCount}개 · " +
-                        "개입 적용 ${stats.interventionAppliedSessionCount}개",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp
                 )
             }
         }
@@ -1073,66 +1080,64 @@ private fun WeeklyReportCharts(
     val maxOpenCount = dayStats.maxOfOrNull { it.openCount }?.takeIf { it > 0 } ?: 1
     val maxExtensionCount = dayStats.maxOfOrNull { it.extensionCount }?.takeIf { it > 0 } ?: 1
     val maxUsageMillis = dayStats.maxOfOrNull { it.usageMillis }?.takeIf { it > 0L } ?: 1L
-    val chartScrollState = rememberScrollState()
-
-    val activePage = if (chartScrollState.maxValue > 0) {
-        ((chartScrollState.value.toFloat() / chartScrollState.maxValue.toFloat()) * 3f)
-            .roundToInt()
-            .coerceIn(0, 3)
-    } else {
-        0
-    }
+    val pagerState = rememberPagerState(pageCount = { 4 })
 
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val cardWidth = maxWidth
-            Row(
-                modifier = Modifier.horizontalScroll(chartScrollState),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                WeeklyBarChartCard(
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            pageSpacing = 0.dp
+        ) { page ->
+            when (page) {
+                0 -> WeeklyBarChartCard(
                     title = "요일별 앱 사용 횟수",
                     labels = dayStats.map { it.label },
                     values = dayStats.map { it.openCount.toDouble() / maxOpenCount },
                     valueLabels = dayStats.map { stat ->
-                        stat.openCount.takeIf { it > 0 }?.let { "${it}회" }.orEmpty()
+                        stat.openCount.takeIf { it > 0 }?.let(::formatCompactCount).orEmpty()
                     },
-                    highlightedIndex = dayStats.indexOfMaxInt { it.openCount },
+                    highlightedIndices = dayStats.indicesOfMaxInt { it.openCount },
                     barColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.width(cardWidth)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                WeeklyBarChartCard(
+
+                1 -> WeeklyBarChartCard(
                     title = "요일별 연장 횟수",
                     labels = dayStats.map { it.label },
                     values = dayStats.map { it.extensionCount.toDouble() / maxExtensionCount },
                     valueLabels = dayStats.map { stat ->
-                        stat.extensionCount.takeIf { it > 0 }?.let { "${it}회" }.orEmpty()
+                        stat.extensionCount.takeIf { it > 0 }?.let(::formatCompactCount).orEmpty()
                     },
-                    highlightedIndex = dayStats.indexOfMaxInt { it.extensionCount },
+                    highlightedIndices = dayStats.indicesOfMaxInt { it.extensionCount },
                     barColor = DashboardWarning,
-                    modifier = Modifier.width(cardWidth)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                WeeklyBarChartCard(
+
+                2 -> WeeklyBarChartCard(
                     title = "요일별 사용 시간",
                     labels = dayStats.map { it.label },
                     values = dayStats.map { it.usageMillis.toDouble() / maxUsageMillis.toDouble() },
-                    highlightedIndex = dayStats.indexOfMaxLong { it.usageMillis },
+                    valueLabels = dayStats.map { stat ->
+                        stat.usageMillis.takeIf { it > 0L }?.let(::formatCompactChartDuration).orEmpty()
+                    },
+                    highlightedIndices = dayStats.indicesOfMaxLong { it.usageMillis },
                     barColor = DashboardSuccess,
-                    modifier = Modifier.width(cardWidth)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                WeeklyAppUsageChartCard(
+
+                3 -> WeeklyAppUsageChartCard(
                     appUsageStats = stats.appUsageStats,
                     appDisplayNames = appDisplayNames,
-                    modifier = Modifier.width(cardWidth)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
         ChartPageIndicator(
             pageCount = 4,
-            activePage = activePage
+            activePage = pagerState.currentPage
         )
     }
 }
@@ -1143,18 +1148,18 @@ private fun WeeklyBarChartCard(
     labels: List<String>,
     values: List<Double>,
     valueLabels: List<String> = emptyList(),
-    highlightedIndex: Int,
+    highlightedIndices: Set<Int>,
     barColor: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.heightIn(min = 190.dp),
+        modifier = modifier.height(WeeklyChartCardHeight),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
             Text(
                 text = title,
@@ -1167,7 +1172,7 @@ private fun WeeklyBarChartCard(
                 labels = labels,
                 values = values,
                 valueLabels = valueLabels,
-                highlightedIndex = highlightedIndex.coerceAtLeast(0),
+                highlightedIndices = highlightedIndices,
                 barWidth = 28,
                 highlightedColor = barColor
             )
@@ -1197,48 +1202,59 @@ private fun WeeklyAppUsageChartCard(
     )
 
     Card(
-        modifier = modifier.heightIn(min = 190.dp),
+        modifier = modifier.height(WeeklyChartCardHeight),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "앱별 사용시간",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                if (usageSlices.isEmpty()) {
-                    Text(
-                        text = "앱별 기록이 아직 없어요.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
-                } else {
-                    usageSlices.forEachIndexed { index, slice ->
-                        ChartLegendRow(
-                            color = colors[index % colors.size],
-                            label = slice.label,
-                            value = "${formatDuration(slice.usageMillis)} · ${formatPercent(slice.ratio)}"
+            Text(
+                text = "앱별 사용시간",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    if (usageSlices.isEmpty()) {
+                        Text(
+                            text = "앱별 기록이 아직 없어요.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
                         )
+                    } else {
+                        usageSlices.forEachIndexed { index, slice ->
+                            ChartLegendRow(
+                                color = colors[index % colors.size],
+                                label = slice.label,
+                                value = "${formatCompactChartDuration(slice.usageMillis)} · ${formatPercent(slice.ratio)}"
+                            )
+                            if (index != usageSlices.lastIndex) {
+                                Spacer(modifier = Modifier.height(5.dp))
+                            }
+                        }
                     }
                 }
+                Spacer(modifier = Modifier.width(12.dp))
+                PieChart(
+                    values = usageSlices.map { it.usageMillis.toFloat() },
+                    colors = colors,
+                    modifier = Modifier.size(96.dp)
+                )
             }
-            Spacer(modifier = Modifier.width(14.dp))
-            PieChart(
-                values = usageSlices.map { it.usageMillis.toFloat() },
-                colors = colors,
-                modifier = Modifier.size(104.dp)
-            )
         }
     }
 }
@@ -1299,11 +1315,11 @@ private fun ChartLegendRow(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = value,
-            modifier = Modifier.weight(0.9f),
+            modifier = Modifier.weight(1.05f),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.End
         )
@@ -1382,7 +1398,7 @@ private fun SimpleBarChart(
     labels: List<String>,
     values: List<Double>,
     valueLabels: List<String> = emptyList(),
-    highlightedIndex: Int,
+    highlightedIndices: Set<Int>,
     barWidth: Int,
     highlightedColor: Color = MaterialTheme.colorScheme.primary
 ) {
@@ -1391,21 +1407,28 @@ private fun SimpleBarChart(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp),
+            .heightIn(min = 110.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
         labels.forEachIndexed { index, label ->
             val normalizedValue = values.getOrNull(index)?.coerceIn(0.0, 1.0) ?: 0.0
-            val barHeight = (8 + normalizedValue * 47).dp
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            val barHeight = if (normalizedValue <= 0.0) 0.dp else (8 + normalizedValue * 72).dp
+            val isHighlighted = index in highlightedIndices
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 if (showValueLabels) {
                     Text(
                         text = valueLabels.getOrNull(index).orEmpty(),
-                        color = if (index == highlightedIndex) highlightedColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isHighlighted) highlightedColor else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(5.dp))
                 }
@@ -1413,7 +1436,7 @@ private fun SimpleBarChart(
                     modifier = Modifier
                         .size(width = barWidth.dp, height = barHeight)
                         .background(
-                            color = if (index == highlightedIndex) {
+                            color = if (isHighlighted) {
                                 highlightedColor
                             } else {
                                 DashboardMutedBar
@@ -1435,20 +1458,51 @@ private fun SimpleBarChart(
     }
 }
 
-private fun List<DailyOverrunStat>.indexOfMaxInt(
+private fun List<DailyOverrunStat>.indicesOfMaxInt(
     selector: (DailyOverrunStat) -> Int
-): Int {
-    return mapIndexed { index, item -> index to selector(item) }
-        .maxByOrNull { it.second }
-        ?.first ?: 0
+): Set<Int> {
+    val values = map(selector)
+    val maxValue = values.maxOrNull()?.takeIf { it > 0 } ?: return emptySet()
+    return values.mapIndexedNotNull { index, value ->
+        index.takeIf { value == maxValue }
+    }.toSet()
 }
 
-private fun List<DailyOverrunStat>.indexOfMaxLong(
+private fun List<DailyOverrunStat>.indicesOfMaxLong(
     selector: (DailyOverrunStat) -> Long
-): Int {
-    return mapIndexed { index, item -> index to selector(item) }
-        .maxByOrNull { it.second }
-        ?.first ?: 0
+): Set<Int> {
+    val values = map(selector)
+    val maxValue = values.maxOrNull()?.takeIf { it > 0L } ?: return emptySet()
+    return values.mapIndexedNotNull { index, value ->
+        index.takeIf { value == maxValue }
+    }.toSet()
+}
+
+private fun formatCompactChartDuration(millis: Long): String {
+    val seconds = millis / 1_000L
+    if (seconds <= 0L) return ""
+
+    val minutes = seconds / 60L
+    if (minutes <= 0L) return "${seconds}초"
+
+    val hours = minutes / 60L
+    if (hours <= 0L) return "${minutes}분"
+
+    val days = hours / 24L
+    return if (days > 0L) {
+        "${days}일+"
+    } else {
+        "${hours}시간"
+    }
+}
+
+private fun formatCompactCount(count: Int): String {
+    if (count <= 0) return ""
+    return if (count >= 1_000) {
+        "${count / 1_000}천+"
+    } else {
+        "${count}회"
+    }
 }
 
 @Composable
@@ -1543,33 +1597,19 @@ private fun WeeklyReportDetailCard(stats: WeeklyReportStats) {
                 fontWeight = FontWeight.Bold
             )
             WeeklySummaryRow(
-                label = "앱 사용",
-                value = "${stats.totalSessionCount}회",
-                subValue = "목표 초과 ${stats.overrunCount}회 · ${formatPercent(stats.overrunRate)}"
-            )
-            WeeklySummaryRow(
-                label = "목적 이탈",
-                value = formatPercent(stats.purposeDriftRate),
-                subValue = "목적 응답 ${stats.outcomeResponseCount}회"
-            )
-            WeeklySummaryRow(
-                label = "시간 연장",
-                value = "${stats.extensionCount}회",
-                subValue = "Session Brake 이후 연장"
+                label = "목표 시간 초과",
+                value = "${stats.overrunCount}회",
+                subValue = "전체 사용 ${stats.totalSessionCount}회 중 ${formatPercent(stats.overrunRate)}"
             )
             WeeklySummaryRow(
                 label = "필요한 사용",
                 value = "${stats.necessaryUseCount}회",
-                subValue = if (stats.necessaryUseExcessMillis > 0L) {
-                    "목표 초과 합계 ${formatDuration(stats.necessaryUseExcessMillis)}"
-                } else {
-                    "목표 초과 없음"
-                }
+                subValue = "목적과 달랐지만 필요하다고 판단한 횟수"
             )
             WeeklySummaryRow(
                 label = "빠른 재진입",
                 value = "${stats.fastReopenCount}회",
-                subValue = stats.averageReopenGapMillis?.let { "평균 재진입 간격 ${formatDuration(it)}" } ?: "평균 데이터 없음"
+                subValue = "앱 종료 후 짧은 시간 안에 다시 들어간 횟수"
             )
             WeeklySummaryRow(
                 label = "개입 후 종료",
@@ -1586,45 +1626,47 @@ private fun WeeklySummaryRow(
     value: String,
     subValue: String
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(DashboardPill, RoundedCornerShape(16.dp))
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 14.dp, vertical = 11.dp)
     ) {
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(0.8f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Column(
-            modifier = Modifier.weight(1.25f),
-            horizontalAlignment = Alignment.End
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = value,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subValue,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
-                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End
             )
         }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subValue,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 10.sp,
+            lineHeight = 14.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
