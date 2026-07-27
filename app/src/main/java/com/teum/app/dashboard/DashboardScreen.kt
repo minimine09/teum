@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -204,6 +205,7 @@ fun DashboardScreen(
                 DashboardTab.TargetApps -> TargetAppSelectionScreen(
                     initialSelectedPackages = targetPackages,
                     installedApps = installedApps,
+                    compactForBottomNav = true,
                     onCompleteClick = { results ->
                         results.forEach { result ->
                             if (result.enabled) {
@@ -1670,6 +1672,7 @@ private fun DashboardBottomNavigation(
         color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
         Row(
