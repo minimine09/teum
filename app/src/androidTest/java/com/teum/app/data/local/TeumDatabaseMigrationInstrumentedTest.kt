@@ -30,76 +30,82 @@ class TeumDatabaseMigrationInstrumentedTest {
     }
 
     @Test
-    fun migrate1To7_preservesSessionsAndAddsAnalyticsSchema() {
+    fun migrate1To8_preservesSessionsAndAddsAnalyticsSchema() {
         createVersionOneDatabase()
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
             TeumDatabase.MIGRATION_1_2,
             TeumDatabase.MIGRATION_2_3,
             TeumDatabase.MIGRATION_3_4,
             TeumDatabase.MIGRATION_4_5,
             TeumDatabase.MIGRATION_5_6,
-            TeumDatabase.MIGRATION_6_7
+            TeumDatabase.MIGRATION_6_7,
+            TeumDatabase.MIGRATION_7_8
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
             assertNecessaryUseColumns(database)
             assertSessionPolicyColumnsUseSafeDefaults(database)
+            assertAppDisplayNameDefaultsToNull(database)
             assertAppOpenEventsTableAcceptsRows(database)
             assertReopenLogsTableAcceptsRows(database)
         }
     }
 
     @Test
-    fun migrate3To7_preservesSessionsAndAddsSessionMetrics() {
+    fun migrate3To8_preservesSessionsAndAddsSessionMetrics() {
         migrationHelper.createDatabase(TEST_DATABASE, 3).use { database ->
             insertVersionThreeSession(database)
         }
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
             TeumDatabase.MIGRATION_3_4,
             TeumDatabase.MIGRATION_4_5,
             TeumDatabase.MIGRATION_5_6,
-            TeumDatabase.MIGRATION_6_7
+            TeumDatabase.MIGRATION_6_7,
+            TeumDatabase.MIGRATION_7_8
         ).use { database ->
             assertPreservedVersionOneSession(database)
             assertOutcomeColumnsDefaultToNull(database)
             assertSessionMetricColumnsDefaultToZero(database)
             assertNecessaryUseColumns(database)
             assertSessionPolicyColumnsUseSafeDefaults(database)
+            assertAppDisplayNameDefaultsToNull(database)
             assertReopenLogsTableAcceptsRows(database)
         }
     }
 
     @Test
-    fun migrate4To7_preservesExistingOverrunAsRawOverrun() {
+    fun migrate4To8_preservesExistingOverrunAsRawOverrun() {
         migrationHelper.createDatabase(TEST_DATABASE, 4).use { database ->
             insertVersionFourSession(database)
         }
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
             TeumDatabase.MIGRATION_4_5,
             TeumDatabase.MIGRATION_5_6,
-            TeumDatabase.MIGRATION_6_7
+            TeumDatabase.MIGRATION_6_7,
+            TeumDatabase.MIGRATION_7_8
         ).use { database ->
             assertNecessaryUseColumns(database, expectedRawOverrunMillis = 5_000L)
             assertSessionPolicyColumnsUseSafeDefaults(database)
+            assertAppDisplayNameDefaultsToNull(database)
             assertReopenLogsTableAcceptsRows(database)
         }
     }
 
     @Test
-    fun migrate5To7_addsReopenLogRelationships() {
+    fun migrate5To8_addsReopenLogRelationships() {
         migrationHelper.createDatabase(TEST_DATABASE, 5).use { database ->
             insertVersionFiveSession(database)
             insertVersionFiveReopenedSession(database)
@@ -107,29 +113,33 @@ class TeumDatabaseMigrationInstrumentedTest {
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
             TeumDatabase.MIGRATION_5_6,
-            TeumDatabase.MIGRATION_6_7
+            TeumDatabase.MIGRATION_6_7,
+            TeumDatabase.MIGRATION_7_8
         ).use { database ->
             assertVersionFiveReopenWasMigrated(database)
             assertSessionPolicyColumnsUseSafeDefaults(database)
+            assertAppDisplayNameDefaultsToNull(database)
         }
     }
 
     @Test
-    fun migrate6To7_addsSessionPolicyStateWithoutChangingExistingRows() {
+    fun migrate6To8_addsSessionPolicyAndAppNameWithoutChangingExistingRows() {
         migrationHelper.createDatabase(TEST_DATABASE, 6).use { database ->
             insertVersionFiveSession(database)
         }
 
         migrationHelper.runMigrationsAndValidate(
             TEST_DATABASE,
-            7,
+            8,
             true,
-            TeumDatabase.MIGRATION_6_7
+            TeumDatabase.MIGRATION_6_7,
+            TeumDatabase.MIGRATION_7_8
         ).use { database ->
             assertSessionPolicyColumnsUseSafeDefaults(database)
+            assertAppDisplayNameDefaultsToNull(database)
         }
     }
 
@@ -274,6 +284,15 @@ class TeumDatabaseMigrationInstrumentedTest {
                 0,
                 cursor.getInt(cursor.getColumnIndexOrThrow("interventionAppliedAtStart"))
             )
+        }
+    }
+
+    private fun assertAppDisplayNameDefaultsToNull(database: SupportSQLiteDatabase) {
+        database.query(
+            "SELECT appDisplayName FROM session_logs WHERE id = $SESSION_ID"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertNull(cursor.getString(cursor.getColumnIndexOrThrow("appDisplayName")))
         }
     }
 

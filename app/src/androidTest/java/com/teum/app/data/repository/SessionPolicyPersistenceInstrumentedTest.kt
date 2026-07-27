@@ -83,4 +83,31 @@ class SessionPolicyPersistenceInstrumentedTest {
             )
         )
     }
+
+    @Test
+    fun saveEndedSession_storesResolvedAppDisplayName() = runBlocking {
+        val startedAtMillis = 100_000L
+        val expectedAppName = context.packageManager.getApplicationLabel(
+            context.packageManager.getApplicationInfo(context.packageName, 0)
+        ).toString()
+
+        val sessionId = repository.saveEndedSession(
+            AppSession(
+                debugSessionId = 2L,
+                packageName = context.packageName,
+                entryDetectedAtMillis = startedAtMillis,
+                startedAtMillis = startedAtMillis,
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                targetDurationMillis = 60_000L,
+                endedAtMillis = startedAtMillis + 10_000L
+            )
+        )
+        val saved = database.sessionLogDao().findLatestEndedSession(
+            packageName = context.packageName,
+            beforeMillis = startedAtMillis + 10_001L
+        )
+
+        assertNotNull(sessionId)
+        assertEquals(expectedAppName, saved?.appDisplayName)
+    }
 }

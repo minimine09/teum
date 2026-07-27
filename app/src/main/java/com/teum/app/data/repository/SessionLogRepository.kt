@@ -1,6 +1,7 @@
 package com.teum.app.data.repository
 
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
@@ -13,7 +14,9 @@ import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
 class SessionLogRepository(context: Context) {
-    private val database = TeumDatabase.getInstance(context)
+    private val applicationContext = context.applicationContext
+    private val packageManager = applicationContext.packageManager
+    private val database = TeumDatabase.getInstance(applicationContext)
     private val sessionLogDao = database.sessionLogDao()
     private val appOpenEventDao = database.appOpenEventDao()
     private val reopenLogDao = database.reopenLogDao()
@@ -68,6 +71,7 @@ class SessionLogRepository(context: Context) {
 
         val entity = SessionLogEntity(
             packageName = session.packageName,
+            appDisplayName = resolveAppDisplayName(session.packageName),
             entryDetectedAtMillis = session.entryDetectedAtMillis,
             startedAtMillis = session.startedAtMillis,
             endedAtMillis = endedAtMillis,
@@ -121,6 +125,16 @@ class SessionLogRepository(context: Context) {
                 )
             }
             currentSessionId
+        }
+    }
+
+    private fun resolveAppDisplayName(packageName: String): String? {
+        return try {
+            packageManager.getApplicationLabel(
+                packageManager.getApplicationInfo(packageName, 0)
+            ).toString().takeIf { it.isNotBlank() }
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
         }
     }
 
