@@ -173,6 +173,7 @@ fun SessionBrakeScreen(
     targetDurationMillis: Long? = null,
     interventionActive: Boolean = false,
     extensionLimitReached: Boolean = false,
+    availableExtensionDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
@@ -193,6 +194,7 @@ fun SessionBrakeScreen(
             targetDurationMillis = targetDurationMillis,
             interventionActive = interventionActive,
             extensionLimitReached = extensionLimitReached,
+            availableExtensionDurations = availableExtensionDurations,
             onEndClick = onEndClick,
             onExtendClick = onExtendClick,
             modifier = Modifier
@@ -210,6 +212,7 @@ fun SessionBrakeContent(
     targetDurationMillis: Long? = null,
     interventionActive: Boolean = false,
     extensionLimitReached: Boolean = false,
+    availableExtensionDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
     modifier: Modifier = Modifier
@@ -228,7 +231,7 @@ fun SessionBrakeContent(
         interventionActive && extensionLimitReached ->
             "오늘 이 시간대의 연장은 여기까지예요.\n처음 목적을 마무리했다면 나와볼까요?"
         interventionActive ->
-            "조심 모드가 켜져 있어요.\n이 시간대에는 연장이 1회까지만 가능해요."
+            "조심 모드가 켜져 있어요.\n취약 시간대에는 연장이 3회까지만 가능해요."
         else ->
             "조금 더 사용할지, 여기서 멈출지 짧게 확인해요."
     }
@@ -308,6 +311,7 @@ fun SessionBrakeContent(
             Spacer(modifier = Modifier.height(24.dp))
             DurationChoiceSlider(
                 selectedDuration = selectedExtensionDuration,
+                availableDurations = availableExtensionDurations,
                 onDurationSelected = { selectedExtensionDuration = it }
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -610,7 +614,10 @@ private val DefaultDurationOptions = listOf(
     TargetDurationChoice.ONE_MINUTE,
     TargetDurationChoice.THREE_MINUTES,
     TargetDurationChoice.FIVE_MINUTES,
-    TargetDurationChoice.TEN_MINUTES
+    TargetDurationChoice.TEN_MINUTES,
+    TargetDurationChoice.FIFTEEN_MINUTES,
+    TargetDurationChoice.THIRTY_MINUTES,
+    TargetDurationChoice.ONE_HOUR
 )
 
 @Composable
