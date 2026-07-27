@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,8 @@ private val PermissionBorder = Color(0xFFE3E7EF)
 private val PermissionReady = Color(0xFF2EC4A6)
 private val PermissionMissing = Color(0xFFF05D5E)
 private val PermissionMissingContainer = Color(0xFFFDEDEE)
+private val PermissionRequiredContainer = Color(0xFFECEEFF)
+private val PermissionRequiredText = Color(0xFF5B5FEA)
 
 @Composable
 fun PermissionSetupScreen(
@@ -92,8 +95,6 @@ fun PermissionSetupScreen(
                     badgeText = "필수",
                     statusText = if (permissionStatus.isAccessibilityEnabled) "완료" else "설정 필요",
                     granted = permissionStatus.isAccessibilityEnabled,
-                    color = PermissionBlue,
-                    containerColor = PermissionBlueContainer,
                     onClick = onOpenAccessibilitySettings
                 )
                 PermissionCard(
@@ -102,8 +103,6 @@ fun PermissionSetupScreen(
                     badgeText = "필수",
                     statusText = if (permissionStatus.canDrawOverlays) "완료" else "설정 필요",
                     granted = permissionStatus.canDrawOverlays,
-                    color = PermissionMint,
-                    containerColor = PermissionMintContainer,
                     onClick = onOpenOverlaySettings
                 )
             }
@@ -127,6 +126,7 @@ fun PermissionSetupScreen(
                 enabled = requiredPermissionsReady,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(if (onLaterClick == null) Modifier.navigationBarsPadding() else Modifier)
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -155,13 +155,6 @@ fun PermissionSetupScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(29.dp))
-            Text(
-                text = "권한은 언제든 설정에서 바꿀 수 있어요.",
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
         }
     }
 }
@@ -173,11 +166,12 @@ private fun PermissionCard(
     badgeText: String,
     statusText: String,
     granted: Boolean,
-    color: Color,
-    containerColor: Color,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
+    val statusColor = if (granted) PermissionReady else PermissionBlue
+    val statusContainerColor = if (granted) PermissionMintContainer else PermissionBlueContainer
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -185,7 +179,7 @@ private fun PermissionCard(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, if (granted) containerColor else PermissionBorder)
+        border = BorderStroke(1.dp, if (granted) PermissionMintContainer else PermissionBorder)
     ) {
         Row(
             modifier = Modifier
@@ -196,12 +190,12 @@ private fun PermissionCard(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .background(containerColor, CircleShape),
+                    .background(statusContainerColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (granted) "✓" else "!",
-                    color = color,
+                    color = statusColor,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -230,8 +224,8 @@ private fun PermissionCard(
             ) {
                 PermissionBadge(
                     text = badgeText,
-                    color = color,
-                    containerColor = containerColor
+                    color = PermissionRequiredText,
+                    containerColor = PermissionRequiredContainer
                 )
                 PermissionBadge(
                     text = statusText,

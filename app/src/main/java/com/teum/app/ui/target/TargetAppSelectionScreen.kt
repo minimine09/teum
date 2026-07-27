@@ -62,6 +62,7 @@ fun TargetAppSelectionScreen(
     onCompleteClick: (List<TargetAppSelectionResult>) -> Unit,
     initialSelectedPackages: Set<String>? = null,
     installedApps: List<TargetAppInstalledApp> = emptyList(),
+    compactForBottomNav: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -107,6 +108,8 @@ fun TargetAppSelectionScreen(
 
     var isPickerOpen by remember { mutableStateOf(false) }
     val selectedCount = checkedStates.values.count { it }
+    val topPadding = if (compactForBottomNav) 36.dp else 50.dp
+    val bottomPadding = if (compactForBottomNav) 24.dp else 82.dp
 
     if (isPickerOpen) {
         InstalledAppPickerScreen(
@@ -139,7 +142,7 @@ fun TargetAppSelectionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 50.dp, bottom = 82.dp)
+                .padding(top = topPadding, bottom = bottomPadding)
         ) {
             Text(
                 text = "관리 앱 선택",
