@@ -49,6 +49,9 @@ class DashboardDataFilterTest {
         assertEquals(2, stats.todaySessionCount)
         assertEquals(1, stats.todayOverrunCount)
         assertEquals(1, stats.todayFastReopenCount)
+        assertEquals(1, stats.todayTargetKeptCount)
+        assertEquals(0, stats.todayExtensionCount)
+        assertEquals(2L, stats.todayUsageMillis)
         assertEquals(1, stats.todayPurposeKeptCount)
         assertEquals(1, stats.todayPurposeDriftCount)
         assertEquals(1, stats.todayClosedAfterInterventionCount)
@@ -79,6 +82,67 @@ class DashboardDataFilterTest {
 
         assertEquals(6, stats.todaySessionCount)
         assertEquals(2, stats.todayPurposeKeptCount)
+    }
+
+    @Test
+    fun todayStatsSummarizesUsageExtensionsFastReopenAndTopApps() {
+        val sessions = listOf(
+            session(
+                "youtube",
+                100,
+                durationMillis = 10_000,
+                extensionCount = 2,
+                appDisplayName = "YouTube"
+            ),
+            session(
+                "instagram",
+                110,
+                durationMillis = 30_000,
+                overrun = true,
+                fast = true,
+                appDisplayName = "Instagram"
+            ),
+            session(
+                "youtube",
+                120,
+                durationMillis = 20_000,
+                appDisplayName = "YouTube"
+            ),
+            session(
+                "older",
+                99,
+                durationMillis = 1_000,
+                extensionCount = 5,
+                fast = true
+            )
+        )
+
+        val stats = DashboardDataFilter.todayStats(sessions, startOfTodayMillis = 100)
+
+        assertEquals(3, stats.todaySessionCount)
+        assertEquals(60_000L, stats.todayUsageMillis)
+        assertEquals(2, stats.todayTargetKeptCount)
+        assertEquals(2, stats.todayExtensionCount)
+        assertEquals(1, stats.todayFastReopenCount)
+        assertEquals(listOf("youtube", "instagram"), stats.todayAppUsageStats.map { it.packageName })
+        assertEquals(30_000L, stats.todayAppUsageStats[0].usageMillis)
+        assertEquals("YouTube", stats.todayAppUsageStats[0].appDisplayName)
+    }
+
+    @Test
+    fun todayAppUsageKeepsOnlyTopFiveByUsage() {
+        val sessions = (1..6).map { index ->
+            session(
+                packageName = "app$index",
+                startedAt = 100L + index,
+                durationMillis = index * 1_000L
+            )
+        }
+
+        val stats = DashboardDataFilter.todayStats(sessions, startOfTodayMillis = 100)
+
+        assertEquals(5, stats.todayAppUsageStats.size)
+        assertEquals(listOf("app6", "app5", "app4", "app3", "app2"), stats.todayAppUsageStats.map { it.packageName })
     }
 
     @Test
@@ -114,22 +178,37 @@ class DashboardDataFilterTest {
         drifted: Boolean? = null,
         closedAfterIntervention: Boolean? = null,
         intentChoice: String = "CLEAR_PURPOSE",
-        outcomeType: String? = null
-    ) = SessionLogEntity(
-        packageName = packageName,
-        entryDetectedAtMillis = startedAt,
-        startedAtMillis = startedAt,
-        endedAtMillis = startedAt + 1,
-        durationMillis = 1,
-        targetDurationMillis = 1,
-        intentChoice = intentChoice,
-        outcomeType = outcomeType,
-        purposeDrifted = drifted,
-        closedAfterIntervention = closedAfterIntervention,
-        overrun = overrun,
-        extensionCount = 0,
-        isFastReopen = fast,
-        reopenGapMillis = null,
-        createdAtMillis = startedAt
-    )
+        outcomeType: String? = null,
+        durationMillis: Long = 1,
+        extensionCount: Int = 0,
+        appDisplayName: String? = null
+    ): SessionLogEntity {
+        val targetMillis = if (overrun) {
+            (durationMillis - 1L).coerceAtLeast(0L)
+        } else {
+            durationMillis
+        }
+        val overrunMillis = (durationMillis - targetMillis).coerceAtLeast(0L)
+        return SessionLogEntity(
+            packageName = packageName,
+            appDisplayName = appDisplayName,
+            entryDetectedAtMillis = startedAt,
+            startedAtMillis = startedAt,
+            endedAtMillis = startedAt + durationMillis,
+            durationMillis = durationMillis,
+            targetDurationMillis = targetMillis,
+            effectiveUsageMillis = durationMillis,
+            finalTargetDurationMillis = targetMillis,
+            overrunMillis = overrunMillis,
+            intentChoice = intentChoice,
+            outcomeType = outcomeType,
+            purposeDrifted = drifted,
+            closedAfterIntervention = closedAfterIntervention,
+            overrun = overrunMillis > 0L,
+            extensionCount = extensionCount,
+            isFastReopen = fast,
+            reopenGapMillis = null,
+            createdAtMillis = startedAt
+        )
+    }
 }
