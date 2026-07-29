@@ -241,9 +241,9 @@ fun SessionBrakeContent(
     var selectedExtensionDuration by remember(availableExtensionDurations) {
         mutableStateOf(
             availableExtensionDurations.firstOrNull {
-                it == TargetDurationChoice.THREE_MINUTES
+                it == TargetDurationChoice.TEST_FIVE_SECONDS
             } ?: availableExtensionDurations.firstOrNull()
-            ?: TargetDurationChoice.THREE_MINUTES
+            ?: TargetDurationChoice.TEST_FIVE_SECONDS
         )
     }
     val overrunMillis = if (elapsedMillis != null && targetDurationMillis != null) {
