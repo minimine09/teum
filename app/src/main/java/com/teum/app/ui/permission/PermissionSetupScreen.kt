@@ -230,8 +230,7 @@ private fun PermissionCard(
                 PermissionBadge(
                     text = statusText,
                     color = if (granted) PermissionReady else PermissionMissing,
-                    containerColor = if (granted) PermissionMintContainer else PermissionMissingContainer,
-                    wide = true
+                    containerColor = if (granted) PermissionMintContainer else PermissionMissingContainer
                 )
             }
         }
@@ -243,12 +242,11 @@ private fun PermissionBadge(
     text: String,
     color: Color,
     containerColor: Color,
-    modifier: Modifier = Modifier,
-    wide: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
-            .size(width = if (wide) 62.dp else 48.dp, height = 26.dp)
+            .size(width = 62.dp, height = 26.dp)
             .background(containerColor, RoundedCornerShape(13.dp)),
         contentAlignment = Alignment.Center
     ) {
