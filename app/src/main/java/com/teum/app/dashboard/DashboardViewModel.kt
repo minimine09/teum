@@ -59,7 +59,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 weeklyReportStats = WeeklyReportAnalyzer.calculate(
                     sessions = sessions,
                     timeSlotStats = timeSlotStats,
-                    reopenLogs = reopenLogs
+                    reopenLogs = reopenLogs,
+                    openEvents = openEvents
                 ),
                 availablePackages = (allSessions.map { it.packageName } +
                     allOpenEvents.map { it.packageName }).toSet(),

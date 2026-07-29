@@ -1,6 +1,7 @@
 package com.teum.app.dashboard
 
 import com.teum.app.core.model.InterventionMode
+import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import java.util.Calendar
@@ -9,7 +10,8 @@ object WeeklyReportAnalyzer {
     fun calculate(
         sessions: List<SessionLogEntity>,
         timeSlotStats: List<TimeSlotStat>,
-        reopenLogs: List<ReopenLogEntity>
+        reopenLogs: List<ReopenLogEntity>,
+        openEvents: List<AppOpenEventEntity> = emptyList()
     ): WeeklyReportStats {
         val totalSessionCount = sessions.size
         val overrunCount = sessions.count { it.overrun }
@@ -56,17 +58,26 @@ object WeeklyReportAnalyzer {
             },
             vulnerableTimeSessionCount = sessions.count { it.isVulnerableTimeAtStart },
             interventionAppliedSessionCount = sessions.count { it.interventionAppliedAtStart },
-            dailyOverrunStats = calculateDailyOverrunStats(sessions),
+            dailyOverrunStats = calculateDailyOverrunStats(
+                sessions = sessions,
+                openEvents = openEvents
+            ),
             appUsageStats = calculateAppUsageStats(sessions)
         )
     }
 
     private fun calculateDailyOverrunStats(
-        sessions: List<SessionLogEntity>
+        sessions: List<SessionLogEntity>,
+        openEvents: List<AppOpenEventEntity>
     ): List<DailyOverrunStat> {
         val sessionsByDay = sessions.groupBy { session ->
             Calendar.getInstance().apply {
                 timeInMillis = session.startedAtMillis
+            }.get(Calendar.DAY_OF_WEEK)
+        }
+        val openEventsByDay = openEvents.groupBy { event ->
+            Calendar.getInstance().apply {
+                timeInMillis = event.detectedAtMillis
             }.get(Calendar.DAY_OF_WEEK)
         }
 
@@ -77,7 +88,7 @@ object WeeklyReportAnalyzer {
                 label = label,
                 sessionCount = daySessions.size,
                 overrunCount = daySessions.count { it.overrun },
-                openCount = daySessions.size,
+                openCount = openEventsByDay[dayOfWeek].orEmpty().size,
                 extensionCount = daySessions.sumOf { it.extensionCount },
                 usageMillis = daySessions.sumOf { SessionMetricsResolver.resolve(it).usageMillis }
             )

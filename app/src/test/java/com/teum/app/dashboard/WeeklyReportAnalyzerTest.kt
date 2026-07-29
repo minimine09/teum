@@ -1,6 +1,7 @@
 ﻿package com.teum.app.dashboard
 
 import com.teum.app.core.model.InterventionMode
+import com.teum.app.data.local.entity.AppOpenEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import org.junit.Assert.*
@@ -121,6 +122,26 @@ class WeeklyReportAnalyzerTest {
         assertEquals(30_000L, report.appUsageStats.first { it.packageName == "chrome" }.usageMillis)
     }
 
+    @Test fun openCountUsesAppOpenEventsWhenSessionAndOpenCountsDiffer() {
+        val mondaySession = session(Calendar.MONDAY, 9)
+        val tuesdaySession = session(Calendar.TUESDAY, 9)
+        val report = report(
+            s = listOf(mondaySession, tuesdaySession),
+            openEvents = listOf(
+                openEvent(mondaySession.startedAtMillis),
+                openEvent(mondaySession.startedAtMillis + 1_000L),
+                openEvent(mondaySession.startedAtMillis + 2_000L)
+            )
+        )
+        val monday = report.dailyOverrunStats.first { it.dayOfWeek == Calendar.MONDAY }
+        val tuesday = report.dailyOverrunStats.first { it.dayOfWeek == Calendar.TUESDAY }
+
+        assertEquals(1, monday.sessionCount)
+        assertEquals(3, monday.openCount)
+        assertEquals(1, tuesday.sessionCount)
+        assertEquals(0, tuesday.openCount)
+    }
+
     @Test fun appUsageUsesNewestSavedDisplayNameForEachPackage() {
         val report = report(listOf(
             session(
@@ -167,7 +188,10 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.interventionAppliedSessionCount)
     }
 
-    private fun report(s: List<SessionLogEntity>) = WeeklyReportAnalyzer.calculate(
+    private fun report(
+        s: List<SessionLogEntity>,
+        openEvents: List<AppOpenEventEntity> = s.map { openEvent(it.startedAtMillis) }
+    ) = WeeklyReportAnalyzer.calculate(
         sessions = s,
         timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(s),
         reopenLogs = s.mapIndexedNotNull { index, session ->
@@ -180,7 +204,12 @@ class WeeklyReportAnalyzerTest {
                     isFastReopen = session.isFastReopen
                 )
             }
-        }
+        },
+        openEvents = openEvents
+    )
+    private fun openEvent(detectedAtMillis: Long) = AppOpenEventEntity(
+        packageName = "target",
+        detectedAtMillis = detectedAtMillis
     )
     private fun session(day:Int,hour:Int,overrun:Boolean=false,extensions:Int=0,fast:Boolean=false,
         gap:Long?=null,intent:String="CLEAR_PURPOSE",answered:Boolean=false,drifted:Boolean?=null,
