@@ -1,8 +1,15 @@
 package com.teum.app.ui.intervention
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.rememberScrollState
@@ -38,14 +45,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,24 +70,28 @@ import com.teum.app.session.OutcomeType
 import com.teum.app.ui.theme.TeumTheme
 import kotlin.math.roundToInt
 
-private val InterventionBackground = Color(0xFFECEEFF)
-private val CareBackground = Color(0xFFFFF5E8)
-private val CareAccent = Color(0xFFFF9F43)
+private val InterventionBackground = Color(0xFFF8F9FC)
+private val CareBackground = Color(0xFFFFFCF7)
+private val CareAccent = Color(0xFFF2A02D)
 private val BrakeBackground = Color(0xFFFFF8F2)
-private val BorderSoft = Color(0xFFE3E7EF)
-private val PurpleChoice = Color(0xFFFBE5FF)
-private val MintChoice = Color(0xFFE8F8F4)
-private val NeutralChoice = Color(0xFFE8E8E8)
-private val BlueChoice = Color(0xFFEAF4FF)
-private val OrangeChoice = Color(0xFFFFF3E4)
+private val BorderSoft = Color(0xFFE5E7EC)
+private val PurpleChoice = Color(0xFFF2EBFF)
+private val MintChoice = Color(0xFFF5F6F8)
+private val NeutralChoice = Color(0xFFF5F6F8)
+private val BlueChoice = Color(0xFFF5F6F8)
+private val OrangeChoice = Color(0xFFF5F6F8)
 private val DangerChoice = Color(0xFFFDEDEE)
 private val Success = Color(0xFF34C6A8)
 private val NeutralDot = Color(0xFF9B9B9B)
 private val Danger = Color(0xFFF05D5E)
 private val Warning = Color(0xFFFF9F43)
+private val TextPrimary = Color(0xFF1F2430)
+private val TextSecondary = Color(0xFF778092)
+private val TrackInactive = Color(0xFFE3E5EA)
 
 @Composable
 fun IntentCheckScreen(
+    packageName: String? = null,
     appName: String = "Instagram",
     recentOpenCountText: String? = null,
     interventionActive: Boolean = false,
@@ -97,14 +112,16 @@ fun IntentCheckScreen(
     }
 
     InterventionLayout(
+        packageName = packageName,
+        appName = appName,
         title = "Intent Check",
         subtitle = "열기 전에 잠깐 확인해요",
+        interventionActive = interventionActive,
         backgroundColor = if (interventionActive) CareBackground else InterventionBackground,
         modifier = modifier
     ) {
         CheckModal(
-            symbol = "?",
-            title = "${appName}을 왜 열었나요?",
+            title = "이 앱을 왜 열었나요?",
             description = descriptionText,
             options = listOf(
                 IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적", PurpleChoice, accentColor),
@@ -125,6 +142,7 @@ fun IntentCheckScreen(
 
 @Composable
 fun ReopenCheckScreen(
+    packageName: String? = null,
     appName: String = "Instagram",
     reopenGapMillis: Long? = null,
     interventionActive: Boolean = false,
@@ -140,14 +158,16 @@ fun ReopenCheckScreen(
     val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
 
     InterventionLayout(
+        packageName = packageName,
+        appName = appName,
         title = "Reopen Check",
-        subtitle = null,
+        subtitle = "방금 다시 열었어요",
+        interventionActive = interventionActive,
         backgroundColor = if (interventionActive) CareBackground else InterventionBackground,
         modifier = modifier
     ) {
         CheckModal(
-            symbol = "!",
-            title = "방금 다시 열었어요",
+            title = "왜 다시 들어왔나요?",
             description = reopenGapMillis?.let { "마지막 실행: ${formatDurationMillis(it)} 전" } ?: "마지막 실행: 짧은 시간 전",
             options = listOf(
                 IntentOptionUi(IntentChoice.CLEAR_PURPOSE, "명확한 목적으로 계속", PurpleChoice, accentColor),
@@ -218,8 +238,13 @@ fun SessionBrakeContent(
     modifier: Modifier = Modifier
 ) {
     var isExtensionExpanded by remember { mutableStateOf(false) }
-    var selectedExtensionDuration by remember {
-        mutableStateOf(TargetDurationChoice.THREE_MINUTES)
+    var selectedExtensionDuration by remember(availableExtensionDurations) {
+        mutableStateOf(
+            availableExtensionDurations.firstOrNull {
+                it == TargetDurationChoice.THREE_MINUTES
+            } ?: availableExtensionDurations.firstOrNull()
+            ?: TargetDurationChoice.THREE_MINUTES
+        )
     }
     val overrunMillis = if (elapsedMillis != null && targetDurationMillis != null) {
         (elapsedMillis - targetDurationMillis).coerceAtLeast(0L)
@@ -238,97 +263,143 @@ fun SessionBrakeContent(
 
     Column(
         modifier = modifier
-            .background(
-                if (interventionActive) CareBackground else InterventionBackground,
-                RoundedCornerShape(34.dp)
+            .background(Color.White, RoundedCornerShape(22.dp))
+            .then(
+                if (interventionActive) {
+                    Modifier.border(1.dp, CareAccent.copy(alpha = 0.72f), RoundedCornerShape(22.dp))
+                } else {
+                    Modifier
+                }
             )
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 31.dp, vertical = 34.dp),
+            .padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        AlertBubble(symbol = "!", size = 90, color = accentColor)
-        Spacer(modifier = Modifier.height(24.dp))
+        if (interventionActive) {
+            CautionModeBadge()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        AlertBubble(
+            symbol = "!",
+            size = 44,
+            color = accentColor,
+            containerColor = accentColor.copy(alpha = 0.12f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "목표 시간에 도달했어요",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 22.sp,
+            color = TextPrimary,
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "처음 정한 시간만큼 사용했어요. 지금 이어갈지 멈출지 확인해볼까요?",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "잠시 쉬어가거나 목적을 확인해 주세요.",
+            color = TextSecondary,
             fontSize = 13.sp,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(5.dp))
+        Spacer(modifier = Modifier.height(18.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(BorderSoft)
+        )
+        Spacer(modifier = Modifier.height(14.dp))
         Text(
-            text = buildSessionBrakeSummary(
-                appName = appName,
-                elapsedMillis = elapsedMillis,
-                targetDurationMillis = targetDurationMillis,
-                overrunMillis = overrunMillis
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = appName,
+            color = TextPrimary,
             fontSize = 13.sp,
-            textAlign = TextAlign.Center
+            fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "지금 계속 사용할 이유가 있나요?",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            BrakeTimeMetric(
+                label = "현재 사용",
+                value = elapsedMillis?.let(::formatDurationMillis) ?: "-"
+            )
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(38.dp)
+                    .background(BorderSoft)
+            )
+            BrakeTimeMetric(
+                label = "목표",
+                value = targetDurationMillis?.let(::formatDurationMillis) ?: "-"
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(BorderSoft)
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = brakeGuidanceText,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
+            color = TextSecondary,
+            fontSize = 11.sp,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(24.dp))
-        TeumFilledButton("종료하기", onEndClick, MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.height(18.dp))
-        TeumFilledButton(
-            text = if (isExtensionExpanded) {
-                "선택한 시간만큼 연장하기"
-            } else {
-                "연장하기"
-            },
-            onClick = {
-                if (isExtensionExpanded) {
-                    onExtendClick(selectedExtensionDuration)
-                } else {
-                    isExtensionExpanded = true
-                }
-            },
-            color = accentColor,
-            enabled = !extensionLimitReached
-        )
+        Spacer(modifier = Modifier.height(20.dp))
         if (isExtensionExpanded) {
-            Spacer(modifier = Modifier.height(24.dp))
             DurationChoiceSlider(
                 selectedDuration = selectedExtensionDuration,
                 availableDurations = availableExtensionDurations,
-                onDurationSelected = { selectedExtensionDuration = it }
+                onDurationSelected = { selectedExtensionDuration = it },
+                accentColor = accentColor,
+                label = "연장 시간 선택"
             )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "연장 시간을 고른 뒤 다시 연장하기를 눌러주세요.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center
+            Spacer(modifier = Modifier.height(20.dp))
+            TeumFilledButton(
+                text = "${selectedExtensionDuration.label} 연장하기",
+                onClick = { onExtendClick(selectedExtensionDuration) },
+                color = accentColor,
+                enabled = !extensionLimitReached
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            TeumOutlinedActionButton(text = "종료하기", onClick = onEndClick)
+        } else {
+            TeumFilledButton("종료하기", onEndClick, accentColor)
+            Spacer(modifier = Modifier.height(8.dp))
+            TeumOutlinedActionButton(
+                text = if (extensionLimitReached) "연장 한도에 도달했어요" else "연장하기",
+                onClick = { isExtensionExpanded = true },
+                enabled = !extensionLimitReached
             )
         }
     }
 }
 
 @Composable
+private fun BrakeTimeMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.width(100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(text = label, color = TextSecondary, fontSize = 11.sp)
+        Text(text = value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
 private fun InterventionLayout(
+    packageName: String?,
+    appName: String,
     title: String,
     subtitle: String?,
+    interventionActive: Boolean,
     backgroundColor: Color,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
@@ -342,13 +413,103 @@ private fun InterventionLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 23.dp)
-                .padding(top = 43.dp, bottom = 24.dp)
+                .padding(horizontal = 24.dp)
+                .padding(top = 32.dp, bottom = 24.dp)
         ) {
-            ScreenHeader(title = title, subtitle = subtitle)
-            Spacer(modifier = Modifier.height(27.dp))
+            if (interventionActive) {
+                CautionModeBadge()
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+            AppIdentityRow(
+                packageName = packageName,
+                appName = appName,
+                accentColor = if (interventionActive) {
+                    CareAccent
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = title,
+                color = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = subtitle,
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
             content()
         }
+    }
+}
+
+@Composable
+private fun CautionModeBadge(modifier: Modifier = Modifier) {
+    Text(
+        text = "⚠ 조심 모드 활성",
+        modifier = modifier
+            .background(Color(0xFFFFF1D8), RoundedCornerShape(50.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        color = CareAccent,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun AppIdentityRow(
+    packageName: String?,
+    appName: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val appIcon = remember(packageName) {
+        packageName?.let { loadApplicationIcon(context, it) }
+    }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (appIcon != null) {
+            Image(
+                bitmap = appIcon,
+                contentDescription = "$appName 앱 아이콘",
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(7.dp))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(7.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = appName.take(1).uppercase(),
+                    color = accentColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = appName,
+            color = TextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -356,7 +517,8 @@ private fun InterventionLayout(
 private fun ScreenHeader(
     title: String,
     subtitle: String?,
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Row(verticalAlignment = Alignment.Top) {
         val backModifier = if (onBackClick != null) {
@@ -379,15 +541,15 @@ private fun ScreenHeader(
         Column {
             Text(
                 text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 22.sp,
+                color = accentColor,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
             )
             if (subtitle != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = TextSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -418,7 +580,6 @@ private fun BackChevron(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CheckModal(
-    symbol: String,
     title: String,
     description: String,
     options: List<IntentOptionUi>,
@@ -434,73 +595,69 @@ private fun CheckModal(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 548.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
-            .padding(horizontal = 22.dp, vertical = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .heightIn(min = 500.dp),
+        horizontalAlignment = Alignment.Start
     ) {
-        AlertBubble(symbol = symbol, size = 64, color = accentColor)
-        Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = title,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 22.sp,
+            color = TextPrimary,
+            fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Start
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = description,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = TextSecondary,
             fontSize = 12.sp,
-            textAlign = TextAlign.Center
+            lineHeight = 18.sp
         )
-        Spacer(modifier = Modifier.height(34.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Spacer(modifier = Modifier.height(18.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
             options.forEach { option ->
                 ChoiceRow(
                     option = option,
                     selected = selectedIntent == option.choice,
+                    accentColor = accentColor,
                     onClick = { onIntentSelected(option.choice) }
                 )
             }
         }
-        Spacer(modifier = Modifier.height(25.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         DurationChoiceSlider(
             selectedDuration = selectedDuration,
             availableDurations = availableDurations,
-            onDurationSelected = onDurationSelected
+            onDurationSelected = onDurationSelected,
+            accentColor = accentColor
         )
-        Spacer(modifier = Modifier.height(18.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TeumFilledButton(
-                text = "시작",
-                onClick = onStartClick,
-                color = accentColor,
-                modifier = Modifier.weight(1f),
-                height = 44,
-                enabled = selectedIntent != null &&
-                    selectedIntent != IntentChoice.CLOSE_NOW &&
-                    selectedDuration != null
+        Spacer(modifier = Modifier.height(48.dp))
+        TeumFilledButton(
+            text = "시작",
+            onClick = onStartClick,
+            color = accentColor,
+            height = 48,
+            enabled = selectedIntent != null &&
+                selectedIntent != IntentChoice.CLOSE_NOW &&
+                selectedDuration != null
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                onIntentSelected(IntentChoice.CLOSE_NOW)
+                onCloseClick()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp),
+            shape = RoundedCornerShape(13.dp),
+            border = BorderStroke(1.dp, BorderSoft)
+        ) {
+            Text(
+                text = "지금은 닫기",
+                color = TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
             )
-            OutlinedButton(
-                onClick = {
-                    onIntentSelected(IntentChoice.CLOSE_NOW)
-                    onCloseClick()
-                },
-                modifier = Modifier
-                    .weight(0.64f)
-                    .height(44.dp),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, BorderSoft)
-            ) {
-                Text(
-                    text = "지금은 닫기",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }
@@ -509,18 +666,19 @@ private fun CheckModal(
 private fun AlertBubble(
     symbol: String,
     size: Int,
-    color: Color = Color(0xFF8491FF)
+    color: Color = Color(0xFF8491FF),
+    containerColor: Color = Color.White
 ) {
     Box(
         modifier = Modifier
             .size(size.dp)
-            .background(Color.White, CircleShape),
+            .background(containerColor, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = symbol,
             color = color,
-            fontSize = if (size > 80) 48.sp else 36.sp,
+            fontSize = if (size > 80) 48.sp else 24.sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -530,34 +688,36 @@ private fun AlertBubble(
 private fun ChoiceRow(
     option: IntentOptionUi,
     selected: Boolean,
+    accentColor: Color,
     onClick: () -> Unit
 ) {
+    val containerColor = if (selected) accentColor.copy(alpha = 0.09f) else Color.White
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(61.dp)
+            .height(52.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = option.containerColor),
-        border = if (selected) BorderStroke(1.4.dp, option.dotColor) else null
+        shape = RoundedCornerShape(13.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = BorderStroke(if (selected) 1.4.dp else 1.dp, if (selected) accentColor else BorderSoft)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SelectionDot(
-                color = option.dotColor,
+                color = accentColor,
                 selected = selected,
-                size = 20
+                size = 18
             )
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = option.text,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = TextPrimary,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
             )
         }
     }
@@ -568,6 +728,8 @@ private fun DurationChoiceSlider(
     selectedDuration: TargetDurationChoice?,
     onDurationSelected: (TargetDurationChoice) -> Unit,
     availableDurations: List<TargetDurationChoice> = DefaultDurationOptions,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+    label: String = "예상 사용 시간",
     modifier: Modifier = Modifier
 ) {
     val durationOptions = availableDurations.ifEmpty { DefaultDurationOptions }
@@ -580,18 +742,22 @@ private fun DurationChoiceSlider(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = "예상 사용 시간",
-                color = MaterialTheme.colorScheme.onSurface,
+                text = label,
+                color = TextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = durationOptions[selectedIndex].label,
+                color = accentColor,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = formatDurationChoice(durationOptions[selectedIndex]),
-                color = Color.Black,
-                fontSize = 12.sp
             )
         }
         TeumDurationSlider(
@@ -602,9 +768,10 @@ private fun DurationChoiceSlider(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(23.dp),
+                .height(20.dp),
             valueRange = 0f..durationOptions.lastIndex.toFloat(),
-            steps = (durationOptions.size - 2).coerceAtLeast(0)
+            steps = (durationOptions.size - 2).coerceAtLeast(0),
+            accentColor = accentColor
         )
     }
 }
@@ -685,14 +852,13 @@ private fun TeumDurationSlider(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 0.5f..30f,
-    steps: Int = 58
+    steps: Int = 58,
+    accentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     var sliderSize by remember { mutableStateOf(IntSize.Zero) }
     val start = valueRange.start
     val end = valueRange.endInclusive
     val progress = ((value - start) / (end - start)).coerceIn(0f, 1f)
-    val primaryColor = MaterialTheme.colorScheme.primary
-
     fun updateValue(positionX: Float) {
         val width = sliderSize.width.toFloat().coerceAtLeast(1f)
         val rawProgress = (positionX / width).coerceIn(0f, 1f)
@@ -713,38 +879,32 @@ private fun TeumDurationSlider(
             }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val trackHeight = size.height
+            val trackHeight = 4.dp.toPx()
             val trackWidth = size.width
-            val corner = 5.dp.toPx()
-            val handleWidth = 11.dp.toPx()
-            val progressWidth = (trackWidth * progress).coerceAtLeast(handleWidth / 2f)
-            val handleLeft = (trackWidth * progress - handleWidth / 2f)
-                .coerceIn(0f, trackWidth - handleWidth)
+            val centerY = size.height / 2f
+            val corner = trackHeight / 2f
+            val thumbRadius = 7.dp.toPx()
+            val progressWidth = trackWidth * progress
 
             drawRoundRect(
-                color = Color.White,
-                topLeft = Offset.Zero,
+                color = TrackInactive,
+                topLeft = Offset(0f, centerY - trackHeight / 2f),
                 size = Size(trackWidth, trackHeight),
                 cornerRadius = CornerRadius(corner, corner)
             )
             drawRoundRect(
-                color = Color(0xFFCCCDFF),
-                topLeft = Offset.Zero,
+                color = accentColor,
+                topLeft = Offset(0f, centerY - trackHeight / 2f),
                 size = Size(progressWidth, trackHeight),
                 cornerRadius = CornerRadius(corner, corner)
             )
-            drawRoundRect(
-                color = Color(0xFF9FA5FF),
-                topLeft = Offset.Zero,
-                size = Size(trackWidth, trackHeight),
-                cornerRadius = CornerRadius(corner, corner),
-                style = Stroke(width = 1.dp.toPx())
-            )
-            drawRoundRect(
-                color = primaryColor,
-                topLeft = Offset(handleLeft, 0f),
-                size = Size(handleWidth, trackHeight),
-                cornerRadius = CornerRadius(corner, corner)
+            drawCircle(
+                color = accentColor,
+                radius = thumbRadius,
+                center = Offset(
+                    x = progressWidth.coerceIn(thumbRadius, trackWidth - thumbRadius),
+                    y = centerY
+                )
             )
         }
     }
@@ -782,16 +942,41 @@ private fun TeumFilledButton(
 }
 
 @Composable
+private fun TeumOutlinedActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(46.dp),
+        shape = RoundedCornerShape(13.dp),
+        border = BorderStroke(1.dp, BorderSoft),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = TextPrimary,
+            disabledContentColor = TextSecondary.copy(alpha = 0.5f)
+        )
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
 private fun OutcomeOption(
     option: OutcomeOptionUi,
     selected: Boolean,
+    accentColor: Color,
     onClick: () -> Unit
 ) {
-    val optionBackground = if (selected) {
-        option.containerColor
-    } else {
-        option.containerColor.copy(alpha = 0.72f)
-    }
+    val optionBackground = if (selected) accentColor.copy(alpha = 0.09f) else Color.White
 
     Card(
         modifier = Modifier
@@ -800,7 +985,7 @@ private fun OutcomeOption(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(13.dp),
         colors = CardDefaults.cardColors(containerColor = optionBackground),
-        border = if (selected) BorderStroke(1.2.dp, option.dotColor) else null
+        border = BorderStroke(if (selected) 1.4.dp else 1.dp, if (selected) accentColor else BorderSoft)
     ) {
         Row(
             modifier = Modifier
@@ -809,15 +994,15 @@ private fun OutcomeOption(
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutcomeSelectionDot(
-                color = option.dotColor,
+                color = accentColor,
                 selected = selected
             )
             Spacer(modifier = Modifier.width(11.dp))
             Text(
                 text = option.title,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = TextPrimary,
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -904,25 +1089,30 @@ fun OutcomeCheckScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 50.dp, bottom = 24.dp)
+                .padding(top = 32.dp, bottom = 24.dp)
         ) {
+            if (interventionActive) {
+                CautionModeBadge()
+                Spacer(modifier = Modifier.height(14.dp))
+            }
             ScreenHeader(
                 title = "Outcome Check",
-                subtitle = "목적과 실제 결과 연결",
-                onBackClick = onDismissClick
+                subtitle = "사용을 마무리합니다",
+                onBackClick = onDismissClick,
+                accentColor = outcomeAccent
             )
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
             ) {
                 OutcomeSessionSummaryCard(sessionData = sessionData)
-                Spacer(modifier = Modifier.height(26.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "처음 목적을 달성했나요?",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 21.sp,
+                    text = "스스로 평가",
+                    color = TextPrimary,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -937,6 +1127,7 @@ fun OutcomeCheckScreen(
                         OutcomeOption(
                             option = option.ui,
                             selected = selectedOutcomeType == option.outcomeType,
+                            accentColor = outcomeAccent,
                             onClick = { selectedOutcomeType = option.outcomeType }
                         )
                     }
@@ -1012,6 +1203,29 @@ data class OutcomeSessionUi(
     val targetDurationMillis: Long,
     val extensionCount: Int
 )
+
+private fun loadApplicationIcon(
+    context: Context,
+    packageName: String
+): ImageBitmap? {
+    return runCatching {
+        context.packageManager.getApplicationIcon(packageName).toImageBitmap()
+    }.getOrNull()
+}
+
+private fun Drawable.toImageBitmap(): ImageBitmap {
+    if (this is BitmapDrawable && bitmap != null) {
+        return bitmap.asImageBitmap()
+    }
+
+    val width = intrinsicWidth.takeIf { it > 0 } ?: 96
+    val height = intrinsicHeight.takeIf { it > 0 } ?: 96
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap.asImageBitmap()
+}
 
 private data class OutcomeSelectionOptionUi(
     val ui: OutcomeOptionUi,

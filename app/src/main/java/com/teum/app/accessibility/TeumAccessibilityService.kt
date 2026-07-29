@@ -518,10 +518,17 @@ class TeumAccessibilityService : AccessibilityService() {
             detail = "max=${availableExtensionDurations.last().name} mode=${session.modeAtStart}"
         )
 
+        val elapsedMillis = SessionManager.getElapsedMillis()
+        val effectiveUsageMillis =
+            (elapsedMillis - session.interventionVisibleMillis).coerceAtLeast(0L)
+        val finalTargetDurationMillis =
+            (session.targetDurationMillis + session.totalExtensionDurationMillis)
+                .coerceAtLeast(0L)
+
         overlayController.showSessionBrake(
             packageName = session.packageName,
-            elapsedMillis = SessionManager.getElapsedMillis(),
-            targetDurationMillis = session.currentLimitDurationMillis,
+            elapsedMillis = effectiveUsageMillis,
+            targetDurationMillis = finalTargetDurationMillis,
             interventionActive = session.interventionAppliedAtStart,
             extensionLimitReached = isExtensionLimitReached(session),
             availableExtensionDurations = availableExtensionDurations,
@@ -537,11 +544,12 @@ class TeumAccessibilityService : AccessibilityService() {
         if (overlayController.currentOverlayName == "SESSION_BRAKE") {
             SessionManager.markInterventionShown()
         }
-        val elapsedMillis = SessionManager.getElapsedMillis()
         TeumLogger.session(
             debugSessionId = session.debugSessionId,
             event = "BRAKE_SHOWN",
-            detail = "elapsed=$elapsedMillis target=${session.targetDurationMillis} overrun=${elapsedMillis >= session.targetDurationMillis}"
+            detail = "elapsed=$elapsedMillis effective=$effectiveUsageMillis " +
+                "target=$finalTargetDurationMillis scheduleLimit=${session.currentLimitDurationMillis} " +
+                "overrun=${effectiveUsageMillis >= finalTargetDurationMillis}"
         )
     }
 
