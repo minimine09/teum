@@ -27,8 +27,7 @@ object WeeklyReportAnalyzer {
         }
         val totalReopenGapMillis = reopenLogs.sumOf { it.gapTimeMillis }
         val mostVulnerableTimeSlotStat = VulnerableTimeSelector.rankVulnerableSlots(
-            timeSlotStats = timeSlotStats,
-            maximumSlotCount = 1
+            timeSlotStats = timeSlotStats
         ).firstOrNull()
 
         return WeeklyReportStats(

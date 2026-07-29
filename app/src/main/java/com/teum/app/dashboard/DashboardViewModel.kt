@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.teum.app.data.local.entity.SessionLogEntity
 import com.teum.app.data.repository.SessionLogRepository
+import com.teum.app.data.repository.TargetAppRepository
+import com.teum.app.data.repository.VulnerableTimePolicyDataFilter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SessionLogRepository(application)
+    private val targetAppRepository = TargetAppRepository(application)
     private val selectedPackageName = MutableStateFlow<String?>(null)
 
     private val dateRange = flow {
@@ -45,9 +48,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 packageName = null
             )
         ) { allSessions, allOpenEvents, reopenLogs ->
-            val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
+            val targetPackages = targetAppRepository.getTargetPackages()
+            val policySessions = VulnerableTimePolicyDataFilter.sessions(
                 sessions = allSessions,
-                openEvents = allOpenEvents
+                targetPackages = targetPackages
+            )
+            val policyOpenEvents = VulnerableTimePolicyDataFilter.openEvents(
+                openEvents = allOpenEvents,
+                targetPackages = targetPackages
+            )
+            val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
+                sessions = policySessions,
+                openEvents = policyOpenEvents
             )
 
             DashboardUiState(

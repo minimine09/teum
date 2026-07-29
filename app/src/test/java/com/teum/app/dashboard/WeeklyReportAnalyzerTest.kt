@@ -62,12 +62,12 @@ class WeeklyReportAnalyzerTest {
         val report = report(listOf(
             session(Calendar.WEDNESDAY, 8, overrun = true),
             session(Calendar.WEDNESDAY, 20, overrun = true, fast = true),
-            session(Calendar.THURSDAY, 20)
+            session(Calendar.THURSDAY, 20, overrun = true)
         ))
 
         assertEquals(20, report.mostVulnerableHourSlot)
         val selectedSlot = requireNotNull(report.mostVulnerableTimeSlotStat)
-        assertEquals(0.5, selectedSlot.overrunRate, 0.0)
+        assertEquals(1.0, selectedSlot.overrunRate, 0.0)
         assertEquals(1, selectedSlot.fastReopenCount)
     }
 
@@ -86,6 +86,13 @@ class WeeklyReportAnalyzerTest {
         assertNull(noRisk.mostVulnerableHourSlot)
         assertNull(noRisk.mostVulnerableTimeSlotStat)
         assertTrue(noRisk.hasEnoughVulnerableTimeData)
+
+        val belowThreshold = report(listOf(
+            session(Calendar.WEDNESDAY, 10, overrun = true),
+            session(Calendar.THURSDAY, 10)
+        ))
+        assertNull(belowThreshold.mostVulnerableTimeSlotStat)
+        assertTrue(belowThreshold.hasEnoughVulnerableTimeData)
     }
 
     @Test fun necessaryUseSummaryCountsOnlyClearPurposeOutcomeExceptions() {

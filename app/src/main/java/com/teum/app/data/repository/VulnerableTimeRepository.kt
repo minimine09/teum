@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 class VulnerableTimeRepository(context: Context) {
     private val appContext = context.applicationContext
     private val sessionLogRepository = SessionLogRepository(context)
+    private val targetAppRepository = TargetAppRepository(context)
     private val userSettingsRepository = UserSettingsRepository(context)
 
     suspend fun analyzeRecentSevenDays(
@@ -28,9 +29,16 @@ class VulnerableTimeRepository(context: Context) {
             sessionLogRepository.observeSessionsSince(dateRange.startOfSevenDayPeriodMillis),
             sessionLogRepository.observeOpenEventsSince(dateRange.startOfSevenDayPeriodMillis)
         ) { sessions, openEvents ->
+            val targetPackages = targetAppRepository.getTargetPackages()
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
-                sessions = sessions,
-                openEvents = openEvents,
+                sessions = VulnerableTimePolicyDataFilter.sessions(
+                    sessions = sessions,
+                    targetPackages = targetPackages
+                ),
+                openEvents = VulnerableTimePolicyDataFilter.openEvents(
+                    openEvents = openEvents,
+                    targetPackages = targetPackages
+                ),
                 timeZone = timeZone
             )
             VulnerableTimeSelector.select(

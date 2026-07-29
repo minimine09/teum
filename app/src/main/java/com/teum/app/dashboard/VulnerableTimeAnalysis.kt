@@ -25,13 +25,11 @@ object VulnerableTimeSelector {
     fun select(
         timeSlotStats: List<TimeSlotStat>,
         analyzedAtMillis: Long,
-        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT,
-        maximumSlotCount: Int = DEFAULT_MAXIMUM_SLOT_COUNT
+        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT
     ): VulnerableTimeAnalysis {
         val rankedSlots = rankVulnerableSlots(
             timeSlotStats = timeSlotStats,
-            minimumSessionCount = minimumSessionCount,
-            maximumSlotCount = maximumSlotCount
+            minimumSessionCount = minimumSessionCount
         )
         val hasEnoughData = timeSlotStats.any { stat ->
             stat.sessionCount >= minimumSessionCount
@@ -49,29 +47,26 @@ object VulnerableTimeSelector {
 
     fun rankVulnerableSlots(
         timeSlotStats: List<TimeSlotStat>,
-        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT,
-        maximumSlotCount: Int = DEFAULT_MAXIMUM_SLOT_COUNT
+        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT
     ): List<TimeSlotStat> {
         require(minimumSessionCount > 0) {
             "minimumSessionCount must be greater than zero"
-        }
-        require(maximumSlotCount > 0) {
-            "maximumSlotCount must be greater than zero"
         }
 
         return timeSlotStats
             .filter { stat ->
                 stat.sessionCount >= minimumSessionCount &&
-                    stat.vulnerabilityScore > 0.0
+                    stat.vulnerabilityScore + SCORE_COMPARISON_EPSILON >=
+                    VULNERABILITY_SCORE_THRESHOLD
             }
             .sortedWith(
                 compareByDescending<TimeSlotStat> { it.vulnerabilityScore }
                     .thenByDescending { it.sessionCount }
                     .thenBy { it.hourSlot }
             )
-            .take(maximumSlotCount)
     }
 
     const val DEFAULT_MINIMUM_SESSION_COUNT = 2
-    const val DEFAULT_MAXIMUM_SLOT_COUNT = 2
+    const val VULNERABILITY_SCORE_THRESHOLD = 0.5
+    private const val SCORE_COMPARISON_EPSILON = 1e-9
 }
