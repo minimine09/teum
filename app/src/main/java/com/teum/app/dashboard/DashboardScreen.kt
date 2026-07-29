@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.drawable.Drawable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -36,13 +37,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -140,6 +145,11 @@ fun DashboardScreen(
 ) {
     var selectedTab by remember { mutableStateOf(DashboardTab.Home) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showAllSessionHistory by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = selectedTab == DashboardTab.Session && showAllSessionHistory) {
+        showAllSessionHistory = false
+    }
 
     LaunchedEffect(selectedPackageName, targetPackages) {
         if (selectedPackageName != null && selectedPackageName !in targetPackages) {
@@ -173,19 +183,22 @@ fun DashboardScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         bottomBar = {
-            DashboardBottomNavigation(
-                selectedTab = selectedTab,
-                onTabSelected = { tab ->
-                    if (
-                        tab == DashboardTab.Home ||
-                        tab == DashboardTab.Session ||
-                        tab == DashboardTab.Report ||
-                        tab == DashboardTab.Settings
-                    ) {
-                        selectedTab = tab
+            if (!(selectedTab == DashboardTab.Session && showAllSessionHistory)) {
+                DashboardBottomNavigation(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        if (
+                            tab == DashboardTab.Home ||
+                            tab == DashboardTab.Session ||
+                            tab == DashboardTab.Report ||
+                            tab == DashboardTab.Settings
+                        ) {
+                            selectedTab = tab
+                            showAllSessionHistory = false
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
@@ -202,14 +215,22 @@ fun DashboardScreen(
                     onRecoverPermissionsClick = onRecoverPermissionsClick
                 )
 
-                DashboardTab.Session -> SessionHistoryContent(
-                    targetPackages = targetPackages,
-                    appDisplayNames = appDisplayNames,
-                    recentSessions = sessionRecentSessions,
-                    availablePackages = availablePackages,
-                    selectedPackageName = selectedPackageName,
-                    onSelectPackage = onSelectPackage
-                )
+                DashboardTab.Session -> {
+                    if (showAllSessionHistory) {
+                        AllSessionHistoryContent(
+                            targetPackages = targetPackages,
+                            appDisplayNames = appDisplayNames,
+                            sessions = sessionRecentSessions,
+                            onBackClick = { showAllSessionHistory = false }
+                        )
+                    } else {
+                        SessionHistoryContent(
+                            appDisplayNames = appDisplayNames,
+                            recentSessions = sessionRecentSessions,
+                            onShowAllClick = { showAllSessionHistory = true }
+                        )
+                    }
+                }
 
                 DashboardTab.Report -> WeeklyReportContent(
                     stats = weeklyReportStats,
@@ -325,12 +346,9 @@ private fun PermissionRecoveryCard(
 
 @Composable
 private fun SessionHistoryContent(
-    targetPackages: Set<String>,
     appDisplayNames: Map<String, String>,
     recentSessions: List<SessionLogEntity>,
-    availablePackages: Set<String>,
-    selectedPackageName: String?,
-    onSelectPackage: (String?) -> Unit
+    onShowAllClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -342,26 +360,343 @@ private fun SessionHistoryContent(
     ) {
         DashboardHeader(
             title = "사용 기록",
-            subtitle = "앱별 사용 내역을 확인하세요"
-        )
-        AppStatisticsFilterCard(
-            packages = targetPackages,
-            selectedPackageName = selectedPackageName,
-            appDisplayNames = appDisplayNames,
-            onSelectPackage = onSelectPackage
-        )
-        SessionHistorySummaryCard(
-            recentSessions = recentSessions,
-            selectedPackageName = selectedPackageName,
-            appDisplayNames = appDisplayNames
+            subtitle = "최근 사용 내역을 확인하세요"
         )
         RecentSessionsCard(
             recentSessions = recentSessions,
             appDisplayNames = appDisplayNames,
-            maxItems = 10,
-            displayMode = RecentSessionDisplayMode.Detailed
+            maxItems = 5,
+            displayMode = RecentSessionDisplayMode.Detailed,
+            footerActionLabel = "전체 기록 보기",
+            onFooterActionClick = onShowAllClick
         )
     }
+}
+
+@Composable
+private fun AllSessionHistoryContent(
+    targetPackages: Set<String>,
+    appDisplayNames: Map<String, String>,
+    sessions: List<SessionLogEntity>,
+    onBackClick: () -> Unit
+) {
+    var selectedPackageName by rememberSaveable { mutableStateOf<String?>(null) }
+    var appliedSortOption by rememberSaveable {
+        mutableStateOf(SessionHistorySortOption.LATEST)
+    }
+    var pendingSortOption by rememberSaveable {
+        mutableStateOf(SessionHistorySortOption.LATEST)
+    }
+    var currentPage by rememberSaveable { mutableStateOf(1) }
+    var showSortSheet by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(selectedPackageName, appliedSortOption) {
+        currentPage = 1
+    }
+
+    val page = remember(
+        sessions,
+        selectedPackageName,
+        appliedSortOption,
+        currentPage
+    ) {
+        SessionHistoryOrganizer.organize(
+            sessions = sessions,
+            selectedPackageName = selectedPackageName,
+            sortOption = appliedSortOption,
+            requestedPage = currentPage
+        )
+    }
+
+    LaunchedEffect(page.page) {
+        currentPage = page.page
+    }
+
+    if (showSortSheet) {
+        SessionHistorySortBottomSheet(
+            selectedOption = pendingSortOption,
+            onOptionSelected = { pendingSortOption = it },
+            onApply = {
+                appliedSortOption = pendingSortOption
+                showSortSheet = false
+            },
+            onCancel = {
+                pendingSortOption = appliedSortOption
+                showSortSheet = false
+            }
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(top = 34.dp, bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        SessionHistoryBackHeader(onBackClick = onBackClick)
+        SessionHistoryFilterBar(
+            packages = targetPackages,
+            appDisplayNames = appDisplayNames,
+            selectedPackageName = selectedPackageName,
+            onPackageSelected = {
+                selectedPackageName = it
+            },
+            onSortClick = {
+                pendingSortOption = appliedSortOption
+                showSortSheet = true
+            }
+        )
+        RecentSessionsCard(
+            recentSessions = page.sessions,
+            appDisplayNames = appDisplayNames,
+            maxItems = 10,
+            displayMode = RecentSessionDisplayMode.Detailed,
+            title = "전체 기록",
+            emptyMessage = "조건에 맞는 사용 기록이 없습니다."
+        )
+        if (page.pageCount > 1) {
+            SessionHistoryPagination(
+                currentPage = page.page,
+                pageCount = page.pageCount,
+                onPageSelected = { currentPage = it }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionHistoryBackHeader(
+    onBackClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(42.dp)
+                .clickable(onClick = onBackClick),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "‹",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 34.sp,
+                    lineHeight = 34.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "전체 기록",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "앱과 정렬 기준을 선택해 기록을 찾아보세요",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionHistoryFilterBar(
+    packages: Set<String>,
+    appDisplayNames: Map<String, String>,
+    selectedPackageName: String?,
+    onPackageSelected: (String?) -> Unit,
+    onSortClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(48.dp)
+                .clickable(onClick = onSortClick),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, DashboardBorder)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "⇅",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        FilterChip(
+            selected = selectedPackageName == null,
+            onClick = { onPackageSelected(null) },
+            label = { Text("기본값") }
+        )
+        packages
+            .sortedBy { appDisplayNames[it] ?: it }
+            .forEach { packageName ->
+                FilterChip(
+                    selected = selectedPackageName == packageName,
+                    onClick = { onPackageSelected(packageName) },
+                    label = {
+                        Text(
+                            text = appDisplayNames[packageName] ?: packageName,
+                            maxLines = 1
+                        )
+                    }
+                )
+            }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SessionHistorySortBottomSheet(
+    selectedOption: SessionHistorySortOption,
+    onOptionSelected: (SessionHistorySortOption) -> Unit,
+    onApply: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onCancel,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "정렬",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            SessionHistorySortOption.entries.forEach { option ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOptionSelected(option) }
+                        .padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = selectedOption == option,
+                        onClick = { onOptionSelected(option) }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = sessionHistorySortLabel(option),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = DashboardBorder
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onApply,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        text = "적용",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text("취소")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionHistoryPagination(
+    currentPage: Int,
+    pageCount: Int,
+    onPageSelected: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        (1..pageCount).forEach { page ->
+            val selected = page == currentPage
+            Surface(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(38.dp)
+                    .clickable { onPageSelected(page) },
+                shape = CircleShape,
+                color = if (selected) {
+                    Color.White
+                } else {
+                    DashboardPill
+                },
+                border = if (selected) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = page.toString(),
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun sessionHistorySortLabel(option: SessionHistorySortOption): String = when (option) {
+    SessionHistorySortOption.LATEST -> "최신순"
+    SessionHistorySortOption.USAGE_ASCENDING -> "사용시간 적은순"
+    SessionHistorySortOption.USAGE_DESCENDING -> "사용시간 많은순"
+    SessionHistorySortOption.EXTENSION_ASCENDING -> "연장횟수 적은순"
+    SessionHistorySortOption.EXTENSION_DESCENDING -> "연장횟수 많은순"
 }
 
 @Composable
@@ -853,7 +1188,11 @@ private fun RecentSessionsCard(
     recentSessions: List<SessionLogEntity>,
     appDisplayNames: Map<String, String>,
     maxItems: Int,
-    displayMode: RecentSessionDisplayMode
+    displayMode: RecentSessionDisplayMode,
+    title: String = "최근 사용",
+    emptyMessage: String = "최근 7일 기록이 없습니다.",
+    footerActionLabel: String? = null,
+    onFooterActionClick: (() -> Unit)? = null
 ) {
     val displayedSessions = recentSessions.take(maxItems)
 
@@ -873,7 +1212,7 @@ private fun RecentSessionsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "최근 사용",
+                    text = title,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
@@ -889,7 +1228,7 @@ private fun RecentSessionsCard(
             }
             if (recentSessions.isEmpty()) {
                 Text(
-                    text = "최근 7일 기록이 없습니다.",
+                    text = emptyMessage,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -903,6 +1242,21 @@ private fun RecentSessionsCard(
                             ?: session.packageName,
                         displayMode = displayMode
                     )
+                }
+                if (footerActionLabel != null && onFooterActionClick != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onFooterActionClick) {
+                            Text(
+                                text = footerActionLabel,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

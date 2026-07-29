@@ -26,6 +26,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val targetAppRepository = TargetAppRepository(application)
     private val selectedPackageName = MutableStateFlow<String?>(null)
 
+    val sessionHistorySessions: StateFlow<List<SessionLogEntity>> =
+        repository.observeRecentSessions(Int.MAX_VALUE)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000L),
+                initialValue = emptyList()
+            )
+
     private val dateRange = flow {
         while (currentCoroutineContext().isActive) {
             val range = DashboardDateRangeCalculator.calculate()

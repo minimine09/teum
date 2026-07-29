@@ -103,9 +103,11 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(userSettingsRepository.getInterventionMode())
                 }
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
+                val sessionHistorySessions by dashboardViewModel.sessionHistorySessions.collectAsState()
                 val displayedPackages = targetPackages +
                     dashboardUiState.availablePackages +
-                    dashboardUiState.recentSessions.map { it.packageName }
+                    dashboardUiState.recentSessions.map { it.packageName } +
+                    sessionHistorySessions.map { it.packageName }
                 val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
 
                 LaunchedEffect(permissionStatus, launchFlowStep) {
@@ -185,7 +187,7 @@ class MainActivity : ComponentActivity() {
                             appDisplayNames = appDisplayNames,
                             dashboardStats = dashboardUiState.dashboardStats,
                             recentSessions = dashboardUiState.recentSessions,
-                            sessionRecentSessions = dashboardUiState.sessionRecentSessions,
+                            sessionRecentSessions = sessionHistorySessions,
                             timeSlotStats = dashboardUiState.timeSlotStats,
                             weeklyReportStats = dashboardUiState.weeklyReportStats,
                             availablePackages = dashboardUiState.availablePackages,
