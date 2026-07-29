@@ -336,6 +336,7 @@ class OverlayController(context: Context) {
                 TeumTheme {
                     if (mode == IntentCheckMode.FAST_REOPEN) {
                         ReopenCheckScreen(
+                            packageName = packageName,
                             appName = displayNameForPackage(packageName),
                             reopenGapMillis = reopenGapMillis,
                             interventionActive = interventionActive,
@@ -349,6 +350,7 @@ class OverlayController(context: Context) {
                         )
                     } else {
                         IntentCheckScreen(
+                            packageName = packageName,
                             appName = displayNameForPackage(packageName),
                             interventionActive = interventionActive,
                             selectedIntent = selectedIntentChoice,
