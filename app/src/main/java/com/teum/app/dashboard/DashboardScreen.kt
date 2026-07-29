@@ -214,7 +214,6 @@ fun DashboardScreen(
                     forceVulnerableNowForDebug = forceVulnerableNowForDebug,
                     onForceVulnerableNowForDebugChange = onForceVulnerableNowForDebugChange,
                     permissionStatus = permissionStatus,
-                    onPermissionSettingsClick = onRecoverPermissionsClick,
                     onManageTargetAppsClick = { selectedTab = DashboardTab.TargetApps },
                     onDeleteAllClick = { showDeleteConfirmation = true },
                     showBottomNav = false
@@ -379,8 +378,8 @@ private fun WeeklyReportContent(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         DashboardHeader(
-            title = "이번 주 리포트",
-            subtitle = "이번 주 사용 패턴을 정리했어요"
+            title = "최근 7일 리포트",
+            subtitle = "최근 7일 사용 패턴을 정리했어요"
         )
         ReportVulnerableTimeCard(stats)
         WeeklyReportCharts(
@@ -396,7 +395,7 @@ private fun WeeklyReportContent(
         ReportMetricCard(
             title = "총 사용 시간",
             value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
-            description = "이번 주 관리 앱을 사용한 시간",
+            description = "최근 7일 관리 앱을 사용한 시간",
             color = DashboardWarning
         )
         ReportMetricCard(
@@ -562,13 +561,6 @@ private fun HomeMainStatCard(stats: DashboardStats) {
                     color = Color.White,
                     fontSize = 36.sp,
                     lineHeight = 44.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = "오늘 ${stats.todaySessionCount}회 중",
-                    color = DashboardSuccess,
-                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -817,7 +809,7 @@ private fun RecentSessionsCard(
             }
             if (recentSessions.isEmpty()) {
                 Text(
-                    text = "아직 저장된 사용 기록이 없습니다.",
+                    text = "최근 7일 기록이 없습니다.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
