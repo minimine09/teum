@@ -37,18 +37,24 @@ class VulnerableTimeSelectorTest {
 
     @Test
     fun selectsAtMostTwoHighestScoringAnalyzableSlots() {
+        val stats = listOf(
+            stat(hourSlot = 9, sessionCount = 4, vulnerabilityScore = 0.30),
+            stat(hourSlot = 18, sessionCount = 2, vulnerabilityScore = 0.80),
+            stat(hourSlot = 22, sessionCount = 3, vulnerabilityScore = 0.80),
+            stat(hourSlot = 23, sessionCount = 1, vulnerabilityScore = 1.0)
+        )
         val analysis = VulnerableTimeSelector.select(
-            timeSlotStats = listOf(
-                stat(hourSlot = 9, sessionCount = 4, vulnerabilityScore = 0.30),
-                stat(hourSlot = 18, sessionCount = 2, vulnerabilityScore = 0.80),
-                stat(hourSlot = 22, sessionCount = 3, vulnerabilityScore = 0.80),
-                stat(hourSlot = 23, sessionCount = 1, vulnerabilityScore = 1.0)
-            ),
+            timeSlotStats = stats,
             analyzedAtMillis = 100L
         )
+        val reportTopSlot = VulnerableTimeSelector.rankVulnerableSlots(
+            timeSlotStats = stats,
+            maximumSlotCount = 1
+        ).single()
 
         assertTrue(analysis.hasEnoughData)
         assertEquals(linkedSetOf(22, 18), analysis.vulnerableHourSlots)
+        assertEquals(analysis.vulnerableHourSlots.first(), reportTopSlot.hourSlot)
     }
 
     @Test

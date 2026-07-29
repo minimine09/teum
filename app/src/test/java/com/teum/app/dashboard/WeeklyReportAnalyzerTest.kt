@@ -58,11 +58,34 @@ class WeeklyReportAnalyzerTest {
         assertEquals(1, report.closedAfterInterventionCount)
     }
 
-    @Test fun vulnerableHourUsesScoreThenSessionCount() {
-        val scoreWinner = report(listOf(session(Calendar.WEDNESDAY,8,overrun=true), session(Calendar.WEDNESDAY,20)))
-        assertEquals(8, scoreWinner.mostVulnerableHourSlot)
-        val countWinner = report(listOf(session(Calendar.WEDNESDAY,8),session(Calendar.WEDNESDAY,20),session(Calendar.THURSDAY,20)))
-        assertEquals(20, countWinner.mostVulnerableHourSlot)
+    @Test fun vulnerableHourUsesPolicyEligibilityAndKeepsSelectedSlotMetrics() {
+        val report = report(listOf(
+            session(Calendar.WEDNESDAY, 8, overrun = true),
+            session(Calendar.WEDNESDAY, 20, overrun = true, fast = true),
+            session(Calendar.THURSDAY, 20)
+        ))
+
+        assertEquals(20, report.mostVulnerableHourSlot)
+        val selectedSlot = requireNotNull(report.mostVulnerableTimeSlotStat)
+        assertEquals(0.5, selectedSlot.overrunRate, 0.0)
+        assertEquals(1, selectedSlot.fastReopenCount)
+    }
+
+    @Test fun vulnerableHourRequiresTwoSessionsAndPositiveScore() {
+        val oneSession = report(listOf(
+            session(Calendar.WEDNESDAY, 8, overrun = true)
+        ))
+        assertNull(oneSession.mostVulnerableHourSlot)
+        assertNull(oneSession.mostVulnerableTimeSlotStat)
+        assertFalse(oneSession.hasEnoughVulnerableTimeData)
+
+        val noRisk = report(listOf(
+            session(Calendar.WEDNESDAY, 9),
+            session(Calendar.THURSDAY, 9)
+        ))
+        assertNull(noRisk.mostVulnerableHourSlot)
+        assertNull(noRisk.mostVulnerableTimeSlotStat)
+        assertTrue(noRisk.hasEnoughVulnerableTimeData)
     }
 
     @Test fun necessaryUseSummaryCountsOnlyClearPurposeOutcomeExceptions() {

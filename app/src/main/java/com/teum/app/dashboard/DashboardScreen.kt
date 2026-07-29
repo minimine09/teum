@@ -1047,8 +1047,8 @@ private fun RecentSessionIntentText(
 
 @Composable
 private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
-    val hourSlot = stats.mostVulnerableHourSlot
-    val timeRange = hourSlot?.let(::formatHourRange)
+    val timeSlotStat = stats.mostVulnerableTimeSlotStat
+    val timeRange = timeSlotStat?.hourSlot?.let(VulnerableTimeDisplayText::hourRange)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1066,9 +1066,13 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (timeRange == null) {
+            if (timeSlotStat == null || timeRange == null) {
                 Text(
-                    text = "아직 분석할 기록이 부족해요",
+                    text = if (stats.hasEnoughVulnerableTimeData) {
+                        "뚜렷한 취약 시간대가 없어요"
+                    } else {
+                        "아직 분석할 기록이 부족해요"
+                    },
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 22.sp,
                     lineHeight = 28.sp,
@@ -1093,7 +1097,8 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "초과율 ${formatPercent(stats.overrunRate)} · 빠른 재진입 ${stats.fastReopenCount}회",
+                    text = "초과율 ${formatPercent(timeSlotStat.overrunRate)} · " +
+                        "빠른 재진입 ${timeSlotStat.fastReopenCount}회",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     lineHeight = 17.sp
@@ -1884,12 +1889,6 @@ private fun formatScore(score: Double): String {
     return String.format("%.2f", score)
 }
 
-private fun formatHourRange(hourSlot: Int): String {
-    val start = hourSlot.mod(24).toString().padStart(2, '0')
-    val end = (hourSlot + 2).mod(24).toString().padStart(2, '0')
-    return "$start:00 - $end:00"
-}
-
 private fun lowDataSuffix(stat: TimeSlotStat): String {
     return if (stat.hasLowData) {
         " / 데이터 적음"
@@ -1927,7 +1926,23 @@ private fun DashboardScreenPreview() {
                 purposeDriftRate = 0.31,
                 closedAfterInterventionCount = 12,
                 averageReopenGapMillis = 124_000L,
-                mostVulnerableHourSlot = 23,
+                mostVulnerableTimeSlotStat = TimeSlotStat(
+                    hourSlot = 23,
+                    openCount = 4,
+                    sessionCount = 4,
+                    overrunCount = 3,
+                    extensionCount = 1,
+                    fastReopenCount = 2,
+                    purposeDriftCount = 1,
+                    purposeOutcomeResponseCount = 3,
+                    overrunRate = 0.75,
+                    fastReopenRate = 0.5,
+                    extensionScore = 0.25,
+                    openScore = 0.8,
+                    purposeDriftRate = 1.0 / 3.0,
+                    vulnerabilityScore = 0.5875
+                ),
+                hasEnoughVulnerableTimeData = true,
                 dailyOverrunStats = listOf(
                     DailyOverrunStat(1, "월", 3, 2),
                     DailyOverrunStat(2, "화", 2, 1),

@@ -26,13 +26,10 @@ object WeeklyReportAnalyzer {
             session.outcomeType == NECESSARY_USE
         }
         val totalReopenGapMillis = reopenLogs.sumOf { it.gapTimeMillis }
-        val mostVulnerableHourSlot = timeSlotStats
-            .filter { it.sessionCount > 0 }
-            .maxWithOrNull(
-                compareBy<TimeSlotStat> { it.vulnerabilityScore }
-                    .thenBy { it.sessionCount }
-            )
-            ?.hourSlot
+        val mostVulnerableTimeSlotStat = VulnerableTimeSelector.rankVulnerableSlots(
+            timeSlotStats = timeSlotStats,
+            maximumSlotCount = 1
+        ).firstOrNull()
 
         return WeeklyReportStats(
             totalSessionCount = totalSessionCount,
@@ -52,7 +49,10 @@ object WeeklyReportAnalyzer {
             } else {
                 totalReopenGapMillis / totalSessionCount
             },
-            mostVulnerableHourSlot = mostVulnerableHourSlot,
+            mostVulnerableTimeSlotStat = mostVulnerableTimeSlotStat,
+            hasEnoughVulnerableTimeData = timeSlotStats.any { stat ->
+                stat.sessionCount >= VulnerableTimeSelector.DEFAULT_MINIMUM_SESSION_COUNT
+            },
             cautionModeSessionCount = sessions.count {
                 it.modeAtStart == InterventionMode.INTERVENTION.name
             },

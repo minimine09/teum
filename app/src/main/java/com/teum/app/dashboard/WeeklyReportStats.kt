@@ -28,10 +28,14 @@ data class WeeklyReportStats(
     val necessaryUseExcessMillis: Long = 0L,
     val closedAfterInterventionCount: Int = 0,
     val averageReopenGapMillis: Long? = null,
-    val mostVulnerableHourSlot: Int? = null,
+    val mostVulnerableTimeSlotStat: TimeSlotStat? = null,
+    val hasEnoughVulnerableTimeData: Boolean = false,
     val cautionModeSessionCount: Int = 0,
     val vulnerableTimeSessionCount: Int = 0,
     val interventionAppliedSessionCount: Int = 0,
     val dailyOverrunStats: List<DailyOverrunStat> = emptyList(),
     val appUsageStats: List<AppUsageStat> = emptyList()
-)
+) {
+    val mostVulnerableHourSlot: Int?
+        get() = mostVulnerableTimeSlotStat?.hourSlot
+}
