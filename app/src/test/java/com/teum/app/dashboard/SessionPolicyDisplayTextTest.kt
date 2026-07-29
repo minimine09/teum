@@ -8,12 +8,24 @@ import org.junit.Test
 
 class SessionPolicyDisplayTextTest {
     @Test
-    fun appliedPolicyTakesPriority() {
+    fun legacyAppliedAtStartStillShowsAppliedPolicy() {
         assertEquals(
             "조심 모드 적용",
             SessionPolicyDisplayText.status(
                 modeAtStart = InterventionMode.INTERVENTION.name,
                 interventionAppliedAtStart = true
+            )
+        )
+    }
+
+    @Test
+    fun everAppliedPolicyTakesPriorityOverStartSnapshot() {
+        assertEquals(
+            "조심 모드 적용",
+            SessionPolicyDisplayText.status(
+                modeAtStart = InterventionMode.NORMAL.name,
+                interventionAppliedAtStart = false,
+                interventionEverApplied = true
             )
         )
     }
