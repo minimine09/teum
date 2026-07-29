@@ -26,20 +26,30 @@ class VulnerableTimeRepository(context: Context) {
             timeZone = timeZone
         )
         return combine(
-            sessionLogRepository.observeSessionsSince(dateRange.startOfSevenDayPeriodMillis),
-            sessionLogRepository.observeOpenEventsSince(dateRange.startOfSevenDayPeriodMillis)
-        ) { sessions, openEvents ->
+            sessionLogRepository.observeSessionsOverlappingPeriod(
+                sinceMillis = dateRange.startOfSevenDayPeriodMillis,
+                untilMillis = dateRange.startOfTomorrowMillis
+            ),
+            sessionLogRepository.observeOpenEventsSince(dateRange.startOfSevenDayPeriodMillis),
+            sessionLogRepository.observeExtensionEventsSince(
+                dateRange.startOfSevenDayPeriodMillis
+            )
+        ) { sessions, openEvents, extensionEvents ->
             val targetPackages = targetAppRepository.getTargetPackages()
+            val policySessions = VulnerableTimePolicyDataFilter.sessions(
+                sessions = sessions,
+                targetPackages = targetPackages
+            )
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
-                sessions = VulnerableTimePolicyDataFilter.sessions(
-                    sessions = sessions,
-                    targetPackages = targetPackages
-                ),
+                sessions = policySessions,
                 openEvents = VulnerableTimePolicyDataFilter.openEvents(
                     openEvents = openEvents,
                     targetPackages = targetPackages
                 ),
-                timeZone = timeZone
+                extensionEvents = extensionEvents,
+                timeZone = timeZone,
+                analysisStartMillis = dateRange.startOfSevenDayPeriodMillis,
+                analysisEndMillis = dateRange.startOfTomorrowMillis
             )
             VulnerableTimeSelector.select(
                 timeSlotStats = timeSlotStats,

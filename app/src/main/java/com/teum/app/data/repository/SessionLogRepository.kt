@@ -262,6 +262,16 @@ class SessionLogRepository(context: Context) {
         return sessionLogDao.observeSessionsSince(sinceMillis)
     }
 
+    fun observeSessionsOverlappingPeriod(
+        sinceMillis: Long,
+        untilMillis: Long
+    ): Flow<List<SessionLogEntity>> {
+        return sessionLogDao.observeSessionsOverlappingPeriod(
+            sinceMillis = sinceMillis,
+            untilMillis = untilMillis
+        )
+    }
+
     fun observeOpenEventsSince(sinceMillis: Long): Flow<List<AppOpenEventEntity>> {
         return appOpenEventDao.observeOpenEventsSince(sinceMillis)
     }

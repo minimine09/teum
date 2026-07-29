@@ -33,6 +33,20 @@ interface SessionLogDao {
         """
         SELECT *
         FROM session_logs
+        WHERE startedAtMillis < :untilMillis
+            AND endedAtMillis > :sinceMillis
+        ORDER BY startedAtMillis DESC
+        """
+    )
+    fun observeSessionsOverlappingPeriod(
+        sinceMillis: Long,
+        untilMillis: Long
+    ): Flow<List<SessionLogEntity>>
+
+    @Query(
+        """
+        SELECT *
+        FROM session_logs
         WHERE packageName = :packageName
             AND endedAtMillis <= :beforeMillis
         ORDER BY endedAtMillis DESC
