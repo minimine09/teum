@@ -18,6 +18,14 @@ object DashboardDataFilter {
         openEvents.filter { it.packageName == selected }
     } ?: openEvents
 
+    fun recentSessions(
+        allSessions: List<SessionLogEntity>,
+        selectedPackageName: String?,
+        limit: Int = 10
+    ): List<SessionLogEntity> = sessions(allSessions, selectedPackageName)
+        .sortedByDescending { it.endedAtMillis }
+        .take(limit)
+
     fun todayStats(
         sessions: List<SessionLogEntity>,
         startOfTodayMillis: Long

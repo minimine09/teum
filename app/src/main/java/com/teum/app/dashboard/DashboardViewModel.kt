@@ -42,25 +42,33 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             repository.observeOpenEventsSince(range.startOfSevenDayPeriodMillis),
             repository.observeReopenLogsSince(
                 sinceMillis = range.startOfSevenDayPeriodMillis,
-                packageName = selectedPackage
+                packageName = null
             )
         ) { allSessions, allOpenEvents, reopenLogs ->
-            val sessions = DashboardDataFilter.sessions(allSessions, selectedPackage)
-            val openEvents = DashboardDataFilter.openEvents(allOpenEvents, selectedPackage)
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
-                sessions = sessions,
-                openEvents = openEvents
+                sessions = allSessions,
+                openEvents = allOpenEvents
             )
 
             DashboardUiState(
-                dashboardStats = DashboardDataFilter.todayStats(sessions, range.startOfTodayMillis),
-                recentSessions = sessions.sortedByDescending { it.endedAtMillis }.take(10),
+                dashboardStats = DashboardDataFilter.todayStats(
+                    allSessions,
+                    range.startOfTodayMillis
+                ),
+                recentSessions = DashboardDataFilter.recentSessions(
+                    allSessions = allSessions,
+                    selectedPackageName = null
+                ),
+                sessionRecentSessions = DashboardDataFilter.recentSessions(
+                    allSessions = allSessions,
+                    selectedPackageName = selectedPackage
+                ),
                 timeSlotStats = timeSlotStats,
                 weeklyReportStats = WeeklyReportAnalyzer.calculate(
-                    sessions = sessions,
+                    sessions = allSessions,
                     timeSlotStats = timeSlotStats,
                     reopenLogs = reopenLogs,
-                    openEvents = openEvents
+                    openEvents = allOpenEvents
                 ),
                 availablePackages = (allSessions.map { it.packageName } +
                     allOpenEvents.map { it.packageName }).toSet(),

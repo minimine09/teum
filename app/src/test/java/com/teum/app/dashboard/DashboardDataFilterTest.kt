@@ -81,6 +81,26 @@ class DashboardDataFilterTest {
         assertEquals(2, stats.todayPurposeKeptCount)
     }
 
+    @Test
+    fun recentSessionsFiltersBeforeApplyingLimit() {
+        val sessions = (1L..11L).map { index ->
+            session("instagram", startedAt = 100L + index)
+        } + session("youtube", startedAt = 1L)
+
+        val homeSessions = DashboardDataFilter.recentSessions(
+            allSessions = sessions,
+            selectedPackageName = null
+        )
+        val youtubeSessions = DashboardDataFilter.recentSessions(
+            allSessions = sessions,
+            selectedPackageName = "youtube"
+        )
+
+        assertEquals(10, homeSessions.size)
+        assertEquals(setOf("instagram"), homeSessions.map { it.packageName }.toSet())
+        assertEquals(listOf("youtube"), youtubeSessions.map { it.packageName })
+    }
+
     private fun open(packageName: String) = AppOpenEventEntity(
         packageName = packageName,
         detectedAtMillis = 100
