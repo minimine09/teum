@@ -249,14 +249,14 @@ fun SessionBrakeContent(
         AlertBubble(symbol = "!", size = 90, color = accentColor)
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "예상 시간을 초과했어요",
+            text = "목표 시간에 도달했어요",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "설정한 사용 시간을 넘겼어요.",
+            text = "처음 정한 시간만큼 사용했어요. 지금 이어갈지 멈출지 확인해볼까요?",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
             textAlign = TextAlign.Center
@@ -1080,7 +1080,7 @@ private fun buildSessionBrakeSummary(
 
     val base = "감지된 앱: $appName\n사용 시간: ${formatDurationMillis(elapsedMillis)} / 목표 시간: ${formatDurationMillis(targetDurationMillis)}"
     return if (overrunMillis != null && overrunMillis > 0L) {
-        "$base\n초과 시간: ${formatDurationMillis(overrunMillis)}"
+        "$base\n점검까지 지난 시간: ${formatDurationMillis(overrunMillis)}"
     } else {
         base
     }

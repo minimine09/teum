@@ -778,10 +778,19 @@ class TeumAccessibilityService : AccessibilityService() {
         endedSession: AppSession,
         source: String
     ) {
+        val durationMillis = getSessionDurationMillis(endedSession)
+        val interventionVisibleMillis = endedSession.interventionVisibleMillis.coerceAtLeast(0L)
+        val effectiveUsageMillis =
+            (durationMillis - interventionVisibleMillis).coerceAtLeast(0L)
+        TeumLogger.session(
+            debugSessionId = endedSession.debugSessionId,
+            event = "OUTCOME_USAGE_DISPLAY",
+            detail = "duration=$durationMillis intervention=$interventionVisibleMillis effective=$effectiveUsageMillis"
+        )
         overlayController.showOutcomeCheck(
             packageName = endedSession.packageName,
             debugSessionId = endedSession.debugSessionId,
-            durationMillis = getSessionDurationMillis(endedSession),
+            durationMillis = effectiveUsageMillis,
             intentChoice = endedSession.intentChoice,
             targetDurationMillis = endedSession.targetDurationMillis +
                 endedSession.totalExtensionDurationMillis,
