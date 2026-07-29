@@ -173,19 +173,21 @@ fun DashboardScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         bottomBar = {
-            DashboardBottomNavigation(
-                selectedTab = selectedTab,
-                onTabSelected = { tab ->
-                    if (
-                        tab == DashboardTab.Home ||
-                        tab == DashboardTab.Session ||
-                        tab == DashboardTab.Report ||
-                        tab == DashboardTab.Settings
-                    ) {
-                        selectedTab = tab
+            if (selectedTab != DashboardTab.TargetApps) {
+                DashboardBottomNavigation(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        if (
+                            tab == DashboardTab.Home ||
+                            tab == DashboardTab.Session ||
+                            tab == DashboardTab.Report ||
+                            tab == DashboardTab.Settings
+                        ) {
+                            selectedTab = tab
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
@@ -231,7 +233,8 @@ fun DashboardScreen(
                 DashboardTab.TargetApps -> TargetAppSelectionScreen(
                     initialSelectedPackages = targetPackages,
                     installedApps = installedApps,
-                    compactForBottomNav = true,
+                    compactForBottomNav = false,
+                    onBackClick = { selectedTab = DashboardTab.Settings },
                     onCompleteClick = { results ->
                         results.forEach { result ->
                             if (result.enabled) {

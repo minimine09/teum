@@ -3,6 +3,7 @@ package com.teum.app.ui.target
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -63,6 +65,7 @@ fun TargetAppSelectionScreen(
     initialSelectedPackages: Set<String>? = null,
     installedApps: List<TargetAppInstalledApp> = emptyList(),
     compactForBottomNav: Boolean = false,
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -91,7 +94,9 @@ fun TargetAppSelectionScreen(
     }
     val addedItems = remember { mutableStateListOf<TargetAppUi>() }
     val appItems = remember(selectedItems, recommendedItems, addedItems.toList()) {
-        (selectedItems + recommendedItems + addedItems).distinctBy { it.packageName }
+        (selectedItems + recommendedItems + addedItems)
+            .distinctBy { it.packageName }
+            .sortedBy { it.name.lowercase() }
     }
     val checkedStates = remember(initialSelectedPackages, installedApps) {
         mutableStateMapOf<String, Boolean>().apply {
@@ -110,6 +115,10 @@ fun TargetAppSelectionScreen(
     val selectedCount = checkedStates.values.count { it }
     val topPadding = if (compactForBottomNav) 36.dp else 50.dp
     val bottomPadding = if (compactForBottomNav) 24.dp else 82.dp
+
+    if (onBackClick != null) {
+        BackHandler(onBack = onBackClick)
+    }
 
     if (isPickerOpen) {
         InstalledAppPickerScreen(
@@ -144,12 +153,27 @@ fun TargetAppSelectionScreen(
                 .padding(horizontal = 24.dp)
                 .padding(top = topPadding, bottom = bottomPadding)
         ) {
-            Text(
-                text = "관리 앱 선택",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "관리 앱 선택",
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (onBackClick != null) {
+                    TextButton(onClick = onBackClick) {
+                        Text(
+                            text = "닫기",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "선택한 앱과 추천 앱만 보여드려요 · ${selectedCount}개 선택됨",
@@ -253,7 +277,7 @@ private fun TargetAppRow(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = item.name,
@@ -261,14 +285,6 @@ private fun TargetAppRow(
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = item.description,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -322,6 +338,8 @@ private fun InstalledAppPickerScreen(
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
+    BackHandler(onBack = onBackClick)
+
     val filteredApps = remember(installedApps, query) {
         val normalizedQuery = query.trim()
         installedApps
@@ -433,7 +451,7 @@ private fun InstalledAppRow(
             Spacer(modifier = Modifier.size(14.dp))
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = app.appName,
@@ -441,14 +459,6 @@ private fun InstalledAppRow(
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = app.packageName,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -516,7 +526,6 @@ private data class TargetAppUi(
     val packageName: String,
     val initial: String,
     val name: String,
-    val description: String,
     val initiallyChecked: Boolean,
     val iconColor: Color,
     val iconContainerColor: Color,
@@ -529,7 +538,6 @@ private data class TargetAppUi(
                 packageName = packageName,
                 initial = packageName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                 name = packageName,
-                description = "설치되지 않음",
                 initiallyChecked = true,
                 iconColor = mutedColor,
                 iconContainerColor = NeutralTint,
@@ -561,7 +569,6 @@ private fun TargetAppInstalledApp.toTargetAppUi(
         packageName = packageName,
         initial = appName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
         name = appName,
-        description = descriptionForPackage(packageName, recommended),
         initiallyChecked = false,
         iconColor = tint.iconColor ?: if (recommended) primaryColor else mutedColor,
         iconContainerColor = tint.containerColor,
@@ -589,22 +596,6 @@ private val recommendedPackageNames = listOf(
     "com.google.android.apps.youtube.music",
     "com.reddit.frontpage"
 )
-
-private fun descriptionForPackage(packageName: String, recommended: Boolean): String = when (packageName) {
-    "com.google.android.youtube" -> "Shorts 포함 영상 앱"
-    "com.instagram.android" -> "릴스 · 피드 · DM"
-    "com.zhiliaoapp.musically" -> "추천 피드가 길어지기 쉬운 앱"
-    "com.twitter.android" -> "피드 · 알림 확인"
-    "com.android.chrome",
-    "com.sec.android.app.sbrowser",
-    "org.mozilla.firefox",
-    "com.brave.browser",
-    "com.naver.whale" -> "검색 · 뉴스 · 커뮤니티"
-    "com.netflix.mediaclient",
-    "com.google.android.apps.youtube.music",
-    "com.reddit.frontpage" -> "콘텐츠 사용 앱"
-    else -> if (recommended) "추천 앱" else packageName
-}
 
 private fun tintForPackage(packageName: String): TargetTint = when (packageName) {
     "com.google.android.youtube",
