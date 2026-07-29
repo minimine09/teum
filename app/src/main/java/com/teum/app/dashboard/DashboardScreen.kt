@@ -1567,7 +1567,7 @@ private fun WeeklyReportReviewSection(
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
-                text = "이번 주 사용 돌아보기",
+                text = "최근 7일 사용 돌아보기",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
@@ -1719,7 +1719,7 @@ private fun ReportDetailToggleButton(
 private fun ReportDetailMetricsCard(stats: WeeklyReportStats) {
     val metrics = listOf(
         ReportDetailMetricUi(
-            label = "이번 주 사용 시간",
+            label = "최근 7일 사용 시간",
             value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
             description = "최근 7일 동안 관리 앱을 사용한 시간"
         ),
