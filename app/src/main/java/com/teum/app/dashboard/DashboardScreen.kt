@@ -673,7 +673,9 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
     val scoreByHour = displayHours.associateWith { hour ->
         timeSlotStats.firstOrNull { it.hourSlot == hour }?.vulnerabilityScore ?: 0.0
     }
-    val highlightedHour = scoreByHour.maxByOrNull { it.value }?.takeIf { it.value > 0.0 }?.key
+    val highlightedHour = VulnerableTimeSelector.rankVulnerableSlots(timeSlotStats)
+        .firstOrNull { stat -> stat.hourSlot in displayHours }
+        ?.hourSlot
         ?: displayHours.last()
     val maxScore = scoreByHour.values.maxOrNull()?.takeIf { it > 0.0 } ?: 1.0
 
@@ -718,12 +720,7 @@ private fun HomeWeakTimeCard(timeSlotStats: List<TimeSlotStat>) {
 @Composable
 private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
     val activeStats = timeSlotStats.filter { it.openCount > 0 || it.sessionCount > 0 }
-    val topStats = activeStats
-        .sortedWith(
-            compareByDescending<TimeSlotStat> { it.vulnerabilityScore }
-                .thenByDescending { it.openCount }
-        )
-        .take(3)
+    val topStats = VulnerableTimeSelector.rankVulnerableSlots(timeSlotStats).take(3)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -759,7 +756,7 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
             )
             topStats.forEach { stat ->
                 DetailLine(
-                    text = "${stat.hourSlot}시: 점수 ${formatScore(stat.vulnerabilityScore)} / 초과율 ${formatPercent(stat.overrunRate)} / 빠른 재진입 ${stat.fastReopenCount}회${lowDataSuffix(stat)}"
+                    text = "${stat.hourSlot}시: 초과율 ${formatPercent(stat.overrunRate)} / 빠른 재진입 ${stat.fastReopenCount}회${lowDataSuffix(stat)}"
                 )
             }
 
@@ -772,7 +769,7 @@ private fun VulnerabilityPatternDetailCard(timeSlotStats: List<TimeSlotStat>) {
             )
             activeStats.sortedBy { it.hourSlot }.forEach { stat ->
                 DetailLine(
-                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 빠른 재진입 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회 / 점수 ${formatScore(stat.vulnerabilityScore)}${lowDataSuffix(stat)}"
+                    text = "${stat.hourSlot}시: 실행 ${stat.openCount}회 / 초과율 ${formatPercent(stat.overrunRate)} / 연장 ${stat.extensionCount}회 / 빠른 재진입 ${stat.fastReopenCount}회 / 목적 이탈 ${stat.purposeDriftCount}회${lowDataSuffix(stat)}"
                 )
             }
         }
@@ -1047,8 +1044,8 @@ private fun RecentSessionIntentText(
 
 @Composable
 private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
-    val hourSlot = stats.mostVulnerableHourSlot
-    val timeRange = hourSlot?.let(::formatHourRange)
+    val timeSlotStat = stats.mostVulnerableTimeSlotStat
+    val timeRange = timeSlotStat?.hourSlot?.let(VulnerableTimeDisplayText::hourRange)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1066,9 +1063,13 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (timeRange == null) {
+            if (timeSlotStat == null || timeRange == null) {
                 Text(
-                    text = "아직 분석할 기록이 부족해요",
+                    text = if (stats.hasEnoughVulnerableTimeData) {
+                        "뚜렷한 취약 시간대가 없어요"
+                    } else {
+                        "아직 분석할 기록이 부족해요"
+                    },
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 22.sp,
                     lineHeight = 28.sp,
@@ -1093,7 +1094,8 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "초과율 ${formatPercent(stats.overrunRate)} · 빠른 재진입 ${stats.fastReopenCount}회",
+                    text = "초과율 ${formatPercent(timeSlotStat.overrunRate)} · " +
+                        "빠른 재진입 ${timeSlotStat.fastReopenCount}회",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     lineHeight = 17.sp
@@ -1880,16 +1882,6 @@ private fun formatPercent(rate: Double): String {
     return "${(rate * 100.0).roundToInt()}%"
 }
 
-private fun formatScore(score: Double): String {
-    return String.format("%.2f", score)
-}
-
-private fun formatHourRange(hourSlot: Int): String {
-    val start = hourSlot.mod(24).toString().padStart(2, '0')
-    val end = (hourSlot + 2).mod(24).toString().padStart(2, '0')
-    return "$start:00 - $end:00"
-}
-
 private fun lowDataSuffix(stat: TimeSlotStat): String {
     return if (stat.hasLowData) {
         " / 데이터 적음"
@@ -1927,7 +1919,23 @@ private fun DashboardScreenPreview() {
                 purposeDriftRate = 0.31,
                 closedAfterInterventionCount = 12,
                 averageReopenGapMillis = 124_000L,
-                mostVulnerableHourSlot = 23,
+                mostVulnerableTimeSlotStat = TimeSlotStat(
+                    hourSlot = 23,
+                    openCount = 4,
+                    sessionCount = 4,
+                    overrunCount = 3,
+                    extensionCount = 1,
+                    fastReopenCount = 2,
+                    purposeDriftCount = 1,
+                    purposeOutcomeResponseCount = 3,
+                    overrunRate = 0.75,
+                    fastReopenRate = 0.5,
+                    extensionScore = 0.25,
+                    openScore = 0.8,
+                    purposeDriftRate = 1.0 / 3.0,
+                    vulnerabilityScore = 0.5875
+                ),
+                hasEnoughVulnerableTimeData = true,
                 dailyOverrunStats = listOf(
                     DailyOverrunStat(1, "월", 3, 2),
                     DailyOverrunStat(2, "화", 2, 1),

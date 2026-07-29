@@ -25,37 +25,48 @@ object VulnerableTimeSelector {
     fun select(
         timeSlotStats: List<TimeSlotStat>,
         analyzedAtMillis: Long,
-        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT,
-        maximumSlotCount: Int = DEFAULT_MAXIMUM_SLOT_COUNT
+        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT
     ): VulnerableTimeAnalysis {
-        require(minimumSessionCount > 0) {
-            "minimumSessionCount must be greater than zero"
-        }
-        require(maximumSlotCount > 0) {
-            "maximumSlotCount must be greater than zero"
-        }
-
-        val analyzableSlots = timeSlotStats.filter { stat ->
+        val rankedSlots = rankVulnerableSlots(
+            timeSlotStats = timeSlotStats,
+            minimumSessionCount = minimumSessionCount
+        )
+        val hasEnoughData = timeSlotStats.any { stat ->
             stat.sessionCount >= minimumSessionCount
         }
-        val vulnerableHourSlots = analyzableSlots
-            .filter { stat -> stat.vulnerabilityScore > 0.0 }
-            .sortedWith(
-                compareByDescending<TimeSlotStat> { it.vulnerabilityScore }
-                    .thenByDescending { it.sessionCount }
-                    .thenBy { it.hourSlot }
-            )
-            .take(maximumSlotCount)
+        val vulnerableHourSlots = rankedSlots
             .mapTo(linkedSetOf()) { it.hourSlot }
 
         return VulnerableTimeAnalysis(
-            hasEnoughData = analyzableSlots.isNotEmpty(),
+            hasEnoughData = hasEnoughData,
             vulnerableHourSlots = vulnerableHourSlots,
             timeSlotStats = timeSlotStats,
             analyzedAtMillis = analyzedAtMillis
         )
     }
 
+    fun rankVulnerableSlots(
+        timeSlotStats: List<TimeSlotStat>,
+        minimumSessionCount: Int = DEFAULT_MINIMUM_SESSION_COUNT
+    ): List<TimeSlotStat> {
+        require(minimumSessionCount > 0) {
+            "minimumSessionCount must be greater than zero"
+        }
+
+        return timeSlotStats
+            .filter { stat ->
+                stat.sessionCount >= minimumSessionCount &&
+                    stat.vulnerabilityScore + SCORE_COMPARISON_EPSILON >=
+                    VULNERABILITY_SCORE_THRESHOLD
+            }
+            .sortedWith(
+                compareByDescending<TimeSlotStat> { it.vulnerabilityScore }
+                    .thenByDescending { it.sessionCount }
+                    .thenBy { it.hourSlot }
+            )
+    }
+
     const val DEFAULT_MINIMUM_SESSION_COUNT = 2
-    const val DEFAULT_MAXIMUM_SLOT_COUNT = 2
+    const val VULNERABILITY_SCORE_THRESHOLD = 0.5
+    private const val SCORE_COMPARISON_EPSILON = 1e-9
 }

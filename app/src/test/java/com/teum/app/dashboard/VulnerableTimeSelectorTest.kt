@@ -36,19 +36,27 @@ class VulnerableTimeSelectorTest {
     }
 
     @Test
-    fun selectsAtMostTwoHighestScoringAnalyzableSlots() {
+    fun selectsEverySlotAtOrAboveThresholdAndKeepsRankingOrder() {
+        val stats = listOf(
+            stat(hourSlot = 7, sessionCount = 4, vulnerabilityScore = 0.4999),
+            stat(hourSlot = 9, sessionCount = 4, vulnerabilityScore = 0.50),
+            stat(hourSlot = 18, sessionCount = 2, vulnerabilityScore = 0.80),
+            stat(hourSlot = 22, sessionCount = 3, vulnerabilityScore = 0.80),
+            stat(hourSlot = 23, sessionCount = 1, vulnerabilityScore = 1.0)
+        )
         val analysis = VulnerableTimeSelector.select(
-            timeSlotStats = listOf(
-                stat(hourSlot = 9, sessionCount = 4, vulnerabilityScore = 0.30),
-                stat(hourSlot = 18, sessionCount = 2, vulnerabilityScore = 0.80),
-                stat(hourSlot = 22, sessionCount = 3, vulnerabilityScore = 0.80),
-                stat(hourSlot = 23, sessionCount = 1, vulnerabilityScore = 1.0)
-            ),
+            timeSlotStats = stats,
             analyzedAtMillis = 100L
         )
+        val reportTopSlot = VulnerableTimeSelector.rankVulnerableSlots(
+            timeSlotStats = stats
+        ).first()
 
         assertTrue(analysis.hasEnoughData)
-        assertEquals(linkedSetOf(22, 18), analysis.vulnerableHourSlots)
+        assertEquals(linkedSetOf(22, 18, 9), analysis.vulnerableHourSlots)
+        assertEquals(analysis.vulnerableHourSlots.first(), reportTopSlot.hourSlot)
+        val utc = TimeZone.getTimeZone("UTC")
+        assertTrue(analysis.isVulnerableAt(timeAt(hour = 9, minute = 30, utc), utc))
     }
 
     @Test
