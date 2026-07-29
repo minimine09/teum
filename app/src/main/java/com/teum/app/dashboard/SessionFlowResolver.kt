@@ -91,9 +91,10 @@ object SessionFlowResolver {
     fun primaryLabel(type: SessionPrimaryFlowType): String = when (type) {
         SessionPrimaryFlowType.CONTINUED_SCROLLING -> "계속 봄"
         SessionPrimaryFlowType.PURPOSE_DRIFTED -> "목적 이탈"
-        SessionPrimaryFlowType.EXTENDED_AFTER_BRAKE -> "연장 사용"
-        SessionPrimaryFlowType.REACHED_AND_CLOSED -> "점검 후 종료"
-        SessionPrimaryFlowType.ENDED_BEFORE_TARGET -> "일반 종료"
+        // This is based on the user's Session Brake extension choice, not raw overrunMillis.
+        SessionPrimaryFlowType.EXTENDED_AFTER_BRAKE -> "초과"
+        SessionPrimaryFlowType.REACHED_AND_CLOSED -> "도달 후 종료"
+        SessionPrimaryFlowType.ENDED_BEFORE_TARGET -> "그냥 종료"
         SessionPrimaryFlowType.COMPLETED -> "완료"
         SessionPrimaryFlowType.UNKNOWN -> "기록됨"
     }

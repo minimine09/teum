@@ -44,12 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -415,6 +412,8 @@ private fun SessionHistorySummaryCard(
     appDisplayNames: Map<String, String>
 ) {
     val filteredLabel = selectedPackageName?.let { appDisplayNames[it] ?: it } ?: "전체 앱"
+    // TODO: This still uses raw overrunMillis via SessionMetrics. Consider switching to
+    // EXTENDED_AFTER_BRAKE count when the report wording is updated.
     val overrunCount = recentSessions.count { SessionMetricsResolver.resolve(it).isOverrun }
     val driftCount = recentSessions.count { it.purposeDrifted == true }
 
@@ -847,29 +846,6 @@ private fun RecentSessionItem(
     }
     val primaryFlowStatus = SessionFlowResolver.primaryLabel(flowSummary.primaryType) to
         flowToneColor(flowSummary.tone)
-    val flowBadgeStatuses = flowSummary.badges
-        .filterNot { badge ->
-            badge == SessionFlowBadge.CLEAR_PURPOSE ||
-                badge == SessionFlowBadge.MINDFUL_REST ||
-                badge == SessionFlowBadge.PURPOSE_KEPT ||
-                badge == SessionFlowBadge.NECESSARY_USE
-        }
-        .map { badge ->
-            SessionFlowResolver.badgeLabel(badge) to flowBadgeColor(badge)
-        }
-    val interventionPolicyStatus = SessionPolicyDisplayText.status(
-        modeAtStart = session.modeAtStart,
-        interventionAppliedAtStart = session.interventionAppliedAtStart
-    )?.takeIf {
-        session.interventionAppliedAtStart
-    }?.let {
-        "조심 모드 개입 적용" to DashboardWarning
-    }
-    val sessionStatuses = buildList {
-        add(primaryFlowStatus)
-        addAll(flowBadgeStatuses)
-        interventionPolicyStatus?.let(::add)
-    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -927,47 +903,15 @@ private fun RecentSessionItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (sessionStatuses.isNotEmpty()) {
-                Text(
-                    text = buildAnnotatedString {
-                        sessionStatuses.forEachIndexed { index, (text, color) ->
-                            if (index > 0) {
-                                withStyle(SpanStyle(color = secondaryTextColor)) {
-                                    append(" · ")
-                                }
-                            }
-                            withStyle(
-                                SpanStyle(
-                                    color = color,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            ) {
-                                append(text)
-                            }
-                        }
-                    },
-                    fontSize = 11.sp,
-                    lineHeight = 17.sp,
-                    maxLines = if (displayMode == RecentSessionDisplayMode.Compact) 2 else 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (displayMode == RecentSessionDisplayMode.Detailed && session.closedAfterIntervention == true) {
-                Text(
-                    text = "자기점검 후 앱을 종료했어요",
-                    color = secondaryTextColor,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
-                )
-            }
-            if (displayMode == RecentSessionDisplayMode.Detailed && metrics.extensionCount > 0) {
-                Text(
-                    text = "사용 시간을 ${metrics.extensionCount}회 연장했어요",
-                    color = secondaryTextColor,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
-                )
-            }
+            Text(
+                text = primaryFlowStatus.first,
+                color = primaryFlowStatus.second,
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -978,18 +922,6 @@ private fun flowToneColor(tone: SessionFlowTone): Color = when (tone) {
     SessionFlowTone.NEUTRAL -> MaterialTheme.colorScheme.primary
     SessionFlowTone.ATTENTION -> DashboardWarning
     SessionFlowTone.WARNING -> DashboardDanger
-}
-
-@Composable
-private fun flowBadgeColor(badge: SessionFlowBadge): Color = when (badge) {
-    SessionFlowBadge.FAST_REOPENED,
-    SessionFlowBadge.MULTIPLE_EXTENSIONS,
-    SessionFlowBadge.RAW_OVER_TARGET -> DashboardWarning
-    SessionFlowBadge.UNCONSCIOUS_OPEN -> MaterialTheme.colorScheme.onSurfaceVariant
-    SessionFlowBadge.MINDFUL_REST,
-    SessionFlowBadge.PURPOSE_KEPT,
-    SessionFlowBadge.NECESSARY_USE -> DashboardSuccess
-    SessionFlowBadge.CLEAR_PURPOSE -> MaterialTheme.colorScheme.primary
 }
 
 @Composable
