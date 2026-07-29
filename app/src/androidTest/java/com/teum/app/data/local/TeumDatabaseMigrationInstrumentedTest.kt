@@ -686,6 +686,28 @@ class TeumDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migrate10To11_preservesSessionsAndAddsNullableOverrunDetectedAt() {
+        migrationHelper.createDatabase(TEST_DATABASE, 10).use { database ->
+            insertVersionNineSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            11,
+            true,
+            TeumDatabase.MIGRATION_10_11
+        ).use { database ->
+            assertPreservedVersionOneSession(database)
+            database.query(
+                "SELECT overrunDetectedAtMillis FROM session_logs WHERE id = $SESSION_ID"
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertNull(cursor.getString(0))
+            }
+        }
+    }
+
     private fun assertExtensionEventsTableAcceptsRowsAndCascades(
         database: SupportSQLiteDatabase
     ) {

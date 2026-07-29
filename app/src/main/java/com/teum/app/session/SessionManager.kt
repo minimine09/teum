@@ -203,6 +203,22 @@ object SessionManager {
         )
     }
 
+    fun recordCurrentOverrunCandidate(
+        effectiveUsageMillis: Long,
+        finalTargetDurationMillis: Long,
+        nowMillis: Long = System.currentTimeMillis()
+    ) {
+        val session = state.currentSession ?: return
+        state = SessionState(
+            currentSession = RuntimeInterventionPolicy.recordOverrunCandidate(
+                session = session,
+                effectiveUsageMillis = effectiveUsageMillis,
+                finalTargetDurationMillis = finalTargetDurationMillis,
+                nowMillis = nowMillis
+            )
+        )
+    }
+
     fun markInterventionShown(nowMillis: Long = System.currentTimeMillis()) {
         val session = state.currentSession ?: return
         if (session.currentInterventionStartedAtMillis != null) return
@@ -280,6 +296,7 @@ internal object RuntimeInterventionPolicy {
             cautionExtensionCount = session.cautionExtensionCount +
                 if (session.currentInterventionActive) 1 else 0,
             totalExtensionDurationMillis = session.totalExtensionDurationMillis + extraMillis,
+            overrunDetectedAtMillis = null,
             extensionEvents = session.extensionEvents + SessionExtensionEvent(
                 occurredAtMillis = nowMillis,
                 extensionDurationMillis = extraMillis,
@@ -287,6 +304,17 @@ internal object RuntimeInterventionPolicy {
             ),
             outcomeType = OutcomeType.EXTENDED
         )
+    }
+
+    fun recordOverrunCandidate(
+        session: AppSession,
+        effectiveUsageMillis: Long,
+        finalTargetDurationMillis: Long,
+        nowMillis: Long
+    ): AppSession {
+        val overrunMillis = effectiveUsageMillis - finalTargetDurationMillis
+        if (overrunMillis <= 0L || session.overrunDetectedAtMillis != null) return session
+        return session.copy(overrunDetectedAtMillis = nowMillis - overrunMillis)
     }
 
     fun isCautionExtensionLimitReached(session: AppSession): Boolean {

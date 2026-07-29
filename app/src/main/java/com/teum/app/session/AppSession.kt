@@ -26,6 +26,7 @@ data class AppSession(
     val extensionCount: Int = 0,
     val cautionExtensionCount: Int = 0,
     val totalExtensionDurationMillis: Long = 0L,
+    val overrunDetectedAtMillis: Long? = null,
     val extensionEvents: List<SessionExtensionEvent> = emptyList(),
     val interventionVisibleMillis: Long = 0L,
     val currentInterventionStartedAtMillis: Long? = null,

@@ -556,12 +556,18 @@ class TeumAccessibilityService : AccessibilityService() {
                 "interventionActive=${session.currentInterventionActive}"
         )
 
-        val elapsedMillis = SessionManager.getElapsedMillis()
+        val brakeShownAtMillis = System.currentTimeMillis()
+        val elapsedMillis = SessionManager.getElapsedMillis(brakeShownAtMillis)
         val effectiveUsageMillis =
             (elapsedMillis - session.interventionVisibleMillis).coerceAtLeast(0L)
         val finalTargetDurationMillis =
             (session.targetDurationMillis + session.totalExtensionDurationMillis)
                 .coerceAtLeast(0L)
+        SessionManager.recordCurrentOverrunCandidate(
+            effectiveUsageMillis = effectiveUsageMillis,
+            finalTargetDurationMillis = finalTargetDurationMillis,
+            nowMillis = brakeShownAtMillis
+        )
 
         overlayController.showSessionBrake(
             packageName = session.packageName,

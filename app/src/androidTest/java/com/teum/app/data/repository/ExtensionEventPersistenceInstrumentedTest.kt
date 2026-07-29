@@ -74,4 +74,38 @@ class ExtensionEventPersistenceInstrumentedTest {
         repository.deleteAllSessionLogs()
         assertTrue(repository.observeExtensionEventsForSession(sessionId).first().isEmpty())
     }
+
+    @Test
+    fun endedSessionPersistsDetectedOverrunTimeAndFallsBackWhenMissing() = runBlocking {
+        repository.deleteAllSessionLogs()
+        repository.saveEndedSession(
+            AppSession(
+                debugSessionId = 2L,
+                packageName = "com.example.detected",
+                entryDetectedAtMillis = 1_000L,
+                startedAtMillis = 1_000L,
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                targetDurationMillis = 60_000L,
+                overrunDetectedAtMillis = 62_000L,
+                endedAtMillis = 71_000L
+            )
+        )
+        repository.saveEndedSession(
+            AppSession(
+                debugSessionId = 3L,
+                packageName = "com.example.fallback",
+                entryDetectedAtMillis = 100_000L,
+                startedAtMillis = 100_000L,
+                intentChoice = IntentChoice.CLEAR_PURPOSE,
+                targetDurationMillis = 60_000L,
+                endedAtMillis = 165_000L
+            )
+        )
+
+        val savedByPackage = repository.observeRecentSessions(limit = 2)
+            .first()
+            .associateBy { it.packageName }
+        assertEquals(62_000L, savedByPackage.getValue("com.example.detected").overrunDetectedAtMillis)
+        assertEquals(160_000L, savedByPackage.getValue("com.example.fallback").overrunDetectedAtMillis)
+    }
 }

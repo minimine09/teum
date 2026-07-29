@@ -103,6 +103,37 @@ class RuntimeInterventionPolicyTest {
         )
     }
 
+    @Test
+    fun `records overrun onset from effective usage only after target is exceeded`() {
+        val unchanged = RuntimeInterventionPolicy.recordOverrunCandidate(
+            session = session(),
+            effectiveUsageMillis = 60_000L,
+            finalTargetDurationMillis = 60_000L,
+            nowMillis = 100_000L
+        )
+        val detected = RuntimeInterventionPolicy.recordOverrunCandidate(
+            session = unchanged,
+            effectiveUsageMillis = 65_000L,
+            finalTargetDurationMillis = 60_000L,
+            nowMillis = 100_000L
+        )
+
+        assertEquals(null, unchanged.overrunDetectedAtMillis)
+        assertEquals(95_000L, detected.overrunDetectedAtMillis)
+    }
+
+    @Test
+    fun `extension clears previous overrun candidate after final target moves`() {
+        val extended = RuntimeInterventionPolicy.extendSession(
+            session = session().copy(overrunDetectedAtMillis = 95_000L),
+            elapsedMillis = 65_000L,
+            extraMillis = 10_000L,
+            nowMillis = 100_000L
+        )
+
+        assertEquals(null, extended.overrunDetectedAtMillis)
+    }
+
     private fun session(): AppSession {
         return AppSession(
             debugSessionId = 1L,

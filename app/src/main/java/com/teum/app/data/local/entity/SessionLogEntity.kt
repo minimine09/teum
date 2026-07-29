@@ -20,6 +20,7 @@ data class SessionLogEntity(
     val totalExtensionDurationMillis: Long = 0L,
     val finalTargetDurationMillis: Long = 0L,
     val rawOverrunMillis: Long = 0L,
+    val overrunDetectedAtMillis: Long? = null,
     val overrunMillis: Long = 0L,
     val necessaryUseExcessMillis: Long = 0L,
     val intentChoice: String,

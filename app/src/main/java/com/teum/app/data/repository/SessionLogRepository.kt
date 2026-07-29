@@ -108,6 +108,11 @@ class SessionLogRepository(context: Context) {
         val overrunMillis = rawOverrunMillis
         val necessaryUseExcessMillis =
             if (isNecessaryUse) rawOverrunMillis else 0L
+        val overrunDetectedAtMillis = if (rawOverrunMillis > 0L) {
+            session.overrunDetectedAtMillis ?: (endedAtMillis - rawOverrunMillis)
+        } else {
+            null
+        }
 
         com.teum.app.debug.TeumLogger.session(
             debugSessionId = session.debugSessionId,
@@ -136,6 +141,7 @@ class SessionLogRepository(context: Context) {
             totalExtensionDurationMillis = totalExtensionDurationMillis,
             finalTargetDurationMillis = finalTargetDurationMillis,
             rawOverrunMillis = rawOverrunMillis,
+            overrunDetectedAtMillis = overrunDetectedAtMillis,
             overrunMillis = overrunMillis,
             necessaryUseExcessMillis = necessaryUseExcessMillis,
             intentChoice = session.intentChoice.name,
