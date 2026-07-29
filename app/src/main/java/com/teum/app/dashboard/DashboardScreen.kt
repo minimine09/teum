@@ -65,6 +65,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -183,7 +184,10 @@ fun DashboardScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         bottomBar = {
-            if (!(selectedTab == DashboardTab.Session && showAllSessionHistory)) {
+            if (
+                selectedTab != DashboardTab.TargetApps &&
+                !(selectedTab == DashboardTab.Session && showAllSessionHistory)
+            ) {
                 DashboardBottomNavigation(
                     selectedTab = selectedTab,
                     onTabSelected = { tab ->
@@ -252,7 +256,8 @@ fun DashboardScreen(
                 DashboardTab.TargetApps -> TargetAppSelectionScreen(
                     initialSelectedPackages = targetPackages,
                     installedApps = installedApps,
-                    compactForBottomNav = true,
+                    compactForBottomNav = false,
+                    onBackClick = { selectedTab = DashboardTab.Settings },
                     onCompleteClick = { results ->
                         results.forEach { result ->
                             if (result.enabled) {
@@ -1270,7 +1275,6 @@ private fun RecentSessionItem(
     displayMode: RecentSessionDisplayMode
 ) {
     val metrics = SessionMetricsResolver.resolve(session)
-    val flowSummary = SessionFlowResolver.resolve(session)
     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
     val sessionTimeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
     val intentColor = when (session.intentChoice) {
@@ -1279,91 +1283,150 @@ private fun RecentSessionItem(
         "UNCONSCIOUS_OPEN" -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> secondaryTextColor
     }
-    val primaryFlowStatus = SessionFlowResolver.primaryLabel(flowSummary.primaryType) to
-        flowToneColor(flowSummary.tone)
+    val sessionMetaStatuses = buildList {
+        if (session.isFastReopen) {
+            add("빠른 재진입" to MaterialTheme.colorScheme.primary)
+        }
+        clearPurposeOutcomeLabel(session)?.let { outcomeLabel ->
+            add(outcomeLabel to intentColor)
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.055f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.06f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SessionIntentDot(intentColor)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    RecentSessionAppName(
-                        appDisplayName = appDisplayName,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = formatSessionStartedAt(session.startedAtMillis),
-                        color = sessionTimeColor,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SessionIntentDot(intentColor)
+                Spacer(modifier = Modifier.width(12.dp))
+                RecentSessionAppName(
+                    appDisplayName = appDisplayName,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = formatSessionStartedAt(session.startedAtMillis),
+                    color = sessionTimeColor,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 22.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 RecentSessionIntentText(
                     text = SessionDisplayText.intent(session.intentChoice),
-                    color = intentColor,
-                    modifier = Modifier.padding(start = 16.dp)
+                    color = intentColor
                 )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${formatDuration(metrics.usageMillis)} 사용",
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = secondaryTextColor)) {
+                            append("목표 ${formatDuration(metrics.targetMillis)}")
+                            append("  →  ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("${formatDuration(metrics.usageMillis)} 사용")
+                        }
+                    },
                     modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 18.sp,
-                    lineHeight = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(14.dp))
-                Text(
-                    text = "목표 ${formatDuration(metrics.targetMillis)}",
-                    color = secondaryTextColor,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = primaryFlowStatus.first,
-                color = primaryFlowStatus.second,
-                fontSize = 11.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (sessionMetaStatuses.isNotEmpty() || metrics.extensionCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 22.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (sessionMetaStatuses.isNotEmpty()) {
+                        Text(
+                            text = buildAnnotatedString {
+                                sessionMetaStatuses.forEachIndexed { index, (text, color) ->
+                                    if (index > 0) {
+                                        withStyle(SpanStyle(color = secondaryTextColor.copy(alpha = 0.7f))) {
+                                            append(" · ")
+                                        }
+                                    }
+                                    withStyle(
+                                        SpanStyle(
+                                            color = color,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    ) {
+                                        append(text)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    if (metrics.extensionCount > 0) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "${metrics.extensionCount}회 연장",
+                            color = DashboardSuccess,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun flowToneColor(tone: SessionFlowTone): Color = when (tone) {
-    SessionFlowTone.POSITIVE -> DashboardSuccess
-    SessionFlowTone.NEUTRAL -> MaterialTheme.colorScheme.primary
-    SessionFlowTone.ATTENTION -> DashboardWarning
-    SessionFlowTone.WARNING -> DashboardDanger
+private fun clearPurposeOutcomeLabel(session: SessionLogEntity): String? {
+    if (session.intentChoice != "CLEAR_PURPOSE") return null
+    return when (session.outcomeType) {
+        "PURPOSE_ACHIEVED" -> "목적 달성"
+        "NECESSARY_USE" -> "필요한 사용"
+        "PURPOSE_DRIFT" -> "목적 이탈"
+        "CONTINUED_SCROLLING" -> "계속 봄"
+        else -> null
+    }
 }
 
 @Composable
 private fun SessionIntentDot(color: Color) {
     Box(
         modifier = Modifier
-            .size(10.dp)
+            .size(12.dp)
             .background(color, CircleShape)
     )
 }
@@ -1377,8 +1440,9 @@ private fun RecentSessionAppName(
         text = appDisplayName,
         modifier = modifier,
         color = MaterialTheme.colorScheme.onSurface,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
+        fontSize = 16.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.ExtraBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
@@ -1392,9 +1456,10 @@ private fun RecentSessionIntentText(
 ) {
     Text(
         text = text,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         color = color,
-        fontSize = 11.sp,
+        fontSize = 13.sp,
+        lineHeight = 17.sp,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
