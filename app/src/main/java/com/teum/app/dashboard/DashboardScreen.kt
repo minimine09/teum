@@ -836,6 +836,7 @@ private fun RecentSessionItem(
     displayMode: RecentSessionDisplayMode
 ) {
     val metrics = SessionMetricsResolver.resolve(session)
+    val flowSummary = SessionFlowResolver.resolve(session)
     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
     val sessionTimeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
     val intentColor = when (session.intentChoice) {
@@ -844,37 +845,18 @@ private fun RecentSessionItem(
         "UNCONSCIOUS_OPEN" -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> secondaryTextColor
     }
-    val outcomeStatus = if (session.intentChoice == "CLEAR_PURPOSE") {
-        when {
-            session.outcomeType == "PURPOSE_ACHIEVED" || session.outcomeAchieved == true ->
-                "목적 달성" to DashboardSuccess
-            session.outcomeType == "NECESSARY_USE" ->
-                "필요한 사용" to MaterialTheme.colorScheme.primary
-            session.outcomeType == "CONTINUED_SCROLLING" ->
-                "무의식 사용 지속" to DashboardWarning
-            session.outcomeType == "PURPOSE_DRIFT" || session.purposeDrifted == true ->
-                "목적 이탈" to DashboardDanger
-            displayMode == RecentSessionDisplayMode.Detailed ->
-                "결과 미확인" to secondaryTextColor
-            else ->
-                null
+    val primaryFlowStatus = SessionFlowResolver.primaryLabel(flowSummary.primaryType) to
+        flowToneColor(flowSummary.tone)
+    val flowBadgeStatuses = flowSummary.badges
+        .filterNot { badge ->
+            badge == SessionFlowBadge.CLEAR_PURPOSE ||
+                badge == SessionFlowBadge.MINDFUL_REST ||
+                badge == SessionFlowBadge.PURPOSE_KEPT ||
+                badge == SessionFlowBadge.NECESSARY_USE
         }
-    } else {
-        null
-    }
-    val overrunStatus = if (metrics.isOverrun) {
-        SessionDisplayText.compactOverrun(metrics.overrunMillis) to DashboardWarning
-    } else {
-        null
-    }
-    val reopenStatus = if (session.isFastReopen) {
-        val text = session.reopenGapMillis?.let {
-            "${formatDuration(it)} 만에 빠른 재진입"
-        } ?: "빠른 재진입"
-        text to MaterialTheme.colorScheme.primary
-    } else {
-        null
-    }
+        .map { badge ->
+            SessionFlowResolver.badgeLabel(badge) to flowBadgeColor(badge)
+        }
     val interventionPolicyStatus = SessionPolicyDisplayText.status(
         modeAtStart = session.modeAtStart,
         interventionAppliedAtStart = session.interventionAppliedAtStart
@@ -884,9 +866,8 @@ private fun RecentSessionItem(
         "조심 모드 개입 적용" to DashboardWarning
     }
     val sessionStatuses = buildList {
-        outcomeStatus?.let(::add)
-        overrunStatus?.let(::add)
-        reopenStatus?.let(::add)
+        add(primaryFlowStatus)
+        addAll(flowBadgeStatuses)
         interventionPolicyStatus?.let(::add)
     }
 
@@ -989,6 +970,26 @@ private fun RecentSessionItem(
             }
         }
     }
+}
+
+@Composable
+private fun flowToneColor(tone: SessionFlowTone): Color = when (tone) {
+    SessionFlowTone.POSITIVE -> DashboardSuccess
+    SessionFlowTone.NEUTRAL -> MaterialTheme.colorScheme.primary
+    SessionFlowTone.ATTENTION -> DashboardWarning
+    SessionFlowTone.WARNING -> DashboardDanger
+}
+
+@Composable
+private fun flowBadgeColor(badge: SessionFlowBadge): Color = when (badge) {
+    SessionFlowBadge.FAST_REOPENED,
+    SessionFlowBadge.MULTIPLE_EXTENSIONS,
+    SessionFlowBadge.RAW_OVER_TARGET -> DashboardWarning
+    SessionFlowBadge.UNCONSCIOUS_OPEN -> MaterialTheme.colorScheme.onSurfaceVariant
+    SessionFlowBadge.MINDFUL_REST,
+    SessionFlowBadge.PURPOSE_KEPT,
+    SessionFlowBadge.NECESSARY_USE -> DashboardSuccess
+    SessionFlowBadge.CLEAR_PURPOSE -> MaterialTheme.colorScheme.primary
 }
 
 @Composable
