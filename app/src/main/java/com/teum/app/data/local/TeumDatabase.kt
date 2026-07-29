@@ -7,10 +7,12 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.teum.app.data.local.dao.AppOpenEventDao
+import com.teum.app.data.local.dao.ExtensionEventDao
 import com.teum.app.data.local.dao.ReopenLogDao
 import com.teum.app.data.local.dao.SelfControlEventDao
 import com.teum.app.data.local.dao.SessionLogDao
 import com.teum.app.data.local.entity.AppOpenEventEntity
+import com.teum.app.data.local.entity.ExtensionEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SelfControlEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
@@ -20,9 +22,10 @@ import com.teum.app.data.local.entity.SessionLogEntity
         SessionLogEntity::class,
         AppOpenEventEntity::class,
         ReopenLogEntity::class,
-        SelfControlEventEntity::class
+        SelfControlEventEntity::class,
+        ExtensionEventEntity::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = true
 )
 abstract class TeumDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class TeumDatabase : RoomDatabase() {
     abstract fun appOpenEventDao(): AppOpenEventDao
     abstract fun reopenLogDao(): ReopenLogDao
     abstract fun selfControlEventDao(): SelfControlEventDao
+    abstract fun extensionEventDao(): ExtensionEventDao
 
     companion object {
         @Volatile
@@ -49,7 +53,9 @@ abstract class TeumDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
-                    MIGRATION_8_9
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11
                 )
                     .build()
                     .also { database ->
@@ -226,6 +232,48 @@ abstract class TeumDatabase : RoomDatabase() {
                         source TEXT
                     )
                     """.trimIndent()
+                )
+            }
+        }
+
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN cautionExtensionCount " +
+                        "INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN interventionEverApplied " +
+                        "INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS extension_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        sessionId INTEGER NOT NULL,
+                        occurredAtMillis INTEGER NOT NULL,
+                        extensionDurationMillis INTEGER NOT NULL,
+                        interventionActiveAtTime INTEGER NOT NULL,
+                        FOREIGN KEY(sessionId) REFERENCES session_logs(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_extension_events_sessionId " +
+                        "ON extension_events(sessionId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_extension_events_occurredAtMillis " +
+                        "ON extension_events(occurredAtMillis)"
+                )
+            }
+        }
+
+        internal val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE session_logs ADD COLUMN overrunDetectedAtMillis INTEGER"
                 )
             }
         }

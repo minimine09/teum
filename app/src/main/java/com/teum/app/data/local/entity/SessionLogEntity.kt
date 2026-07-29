@@ -1,5 +1,6 @@
 package com.teum.app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -19,6 +20,7 @@ data class SessionLogEntity(
     val totalExtensionDurationMillis: Long = 0L,
     val finalTargetDurationMillis: Long = 0L,
     val rawOverrunMillis: Long = 0L,
+    val overrunDetectedAtMillis: Long? = null,
     val overrunMillis: Long = 0L,
     val necessaryUseExcessMillis: Long = 0L,
     val intentChoice: String,
@@ -33,6 +35,10 @@ data class SessionLogEntity(
     val interventionExitConfirmedAtMillis: Long? = null,
     val overrun: Boolean,
     val extensionCount: Int,
+    @ColumnInfo(defaultValue = "0")
+    val cautionExtensionCount: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val interventionEverApplied: Boolean = false,
     val isFastReopen: Boolean,
     val reopenGapMillis: Long?,
     val createdAtMillis: Long

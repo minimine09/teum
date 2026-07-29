@@ -198,7 +198,8 @@ class WeeklyReportAnalyzerTest {
                 22,
                 modeAtStart = InterventionMode.INTERVENTION.name,
                 isVulnerableTimeAtStart = true,
-                interventionAppliedAtStart = true
+                interventionAppliedAtStart = true,
+                interventionEverApplied = true
             ),
             session(
                 Calendar.TUESDAY,
@@ -209,13 +210,20 @@ class WeeklyReportAnalyzerTest {
                 Calendar.WEDNESDAY,
                 22,
                 modeAtStart = InterventionMode.NORMAL.name,
-                isVulnerableTimeAtStart = true
+                isVulnerableTimeAtStart = true,
+                interventionEverApplied = true
+            ),
+            session(
+                Calendar.THURSDAY,
+                8,
+                modeAtStart = InterventionMode.NORMAL.name,
+                interventionAppliedAtStart = true
             )
         ))
 
         assertEquals(2, report.cautionModeSessionCount)
         assertEquals(2, report.vulnerableTimeSessionCount)
-        assertEquals(1, report.interventionAppliedSessionCount)
+        assertEquals(3, report.interventionAppliedSessionCount)
     }
 
     private fun report(
@@ -246,13 +254,15 @@ class WeeklyReportAnalyzerTest {
         closed:Boolean?=null,outcome:String?=null,necessaryUseExcessMillis:Long=0L,
         packageName:String="target",appDisplayName:String?=null,durationMillis:Long=60_000L,
         modeAtStart:String?=null,isVulnerableTimeAtStart:Boolean=false,
-        interventionAppliedAtStart:Boolean=false): SessionLogEntity {
+        interventionAppliedAtStart:Boolean=false,
+        interventionEverApplied:Boolean=false): SessionLogEntity {
         val start=time(day,hour)
         return SessionLogEntity(packageName=packageName,appDisplayName=appDisplayName,
             entryDetectedAtMillis=start,startedAtMillis=start,
             endedAtMillis=start+durationMillis,durationMillis=durationMillis,targetDurationMillis=60_000,intentChoice=intent,
             modeAtStart=modeAtStart,isVulnerableTimeAtStart=isVulnerableTimeAtStart,
             interventionAppliedAtStart=interventionAppliedAtStart,
+            interventionEverApplied=interventionEverApplied,
             outcomeType=outcome,outcomeRespondedAtMillis=if(answered) start+61_000 else null,purposeDrifted=drifted,
             closedAfterIntervention=closed,overrun=overrun,extensionCount=extensions,isFastReopen=fast,
             reopenGapMillis=gap,necessaryUseExcessMillis=necessaryUseExcessMillis,createdAtMillis=start)

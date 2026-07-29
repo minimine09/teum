@@ -56,7 +56,9 @@ object WeeklyReportAnalyzer {
                 it.modeAtStart == InterventionMode.INTERVENTION.name
             },
             vulnerableTimeSessionCount = sessions.count { it.isVulnerableTimeAtStart },
-            interventionAppliedSessionCount = sessions.count { it.interventionAppliedAtStart },
+            interventionAppliedSessionCount = sessions.count {
+                it.interventionEverApplied || it.interventionAppliedAtStart
+            },
             dailyOverrunStats = calculateDailyOverrunStats(
                 sessions = sessions,
                 openEvents = openEvents

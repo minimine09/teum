@@ -42,15 +42,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }.flatMapLatest { (range, selectedPackage) ->
         combine(
             repository.observeSessionsSince(range.startOfSevenDayPeriodMillis),
+            repository.observeSessionsOverlappingPeriod(
+                sinceMillis = range.startOfSevenDayPeriodMillis,
+                untilMillis = range.startOfTomorrowMillis
+            ),
             repository.observeOpenEventsSince(range.startOfSevenDayPeriodMillis),
             repository.observeReopenLogsSince(
                 sinceMillis = range.startOfSevenDayPeriodMillis,
                 packageName = null
-            )
-        ) { allSessions, allOpenEvents, reopenLogs ->
+            ),
+            repository.observeExtensionEventsSince(range.startOfSevenDayPeriodMillis)
+        ) { allSessions, policySessionCandidates, allOpenEvents, reopenLogs, extensionEvents ->
             val targetPackages = targetAppRepository.getTargetPackages()
             val policySessions = VulnerableTimePolicyDataFilter.sessions(
-                sessions = allSessions,
+                sessions = policySessionCandidates,
                 targetPackages = targetPackages
             )
             val policyOpenEvents = VulnerableTimePolicyDataFilter.openEvents(
@@ -59,7 +64,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             )
             val timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(
                 sessions = policySessions,
-                openEvents = policyOpenEvents
+                openEvents = policyOpenEvents,
+                extensionEvents = extensionEvents,
+                analysisStartMillis = range.startOfSevenDayPeriodMillis,
+                analysisEndMillis = range.startOfTomorrowMillis
             )
 
             DashboardUiState(
