@@ -479,7 +479,7 @@ class TeumAccessibilityService : AccessibilityService() {
             }
             requestHomeNavigationBeforeSession(
                 packageName = packageName,
-                reason = "close_now_before_session"
+                reason = "after_close_now"
             )
         }
     }
@@ -1196,7 +1196,7 @@ class TeumAccessibilityService : AccessibilityService() {
         const val THREE_MINUTES_MILLIS = 180_000L
         const val BRAKE_RETRY_DELAY_MILLIS = 1_000L
         const val SUPPRESS_REENTRY_AFTER_END_MILLIS = 10_000L
-        const val SUPPRESS_REENTRY_AFTER_CLOSE_NOW_MILLIS = 10_000L
+        const val SUPPRESS_REENTRY_AFTER_CLOSE_NOW_MILLIS = 1_500L
         const val SUPPRESS_REENTRY_AFTER_TARGET_EXIT_MILLIS = 1_500L
         const val ENTER_CONFIRM_DELAY_MILLIS = 400L
         const val HOME_NAVIGATION_ENTER_GUARD_MILLIS = 2_000L
