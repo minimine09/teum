@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.viewModels
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,10 @@ private enum class PermissionSetupEntryPoint {
     DashboardRecovery
 }
 
+private fun PermissionStatus.hasRequiredPermissions(): Boolean {
+    return isAccessibilityEnabled && canDrawOverlays
+}
+
 class MainActivity : ComponentActivity() {
     private val targetAppRepository by lazy {
         TargetAppRepository(this)
@@ -73,17 +78,26 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TeumTheme {
+                val setupCompleted = userSettingsRepository.isSetupCompleted()
                 var launchFlowStep by remember {
                     mutableStateOf(
-                        if (userSettingsRepository.isSetupCompleted()) {
+                        if (!setupCompleted) {
+                            LaunchFlowStep.Onboarding
+                        } else if (permissionStatus.hasRequiredPermissions()) {
                             LaunchFlowStep.Dashboard
                         } else {
-                            LaunchFlowStep.Onboarding
+                            LaunchFlowStep.PermissionSetup
                         }
                     )
                 }
                 var permissionSetupEntryPoint by remember {
-                    mutableStateOf(PermissionSetupEntryPoint.InitialSetup)
+                    mutableStateOf(
+                        if (setupCompleted && !permissionStatus.hasRequiredPermissions()) {
+                            PermissionSetupEntryPoint.DashboardRecovery
+                        } else {
+                            PermissionSetupEntryPoint.InitialSetup
+                        }
+                    )
                 }
                 var selectedInterventionMode by remember {
                     mutableStateOf(userSettingsRepository.getInterventionMode())
@@ -93,6 +107,21 @@ class MainActivity : ComponentActivity() {
                     dashboardUiState.availablePackages +
                     dashboardUiState.recentSessions.map { it.packageName }
                 val appDisplayNames = displayedPackages.associateWith(appDisplayNameResolver::resolve)
+
+                LaunchedEffect(permissionStatus, launchFlowStep) {
+                    if (
+                        launchFlowStep != LaunchFlowStep.Onboarding &&
+                        launchFlowStep != LaunchFlowStep.PermissionSetup &&
+                        !permissionStatus.hasRequiredPermissions()
+                    ) {
+                        permissionSetupEntryPoint = if (userSettingsRepository.isSetupCompleted()) {
+                            PermissionSetupEntryPoint.DashboardRecovery
+                        } else {
+                            PermissionSetupEntryPoint.InitialSetup
+                        }
+                        launchFlowStep = LaunchFlowStep.PermissionSetup
+                    }
+                }
 
                 when (launchFlowStep) {
                     LaunchFlowStep.Onboarding -> {
@@ -115,11 +144,7 @@ class MainActivity : ComponentActivity() {
                                     PermissionSetupEntryPoint.DashboardRecovery -> LaunchFlowStep.Dashboard
                                 }
                             },
-                            onLaterClick = if (permissionSetupEntryPoint == PermissionSetupEntryPoint.DashboardRecovery) {
-                                { launchFlowStep = LaunchFlowStep.Dashboard }
-                            } else {
-                                null
-                            }
+                            onLaterClick = null
                         )
                     }
 

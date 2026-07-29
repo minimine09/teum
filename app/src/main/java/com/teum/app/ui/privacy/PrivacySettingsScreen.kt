@@ -55,7 +55,6 @@ fun PrivacySettingsScreen(
     forceVulnerableNowForDebug: Boolean = false,
     onForceVulnerableNowForDebugChange: (Boolean) -> Unit = {},
     permissionStatus: PermissionStatus,
-    onPermissionSettingsClick: () -> Unit,
     onManageTargetAppsClick: () -> Unit = {},
     onDeleteAllClick: () -> Unit,
     showBottomNav: Boolean = true,
@@ -82,8 +81,7 @@ fun PrivacySettingsScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             PermissionSettingsCard(
-                permissionStatus = permissionStatus,
-                onClick = onPermissionSettingsClick
+                permissionStatus = permissionStatus
             )
             if (showVulnerableDebugOverride) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -119,13 +117,10 @@ fun PrivacySettingsScreen(
 @Composable
 private fun PermissionSettingsCard(
     permissionStatus: PermissionStatus,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, PrivacyBorder)
@@ -135,13 +130,13 @@ private fun PermissionSettingsCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "권한 설정",
+                text = "권한 상태",
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "앱 사용 감지와 확인 화면에 필요한 권한을 관리해요.",
+                text = "앱 사용 감지와 확인 화면에 필요한 권한을 확인해요.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
@@ -153,12 +148,6 @@ private fun PermissionSettingsCard(
             PermissionStatusLine(
                 label = "화면 위 표시 권한",
                 ready = permissionStatus.canDrawOverlays
-            )
-            Text(
-                text = "권한 확인 및 변경",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -180,7 +169,7 @@ private fun PermissionStatusLine(
             fontSize = 12.sp
         )
         Text(
-            text = if (ready) "완료" else "설정 필요",
+            text = if (ready) "켜짐" else "꺼짐",
             color = if (ready) PrivacyCare else PrivacyDanger,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
@@ -409,7 +398,6 @@ private fun PrivacySettingsNormalPreview() {
                 isAccessibilityEnabled = true,
                 canDrawOverlays = true
             ),
-            onPermissionSettingsClick = {},
             onDeleteAllClick = {}
         )
     }
@@ -426,7 +414,6 @@ private fun PrivacySettingsCarePreview() {
                 isAccessibilityEnabled = false,
                 canDrawOverlays = true
             ),
-            onPermissionSettingsClick = {},
             onDeleteAllClick = {}
         )
     }
