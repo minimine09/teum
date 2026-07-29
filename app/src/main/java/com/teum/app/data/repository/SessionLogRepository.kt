@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.room.withTransaction
 import com.teum.app.data.local.TeumDatabase
 import com.teum.app.data.local.entity.AppOpenEventEntity
+import com.teum.app.data.local.entity.ExtensionEventEntity
 import com.teum.app.data.local.entity.ReopenLogEntity
 import com.teum.app.data.local.entity.SelfControlEventEntity
 import com.teum.app.data.local.entity.SessionLogEntity
@@ -20,6 +21,7 @@ class SessionLogRepository(context: Context) {
     private val database = TeumDatabase.getInstance(applicationContext)
     private val sessionLogDao = database.sessionLogDao()
     private val appOpenEventDao = database.appOpenEventDao()
+    private val extensionEventDao = database.extensionEventDao()
     private val reopenLogDao = database.reopenLogDao()
     private val selfControlEventDao = database.selfControlEventDao()
 
@@ -33,6 +35,34 @@ class SessionLogRepository(context: Context) {
                 detectedAtMillis = detectedAtMillis
             )
         )
+    }
+
+    suspend fun saveExtensionEvent(
+        sessionId: Long,
+        occurredAtMillis: Long,
+        extensionDurationMillis: Long,
+        interventionActiveAtTime: Boolean
+    ): Long {
+        return extensionEventDao.insertExtensionEvent(
+            ExtensionEventEntity(
+                sessionId = sessionId,
+                occurredAtMillis = occurredAtMillis,
+                extensionDurationMillis = extensionDurationMillis,
+                interventionActiveAtTime = interventionActiveAtTime
+            )
+        )
+    }
+
+    fun observeExtensionEventsSince(
+        sinceMillis: Long
+    ): Flow<List<ExtensionEventEntity>> {
+        return extensionEventDao.observeExtensionEventsSince(sinceMillis)
+    }
+
+    fun observeExtensionEventsForSession(
+        sessionId: Long
+    ): Flow<List<ExtensionEventEntity>> {
+        return extensionEventDao.observeExtensionEventsForSession(sessionId)
     }
 
     suspend fun saveCloseNowBeforeSessionEvent(
@@ -130,12 +160,26 @@ class SessionLogRepository(context: Context) {
             },
             overrun = overrunMillis > 0L,
             extensionCount = session.extensionCount,
+            cautionExtensionCount = session.cautionExtensionCount,
+            interventionEverApplied = session.interventionEverApplied,
             isFastReopen = reopenCheck.isFastReopen,
             reopenGapMillis = reopenCheck.gapTimeMillis,
             createdAtMillis = savedAtMillis
         )
         return database.withTransaction {
             val currentSessionId = sessionLogDao.insertSessionLog(entity)
+            if (session.extensionEvents.isNotEmpty()) {
+                extensionEventDao.insertExtensionEvents(
+                    session.extensionEvents.map { event ->
+                        ExtensionEventEntity(
+                            sessionId = currentSessionId,
+                            occurredAtMillis = event.occurredAtMillis,
+                            extensionDurationMillis = event.extensionDurationMillis,
+                            interventionActiveAtTime = event.interventionActiveAtTime
+                        )
+                    }
+                )
+            }
             val previousSessionId = reopenCheck.previousSessionId
             val gapTimeMillis = reopenCheck.gapTimeMillis
             if (previousSessionId != null && gapTimeMillis != null) {

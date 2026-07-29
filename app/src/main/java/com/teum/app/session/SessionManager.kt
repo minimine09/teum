@@ -144,21 +144,38 @@ object SessionManager {
         return (nowMillis - session.startedAtMillis).coerceAtLeast(0L)
     }
 
+    fun updateCurrentInterventionActive(interventionActive: Boolean) {
+        val session = state.currentSession ?: return
+        val updatedSession = RuntimeInterventionPolicy.updateSession(
+            session = session,
+            interventionActive = interventionActive
+        )
+        state = SessionState(currentSession = updatedSession)
+
+        TeumLogger.session(
+            debugSessionId = updatedSession.debugSessionId,
+            event = "RUNTIME_POLICY_UPDATED",
+            detail = "interventionActive=${updatedSession.currentInterventionActive} " +
+                "everApplied=${updatedSession.interventionEverApplied} " +
+                "cautionExtensionCount=${updatedSession.cautionExtensionCount}"
+        )
+    }
+
     fun extendCurrentSession(extraMillis: Long, nowMillis: Long = System.currentTimeMillis()) {
         val session = state.currentSession ?: return
         val elapsedMillis = getElapsedMillis(nowMillis)
-        val nextLimitDurationMillis = elapsedMillis + extraMillis
-        val updatedSession = session.copy(
-            currentLimitDurationMillis = nextLimitDurationMillis,
-            extensionCount = session.extensionCount + 1,
-            totalExtensionDurationMillis = session.totalExtensionDurationMillis + extraMillis,
-            outcomeType = OutcomeType.EXTENDED
+        val updatedSession = RuntimeInterventionPolicy.extendSession(
+            session = session,
+            elapsedMillis = elapsedMillis,
+            extraMillis = extraMillis,
+            nowMillis = nowMillis
         )
         state = SessionState(currentSession = updatedSession)
 
         Log.d(
             TAG,
             "session extended package=${updatedSession.packageName} extensionCount=${updatedSession.extensionCount} " +
+                "cautionExtensionCount=${updatedSession.cautionExtensionCount} " +
                 "originalTarget=${updatedSession.targetDurationMillis} currentLimit=${updatedSession.currentLimitDurationMillis} " +
                 "nextBrakeDelay=$extraMillis"
         )
@@ -166,6 +183,7 @@ object SessionManager {
             debugSessionId = updatedSession.debugSessionId,
             event = "EXTEND",
             detail = "duration=$extraMillis extensionCount=${updatedSession.extensionCount} " +
+                "cautionExtensionCount=${updatedSession.cautionExtensionCount} " +
                 "nextBrakeDelay=$extraMillis nextLimit=${updatedSession.currentLimitDurationMillis}"
         )
     }
@@ -228,4 +246,51 @@ object SessionManager {
     }
 
     private const val DEFAULT_REOPEN_THRESHOLD_MILLIS = 5 * 60 * 1_000L
+}
+
+internal object RuntimeInterventionPolicy {
+    const val MAX_CAUTION_EXTENSION_COUNT = 3
+
+    fun isActive(
+        interventionModeEnabled: Boolean,
+        isVulnerableTime: Boolean
+    ): Boolean {
+        return interventionModeEnabled && isVulnerableTime
+    }
+
+    fun updateSession(
+        session: AppSession,
+        interventionActive: Boolean
+    ): AppSession {
+        return session.copy(
+            currentInterventionActive = interventionActive,
+            interventionEverApplied = session.interventionEverApplied || interventionActive
+        )
+    }
+
+    fun extendSession(
+        session: AppSession,
+        elapsedMillis: Long,
+        extraMillis: Long,
+        nowMillis: Long
+    ): AppSession {
+        return session.copy(
+            currentLimitDurationMillis = elapsedMillis + extraMillis,
+            extensionCount = session.extensionCount + 1,
+            cautionExtensionCount = session.cautionExtensionCount +
+                if (session.currentInterventionActive) 1 else 0,
+            totalExtensionDurationMillis = session.totalExtensionDurationMillis + extraMillis,
+            extensionEvents = session.extensionEvents + SessionExtensionEvent(
+                occurredAtMillis = nowMillis,
+                extensionDurationMillis = extraMillis,
+                interventionActiveAtTime = session.currentInterventionActive
+            ),
+            outcomeType = OutcomeType.EXTENDED
+        )
+    }
+
+    fun isCautionExtensionLimitReached(session: AppSession): Boolean {
+        return session.currentInterventionActive &&
+            session.cautionExtensionCount >= MAX_CAUTION_EXTENSION_COUNT
+    }
 }

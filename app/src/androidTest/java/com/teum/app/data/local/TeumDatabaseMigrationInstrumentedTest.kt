@@ -143,6 +143,24 @@ class TeumDatabaseMigrationInstrumentedTest {
         }
     }
 
+    @Test
+    fun migrate9To10_preservesSessionsAndAddsExtensionEvents() {
+        migrationHelper.createDatabase(TEST_DATABASE, 9).use { database ->
+            insertVersionNineSession(database)
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            10,
+            true,
+            TeumDatabase.MIGRATION_9_10
+        ).use { database ->
+            assertPreservedVersionOneSession(database)
+            assertRuntimeInterventionColumnsUseSafeDefaults(database)
+            assertExtensionEventsTableAcceptsRowsAndCascades(database)
+        }
+    }
+
     private fun createVersionOneDatabase() {
         context.deleteDatabase(TEST_DATABASE)
         context.openOrCreateDatabase(TEST_DATABASE, Context.MODE_PRIVATE, null).use { database ->
@@ -541,6 +559,77 @@ class TeumDatabaseMigrationInstrumentedTest {
         )
     }
 
+    private fun insertVersionNineSession(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            INSERT INTO session_logs (
+                id,
+                packageName,
+                appDisplayName,
+                entryDetectedAtMillis,
+                startedAtMillis,
+                endedAtMillis,
+                durationMillis,
+                targetDurationMillis,
+                interventionVisibleMillis,
+                effectiveUsageMillis,
+                totalExtensionDurationMillis,
+                finalTargetDurationMillis,
+                rawOverrunMillis,
+                overrunMillis,
+                necessaryUseExcessMillis,
+                intentChoice,
+                modeAtStart,
+                isVulnerableTimeAtStart,
+                interventionAppliedAtStart,
+                outcomeType,
+                outcomeRespondedAtMillis,
+                outcomeAchieved,
+                purposeDrifted,
+                closedAfterIntervention,
+                interventionExitConfirmedAtMillis,
+                overrun,
+                extensionCount,
+                isFastReopen,
+                reopenGapMillis,
+                createdAtMillis
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(
+                SESSION_ID,
+                PACKAGE_NAME,
+                "YouTube",
+                1_000L,
+                2_000L,
+                12_000L,
+                10_000L,
+                60_000L,
+                0L,
+                10_000L,
+                0L,
+                60_000L,
+                0L,
+                0L,
+                0L,
+                "CLEAR_PURPOSE",
+                "NORMAL",
+                0,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                1,
+                1,
+                30_000L,
+                12_500L
+            )
+        )
+    }
+
     private fun assertAppOpenEventsTableAcceptsRows(database: SupportSQLiteDatabase) {
         database.execSQL(
             "INSERT INTO app_open_events (packageName, detectedAtMillis) VALUES (?, ?)",
@@ -594,6 +683,62 @@ class TeumDatabaseMigrationInstrumentedTest {
             assertEquals(CURRENT_SESSION_ID, cursor.getLong(1))
             assertEquals(30_000L, cursor.getLong(2))
             assertEquals(1, cursor.getInt(3))
+        }
+    }
+
+    private fun assertExtensionEventsTableAcceptsRowsAndCascades(
+        database: SupportSQLiteDatabase
+    ) {
+        database.execSQL("PRAGMA foreign_keys = ON")
+        database.execSQL(
+            """
+            INSERT INTO extension_events (
+                sessionId,
+                occurredAtMillis,
+                extensionDurationMillis,
+                interventionActiveAtTime
+            ) VALUES (?, ?, ?, ?)
+            """.trimIndent(),
+            arrayOf(SESSION_ID, 9_000L, 180_000L, 1)
+        )
+
+        database.query(
+            """
+            SELECT
+                sessionId,
+                occurredAtMillis,
+                extensionDurationMillis,
+                interventionActiveAtTime
+            FROM extension_events
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(SESSION_ID, cursor.getLong(0))
+            assertEquals(9_000L, cursor.getLong(1))
+            assertEquals(180_000L, cursor.getLong(2))
+            assertEquals(1, cursor.getInt(3))
+        }
+
+        database.execSQL("DELETE FROM session_logs WHERE id = $SESSION_ID")
+        database.query("SELECT COUNT(*) FROM extension_events").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+    }
+
+    private fun assertRuntimeInterventionColumnsUseSafeDefaults(
+        database: SupportSQLiteDatabase
+    ) {
+        database.query(
+            """
+            SELECT cautionExtensionCount, interventionEverApplied
+            FROM session_logs
+            WHERE id = $SESSION_ID
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+            assertEquals(0, cursor.getInt(1))
         }
     }
 
