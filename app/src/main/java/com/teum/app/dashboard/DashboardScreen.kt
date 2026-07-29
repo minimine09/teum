@@ -105,6 +105,7 @@ fun DashboardScreen(
     appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
     recentSessions: List<SessionLogEntity>,
+    sessionRecentSessions: List<SessionLogEntity>,
     timeSlotStats: List<TimeSlotStat>,
     weeklyReportStats: WeeklyReportStats,
     availablePackages: Set<String>,
@@ -126,6 +127,12 @@ fun DashboardScreen(
 ) {
     var selectedTab by remember { mutableStateOf(DashboardTab.Home) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedPackageName, targetPackages) {
+        if (selectedPackageName != null && selectedPackageName !in targetPackages) {
+            onSelectPackage(null)
+        }
+    }
 
     if (showDeleteConfirmation) {
         AlertDialog(
@@ -189,7 +196,7 @@ fun DashboardScreen(
                 DashboardTab.Session -> SessionHistoryContent(
                     targetPackages = targetPackages,
                     appDisplayNames = appDisplayNames,
-                    recentSessions = recentSessions,
+                    recentSessions = sessionRecentSessions,
                     availablePackages = availablePackages,
                     selectedPackageName = selectedPackageName,
                     onSelectPackage = onSelectPackage
@@ -326,12 +333,6 @@ private fun SessionHistoryContent(
     selectedPackageName: String?,
     onSelectPackage: (String?) -> Unit
 ) {
-    LaunchedEffect(selectedPackageName, targetPackages) {
-        if (selectedPackageName != null && selectedPackageName !in targetPackages) {
-            onSelectPackage(null)
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1916,6 +1917,7 @@ private fun DashboardScreenPreview() {
                 todayPurposeDriftCount = 2
             ),
             recentSessions = emptyList(),
+            sessionRecentSessions = emptyList(),
             timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(emptyList()),
             weeklyReportStats = WeeklyReportStats(
                 totalSessionCount = 24,

@@ -160,6 +160,7 @@ class MainActivity : ComponentActivity() {
                             appDisplayNames = appDisplayNames,
                             dashboardStats = dashboardUiState.dashboardStats,
                             recentSessions = dashboardUiState.recentSessions,
+                            sessionRecentSessions = dashboardUiState.sessionRecentSessions,
                             timeSlotStats = dashboardUiState.timeSlotStats,
                             weeklyReportStats = dashboardUiState.weeklyReportStats,
                             availablePackages = dashboardUiState.availablePackages,
