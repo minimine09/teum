@@ -1,7 +1,12 @@
 package com.teum.app.dashboard
 
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.drawable.Drawable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,6 +15,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +37,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -40,10 +48,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -65,7 +78,6 @@ import kotlin.math.roundToInt
 
 private val DashboardBorder = Color(0xFFE3E7EF)
 private val DashboardDark = Color(0xFF121622)
-private val DashboardDarkChip = Color(0xFF232A3A)
 private val DashboardMutedBar = Color(0xFFD8DDF0)
 private val DashboardPill = Color(0xFFF1F3F7)
 private val DashboardSuccess = Color(0xFF2EC4A6)
@@ -77,6 +89,10 @@ data class DashboardStats(
     val todaySessionCount: Int = 0,
     val todayOverrunCount: Int = 0,
     val todayFastReopenCount: Int = 0,
+    val todayTargetKeptCount: Int = 0,
+    val todayExtensionCount: Int = 0,
+    val todayUsageMillis: Long = 0L,
+    val todayAppUsageStats: List<AppUsageStat> = emptyList(),
     val todayPurposeKeptCount: Int = 0,
     val todayPurposeDriftCount: Int = 0,
     val todayClosedAfterInterventionCount: Int = 0
@@ -182,11 +198,7 @@ fun DashboardScreen(
             when (selectedTab) {
                 DashboardTab.Home -> HomeDashboardContent(
                     permissionStatus = permissionStatus,
-                    appDisplayNames = appDisplayNames,
                     dashboardStats = dashboardStats,
-                    recentSessions = recentSessions,
-                    timeSlotStats = timeSlotStats,
-                    weeklyReportStats = weeklyReportStats,
                     onRecoverPermissionsClick = onRecoverPermissionsClick
                 )
 
@@ -239,11 +251,7 @@ fun DashboardScreen(
 @Composable
 private fun HomeDashboardContent(
     permissionStatus: PermissionStatus,
-    appDisplayNames: Map<String, String>,
     dashboardStats: DashboardStats,
-    recentSessions: List<SessionLogEntity>,
-    timeSlotStats: List<TimeSlotStat>,
-    weeklyReportStats: WeeklyReportStats,
     onRecoverPermissionsClick: () -> Unit
 ) {
     val hasRequiredPermissions = permissionStatus.isAccessibilityEnabled &&
@@ -266,12 +274,7 @@ private fun HomeDashboardContent(
         }
         HomeMainStatCard(dashboardStats)
         HomeSmallStatsRow(dashboardStats)
-        RecentSessionsCard(
-            recentSessions = recentSessions,
-            appDisplayNames = appDisplayNames,
-            maxItems = 3,
-            displayMode = RecentSessionDisplayMode.Compact
-        )
+        TodayAppUsageCard(dashboardStats.todayAppUsageStats)
     }
 }
 
@@ -366,6 +369,8 @@ private fun WeeklyReportContent(
     stats: WeeklyReportStats,
     appDisplayNames: Map<String, String>
 ) {
+    var isDetailExpanded by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -383,25 +388,11 @@ private fun WeeklyReportContent(
             stats = stats,
             appDisplayNames = appDisplayNames
         )
-        ReportMetricCard(
-            title = "목적 이탈률",
-            value = formatPercent(stats.purposeDriftRate),
-            description = "처음 목적과 달라진 비율",
-            color = DashboardDanger
+        WeeklyReportReviewSection(
+            stats = stats,
+            isDetailExpanded = isDetailExpanded,
+            onDetailToggle = { isDetailExpanded = !isDetailExpanded }
         )
-        ReportMetricCard(
-            title = "총 사용 시간",
-            value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
-            description = "최근 7일 관리 앱을 사용한 시간",
-            color = DashboardWarning
-        )
-        ReportMetricCard(
-            title = "총 연장 횟수",
-            value = "${stats.extensionCount}회",
-            description = "목표 시간 이후 더 사용한 횟수",
-            color = DashboardSuccess
-        )
-        WeeklyReportDetailCard(stats)
     }
 }
 
@@ -533,56 +524,28 @@ private fun DashboardHeader(
 
 @Composable
 private fun HomeMainStatCard(stats: DashboardStats) {
-    val overrunRate = if (stats.todaySessionCount == 0) {
-        0
-    } else {
-        ((stats.todayOverrunCount.toFloat() / stats.todaySessionCount) * 100).roundToInt()
-    }
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(131.dp)
+            .heightIn(min = 112.dp)
             .background(DashboardDark, RoundedCornerShape(28.dp))
-            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .padding(horizontal = 24.dp, vertical = 18.dp)
     ) {
         Column {
             Text(
-                text = "목적대로 사용한 횟수",
+                text = "오늘 총 사용 시간",
                 color = Color(0xFFAAB1C3),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${stats.todayPurposeKeptCount}회",
-                    color = Color.White,
-                    fontSize = 36.sp,
-                    lineHeight = 44.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .size(width = 82.dp, height = 62.dp)
-                .background(DashboardDarkChip, RoundedCornerShape(18.dp)),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "초과율",
-                color = Color(0xFFAAB1C3),
-                fontSize = 11.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${overrunRate}%",
+                text = formatDuration(stats.todayUsageMillis),
                 color = Color.White,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 34.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
             )
         }
     }
@@ -594,24 +557,24 @@ private fun HomeSmallStatsRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(15.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         HomeSmallStatCard(
-            label = "목적 이탈",
-            value = "${dashboardStats.todayPurposeDriftCount}회",
-            color = DashboardDanger,
+            label = "목표 준수",
+            value = "${dashboardStats.todayTargetKeptCount}회",
+            color = DashboardSuccess,
+            modifier = Modifier.weight(1f)
+        )
+        HomeSmallStatCard(
+            label = "연장 횟수",
+            value = "${dashboardStats.todayExtensionCount}회",
+            color = DashboardWarning,
             modifier = Modifier.weight(1f)
         )
         HomeSmallStatCard(
             label = "빠른 재진입",
             value = "${dashboardStats.todayFastReopenCount}회",
-            color = DashboardWarning,
-            modifier = Modifier.weight(1f)
-        )
-        HomeSmallStatCard(
-            label = "개입 후 종료",
-            value = "${dashboardStats.todayClosedAfterInterventionCount}회",
-            color = DashboardSuccess,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f)
         )
     }
@@ -625,7 +588,7 @@ private fun HomeSmallStatCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.heightIn(min = 82.dp),
+        modifier = modifier.heightIn(min = 86.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
@@ -633,8 +596,8 @@ private fun HomeSmallStatCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+                .padding(horizontal = 14.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = label,
@@ -642,17 +605,135 @@ private fun HomeSmallStatCard(
                 fontSize = 11.sp,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 2
             )
             Text(
                 text = value,
                 color = color,
-                fontSize = 22.sp,
-                lineHeight = 27.sp,
+                fontSize = 21.sp,
+                lineHeight = 26.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayAppUsageCard(
+    appUsageStats: List<AppUsageStat>
+) {
+    val displayedStats = appUsageStats.take(5)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, DashboardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "앱별 오늘 사용 시간",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            if (displayedStats.isEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "오늘 기록된 사용 시간이 없어요",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                    Text(
+                        text = "앱을 사용하면 여기에 정리돼요",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                }
+            } else {
+                displayedStats.forEach { stat ->
+                    TodayAppUsageRow(stat = stat)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayAppUsageRow(
+    stat: AppUsageStat
+) {
+    val displayName = stat.appDisplayName
+        ?.takeIf { it.isNotBlank() }
+        ?: stat.packageName
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TodayAppIcon(packageName = stat.packageName)
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = displayName,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = formatDuration(stat.usageMillis),
+            modifier = Modifier.widthIn(min = 52.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun TodayAppIcon(
+    packageName: String
+) {
+    val context = LocalContext.current
+    val iconBitmap = remember(packageName) {
+        val packageManager = context.applicationContext.packageManager
+        val icon = try {
+            packageManager.getApplicationIcon(packageName)
+        } catch (_: PackageManager.NameNotFoundException) {
+            packageManager.defaultActivityIcon
+        }
+        icon.toBitmapOrNull()
+    }
+
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .background(DashboardPill, RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (iconBitmap != null) {
+            Image(
+                bitmap = iconBitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.size(28.dp)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
             )
         }
     }
@@ -1002,7 +1083,11 @@ private fun ReportVulnerableTimeCard(stats: WeeklyReportStats) {
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "사용 기록이 쌓이면 자주 흔들리는 시간을 알려드릴게요.",
+                    text = if (stats.hasEnoughVulnerableTimeData) {
+                        "최근 7일은 특정 시간대에 사용이 몰리지 않았어요."
+                    } else {
+                        "사용 기록이 쌓이면 자주 흔들리는 시간을 알려드릴게요."
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     lineHeight = 18.sp
@@ -1106,6 +1191,7 @@ private fun WeeklyReportCharts(
             pageCount = 4,
             activePage = pagerState.currentPage
         )
+        Spacer(modifier = Modifier.height(10.dp))
     }
 }
 
@@ -1473,71 +1559,217 @@ private fun formatCompactCount(count: Int): String {
 }
 
 @Composable
-private fun ReportMetricCard(
+private fun WeeklyReportReviewSection(
+    stats: WeeklyReportStats,
+    isDetailExpanded: Boolean,
+    onDetailToggle: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(
+                text = "이번 주 사용 돌아보기",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 17.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "최근 7일 동안의 주요 사용 흐름이에요",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                lineHeight = 17.sp
+            )
+        }
+        ReportHighlightMetricGrid(stats)
+        ReportDetailToggleButton(
+            expanded = isDetailExpanded,
+            onClick = onDetailToggle
+        )
+        if (isDetailExpanded) {
+            ReportDetailMetricsCard(stats)
+        }
+    }
+}
+
+@Composable
+private fun ReportHighlightMetricGrid(stats: WeeklyReportStats) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ReportHighlightMetricCard(
+                title = "목적과 다른 사용",
+                value = formatPercent(stats.purposeDriftRate),
+                color = DashboardDanger,
+                modifier = Modifier.weight(1f)
+            )
+            ReportHighlightMetricCard(
+                title = "사용 연장",
+                value = "${stats.extensionCount}회",
+                color = DashboardWarning,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            ReportHighlightMetricCard(
+                title = "빠른 재진입",
+                value = "${stats.fastReopenCount}회",
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+            ReportHighlightMetricCard(
+                title = "개입 후 종료",
+                value = "${stats.closedAfterInterventionCount}회",
+                color = DashboardSuccess,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportHighlightMetricCard(
     title: String,
     value: String,
-    description: String,
-    color: Color
+    color: Color,
+    modifier: Modifier = Modifier
 ) {
-    val valueFontSize = if (value.length >= 5) 18.sp else 24.sp
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.heightIn(min = 118.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, DashboardBorder)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 17.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .background(color.copy(alpha = 0.11f), CircleShape),
+                    .size(28.dp)
+                    .background(color.copy(alpha = 0.12f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(6.dp)
                         .background(color, CircleShape)
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+            Text(
+                text = title,
+                modifier = Modifier.height(34.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                modifier = Modifier.height(31.dp),
+                color = color,
+                fontSize = if (value.length >= 6) 21.sp else 25.sp,
+                lineHeight = 29.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailToggleButton(
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier
+                .heightIn(min = 44.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(999.dp)
+                ),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)
+        ) {
+            Text(
+                text = if (expanded) "간단히 보기 ▲" else "다른 지표 더 보기 ▼",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailMetricsCard(stats: WeeklyReportStats) {
+    val metrics = listOf(
+        ReportDetailMetricUi(
+            label = "이번 주 사용 시간",
+            value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
+            description = "최근 7일 동안 관리 앱을 사용한 시간"
+        ),
+        ReportDetailMetricUi(
+            label = "사용 세션",
+            value = "${stats.totalSessionCount}회",
+            description = "최근 7일 동안 완료된 사용 세션 수"
+        ),
+        ReportDetailMetricUi(
+            label = "목표 시간 초과",
+            value = "${stats.overrunCount}회 · ${formatPercent(stats.overrunRate)}",
+            description = "정한 시간을 넘긴 세션의 횟수와 비율"
+        ),
+        ReportDetailMetricUi(
+            label = "필요한 사용",
+            value = "${stats.necessaryUseCount}회",
+            description = "처음 목적과 달라졌지만 필요하다고 판단한 횟수"
+        ),
+        ReportDetailMetricUi(
+            label = "사용 결과 확인",
+            value = "${stats.outcomeResponseCount}회",
+            description = "앱 사용 후 결과 확인 화면에 답한 횟수"
+        ),
+        ReportDetailMetricUi(
+            label = "조심 모드 적용",
+            value = "${stats.interventionAppliedSessionCount}회",
+            description = "취약 시간대에 강화된 확인이 적용된 횟수"
+        )
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, DashboardBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            metrics.forEachIndexed { index, metric ->
+                ReportDetailMetricRow(
+                    label = metric.label,
+                    value = metric.value,
+                    description = metric.description
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = value,
-                        color = color,
-                        fontSize = valueFontSize,
-                        lineHeight = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = description,
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                if (index != metrics.lastIndex) {
+                    HorizontalDivider(
+                        color = DashboardBorder.copy(alpha = 0.55f),
+                        thickness = 0.6.dp
                     )
                 }
             }
@@ -1546,96 +1778,54 @@ private fun ReportMetricCard(
 }
 
 @Composable
-private fun WeeklyReportDetailCard(stats: WeeklyReportStats) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, DashboardBorder)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "주간 상세 요약",
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-            WeeklySummaryRow(
-                label = "목표 시간 초과",
-                value = "${stats.overrunCount}회",
-                subValue = "전체 사용 ${stats.totalSessionCount}회 중 ${formatPercent(stats.overrunRate)}"
-            )
-            WeeklySummaryRow(
-                label = "필요한 사용",
-                value = "${stats.necessaryUseCount}회",
-                subValue = "목적과 달랐지만 필요하다고 판단한 횟수"
-            )
-            WeeklySummaryRow(
-                label = "빠른 재진입",
-                value = "${stats.fastReopenCount}회",
-                subValue = "앱 종료 후 짧은 시간 안에 다시 들어간 횟수"
-            )
-            WeeklySummaryRow(
-                label = "개입 후 종료",
-                value = "${stats.closedAfterInterventionCount}회",
-                subValue = "자기점검 화면 이후 앱을 닫은 횟수"
-            )
-        }
-    }
-}
-
-@Composable
-private fun WeeklySummaryRow(
+private fun ReportDetailMetricRow(
     label: String,
     value: String,
-    subValue: String
+    description: String
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DashboardPill, RoundedCornerShape(16.dp))
-            .padding(horizontal = 14.dp, vertical = 11.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Text(
                 text = label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = value,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = subValue,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 10.sp,
-            lineHeight = 14.sp,
+            text = description,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
             maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth()
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
+
+private data class ReportDetailMetricUi(
+    val label: String,
+    val value: String,
+    val description: String
+)
 
 @Composable
 private fun DetailLine(
@@ -1807,6 +1997,18 @@ private fun formatPercent(rate: Double): String {
     return "${(rate * 100.0).roundToInt()}%"
 }
 
+private fun Drawable.toBitmapOrNull(): Bitmap? {
+    val width = intrinsicWidth.takeIf { it > 0 } ?: 96
+    val height = intrinsicHeight.takeIf { it > 0 } ?: 96
+    return runCatching {
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            val canvas = AndroidCanvas(bitmap)
+            setBounds(0, 0, canvas.width, canvas.height)
+            draw(canvas)
+        }
+    }.getOrNull()
+}
+
 private fun lowDataSuffix(stat: TimeSlotStat): String {
     return if (stat.hasLowData) {
         " / 데이터 적음"
@@ -1830,6 +2032,14 @@ private fun DashboardScreenPreview() {
                 todaySessionCount = 10,
                 todayOverrunCount = 2,
                 todayFastReopenCount = 1,
+                todayTargetKeptCount = 8,
+                todayExtensionCount = 3,
+                todayUsageMillis = 84L * 60L * 1_000L,
+                todayAppUsageStats = listOf(
+                    AppUsageStat("com.google.android.youtube", 42L * 60L * 1_000L, "YouTube"),
+                    AppUsageStat("com.instagram.android", 25L * 60L * 1_000L, "Instagram"),
+                    AppUsageStat("com.android.chrome", 17L * 60L * 1_000L, "Chrome")
+                ),
                 todayPurposeKeptCount = 5,
                 todayPurposeDriftCount = 2
             ),
