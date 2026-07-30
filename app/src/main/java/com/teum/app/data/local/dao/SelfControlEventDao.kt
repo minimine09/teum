@@ -11,6 +11,12 @@ interface SelfControlEventDao {
     @Insert
     suspend fun insertSelfControlEvent(entity: SelfControlEventEntity): Long
 
+    @Query("SELECT * FROM self_control_events ORDER BY occurredAtMillis ASC")
+    suspend fun getAllSelfControlEventsForDebug(): List<SelfControlEventEntity>
+
+    @Query("SELECT COUNT(*) FROM self_control_events")
+    suspend fun countSelfControlEventsForDebug(): Int
+
     @Query(
         "SELECT COUNT(*) FROM self_control_events " +
             "WHERE eventType = :eventType AND occurredAtMillis >= :sinceMillis"

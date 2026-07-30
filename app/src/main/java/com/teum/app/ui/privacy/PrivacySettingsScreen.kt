@@ -28,6 +28,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.teum.app.core.model.InterventionMode
 import com.teum.app.core.model.PermissionStatus
+import com.teum.app.demo.DemoToolsEntry
 import com.teum.app.ui.theme.TeumTheme
 
 private val PrivacyBorder = Color(0xFFE3E7EF)
@@ -65,6 +71,8 @@ fun PrivacySettingsScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         val bottomPadding = if (showBottomNav) 96.dp else 24.dp
+        var debugHeaderTapCount by remember { mutableIntStateOf(0) }
+        var showDemoTools by remember { mutableStateOf(false) }
 
         Column(
             modifier = Modifier
@@ -73,7 +81,18 @@ fun PrivacySettingsScreen(
                 .padding(horizontal = 24.dp)
                 .padding(top = 50.dp, bottom = bottomPadding)
         ) {
-            Header()
+            Header(
+                modifier = if (showVulnerableDebugOverride) {
+                    Modifier.clickable {
+                        debugHeaderTapCount += 1
+                        if (debugHeaderTapCount >= 5) {
+                            showDemoTools = true
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
             Spacer(modifier = Modifier.height(20.dp))
             ModeCard(
                 selectedMode = selectedMode,
@@ -83,11 +102,12 @@ fun PrivacySettingsScreen(
             PermissionSettingsCard(
                 permissionStatus = permissionStatus
             )
-            if (showVulnerableDebugOverride) {
+            if (showVulnerableDebugOverride && showDemoTools) {
                 Spacer(modifier = Modifier.height(16.dp))
-                VulnerableDebugOverrideCard(
-                    enabled = forceVulnerableNowForDebug,
-                    onEnabledChange = onForceVulnerableNowForDebugChange
+                DemoToolsEntry(
+                    permissionStatus = permissionStatus,
+                    forceVulnerableNowForDebug = forceVulnerableNowForDebug,
+                    onForceVulnerableNowForDebugChange = onForceVulnerableNowForDebugChange
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))

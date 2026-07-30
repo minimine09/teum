@@ -14,6 +14,15 @@ interface ExtensionEventDao {
     @Insert
     suspend fun insertExtensionEvents(entities: List<ExtensionEventEntity>): List<Long>
 
+    @Query("SELECT * FROM extension_events ORDER BY occurredAtMillis ASC")
+    suspend fun getAllExtensionEventsForDebug(): List<ExtensionEventEntity>
+
+    @Query("SELECT COUNT(*) FROM extension_events")
+    suspend fun countExtensionEventsForDebug(): Int
+
+    @Query("DELETE FROM extension_events")
+    suspend fun deleteAllExtensionEventsForDebug()
+
     @Query(
         "SELECT * FROM extension_events " +
             "WHERE occurredAtMillis >= :sinceMillis " +

@@ -11,6 +11,12 @@ interface AppOpenEventDao {
     @Insert
     suspend fun insertAppOpenEvent(entity: AppOpenEventEntity): Long
 
+    @Query("SELECT * FROM app_open_events ORDER BY detectedAtMillis ASC")
+    suspend fun getAllAppOpenEventsForDebug(): List<AppOpenEventEntity>
+
+    @Query("SELECT COUNT(*) FROM app_open_events")
+    suspend fun countAppOpenEventsForDebug(): Int
+
     @Query("SELECT * FROM app_open_events WHERE detectedAtMillis >= :sinceMillis ORDER BY detectedAtMillis DESC")
     fun observeOpenEventsSince(sinceMillis: Long): Flow<List<AppOpenEventEntity>>
 
