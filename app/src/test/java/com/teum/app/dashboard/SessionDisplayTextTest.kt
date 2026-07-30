@@ -7,8 +7,8 @@ class SessionDisplayTextTest {
     @Test
     fun intentValuesUseKoreanUserLabels() {
         assertEquals("명확한 목적", SessionDisplayText.intent("CLEAR_PURPOSE"))
-        assertEquals("인지하고 선택한 휴식", SessionDisplayText.intent("MINDFUL_REST"))
-        assertEquals("무의식적으로 실행", SessionDisplayText.intent("UNCONSCIOUS_OPEN"))
+        assertEquals("인지된 휴식", SessionDisplayText.intent("MINDFUL_REST"))
+        assertEquals("무의식 실행", SessionDisplayText.intent("UNCONSCIOUS_OPEN"))
         assertEquals("사용하지 않고 닫기", SessionDisplayText.intent("CLOSE_NOW"))
         assertEquals("확인되지 않은 목적", SessionDisplayText.intent("UNKNOWN"))
     }

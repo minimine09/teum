@@ -1352,7 +1352,7 @@ private fun RecentSessionItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 22.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 RecentSessionIntentText(
@@ -1363,7 +1363,7 @@ private fun RecentSessionItem(
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(color = secondaryTextColor)) {
                             append("목표 ${formatDuration(session.targetDurationMillis)}")
-                            append("  →  ")
+                            append(" → ")
                         }
                         withStyle(
                             SpanStyle(
