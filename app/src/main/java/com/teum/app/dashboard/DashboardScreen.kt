@@ -743,9 +743,7 @@ private fun SessionHistorySummaryCard(
     appDisplayNames: Map<String, String>
 ) {
     val filteredLabel = selectedPackageName?.let { appDisplayNames[it] ?: it } ?: "전체 앱"
-    // TODO: This still uses raw overrunMillis via SessionMetrics. Consider switching to
-    // EXTENDED_AFTER_BRAKE count when the report wording is updated.
-    val overrunCount = recentSessions.count { SessionMetricsResolver.resolve(it).isOverrun }
+    val overrunCount = recentSessions.count(SessionGoalPolicy::exceededInitialGoal)
     val driftCount = recentSessions.count { it.purposeDrifted == true }
 
     Card(
@@ -1364,7 +1362,7 @@ private fun RecentSessionItem(
                 Text(
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(color = secondaryTextColor)) {
-                            append("목표 ${formatDuration(metrics.targetMillis)}")
+                            append("목표 ${formatDuration(session.targetDurationMillis)}")
                             append("  →  ")
                         }
                         withStyle(

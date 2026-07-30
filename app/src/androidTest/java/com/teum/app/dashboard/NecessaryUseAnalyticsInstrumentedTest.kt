@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NecessaryUseAnalyticsInstrumentedTest {
     @Test
-    fun necessaryUse_preservesTimeOverrunAndTracksSeparateExcess() = runBlocking {
+    fun necessaryUse_preservesRawOverrunWithoutCountingUnextendedInitialGoal() = runBlocking {
         val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
         repository.deleteAllSessionLogs()
 
@@ -75,8 +75,8 @@ class NecessaryUseAnalyticsInstrumentedTest {
             reopenLogs = emptyList()
         )
         assertEquals(3, report.totalSessionCount)
-        assertEquals(3, report.overrunCount)
-        assertEquals(1.0, report.overrunRate, 0.0001)
+        assertEquals(0, report.overrunCount)
+        assertEquals(0.0, report.overrunRate, 0.0)
         assertEquals(1, report.necessaryUseCount)
         assertEquals(5_000L, report.necessaryUseExcessMillis)
     }

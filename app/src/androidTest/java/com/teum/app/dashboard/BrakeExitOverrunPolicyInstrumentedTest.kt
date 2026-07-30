@@ -18,7 +18,37 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class BrakeExitOverrunPolicyInstrumentedTest {
     @Test
-    fun confirmedBrakeExit_excludesOnlyAchievedClearPurposeSessionFromOverrun() = runBlocking {
+    fun todayInitialGoalOverrunCount_usesPersistedExtensionCount() = runBlocking {
+        val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
+        repository.deleteAllSessionLogs()
+
+        val now = System.currentTimeMillis()
+        repository.saveEndedSession(
+            overrunSession(now - 1_000L, IntentChoice.CLEAR_PURPOSE)
+        )
+        repository.saveEndedSession(
+            overrunSession(now, IntentChoice.CLEAR_PURPOSE).copy(
+                extensionCount = 1,
+                totalExtensionDurationMillis = 5_000L
+            )
+        )
+
+        val sessions = repository.observeSessionsForLastSevenDays().first()
+        val extendedSession = sessions.single { it.extensionCount == 1 }
+        assertEquals(1, extendedSession.extensionCount)
+        assertEquals(1, repository.observeTodayOverrunCount().first())
+
+        val report = WeeklyReportAnalyzer.calculate(
+            sessions = sessions,
+            timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(sessions),
+            reopenLogs = emptyList()
+        )
+        assertEquals(1, report.overrunCount)
+        assertEquals(0.5, report.overrunRate, 0.0)
+    }
+
+    @Test
+    fun confirmedBrakeExit_preservesRawOverrunButInitialGoalStatsRequireExtension() = runBlocking {
         val repository = SessionLogRepository(ApplicationProvider.getApplicationContext())
         repository.deleteAllSessionLogs()
 
@@ -87,9 +117,9 @@ class BrakeExitOverrunPolicyInstrumentedTest {
             timeSlotStats = VulnerabilityAnalyzer.calculateTimeSlotStats(sessions),
             reopenLogs = emptyList()
         )
-        assertEquals(4, report.overrunCount)
-        assertEquals(4.0 / 5.0, report.overrunRate, 0.0001)
-        assertEquals(4, repository.observeTodayOverrunCount().first())
+        assertEquals(0, report.overrunCount)
+        assertEquals(0.0, report.overrunRate, 0.0)
+        assertEquals(0, repository.observeTodayOverrunCount().first())
     }
 
     private fun assertOverrunIsRetained(session: SessionLogEntity) {
