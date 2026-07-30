@@ -3,8 +3,8 @@
 object SessionDisplayText {
     fun intent(intentChoice: String): String = when (intentChoice) {
         "CLEAR_PURPOSE" -> "명확한 목적"
-        "MINDFUL_REST" -> "인지하고 선택한 휴식"
-        "UNCONSCIOUS_OPEN" -> "무의식적으로 실행"
+        "MINDFUL_REST" -> "인지된 휴식"
+        "UNCONSCIOUS_OPEN" -> "무의식 실행"
         "CLOSE_NOW" -> "사용하지 않고 닫기"
         else -> "확인되지 않은 목적"
     }
