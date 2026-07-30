@@ -11,6 +11,12 @@ interface SessionLogDao {
     @Insert
     suspend fun insertSessionLog(entity: SessionLogEntity): Long
 
+    @Query("SELECT * FROM session_logs ORDER BY startedAtMillis ASC")
+    suspend fun getAllSessionLogsForDebug(): List<SessionLogEntity>
+
+    @Query("SELECT COUNT(*) FROM session_logs")
+    suspend fun countSessionLogsForDebug(): Int
+
     @Query("SELECT * FROM session_logs ORDER BY endedAtMillis DESC LIMIT :limit")
     fun observeRecentSessions(limit: Int = 10): Flow<List<SessionLogEntity>>
 

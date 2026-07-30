@@ -11,6 +11,15 @@ interface ReopenLogDao {
     @Insert
     suspend fun insertReopenLog(entity: ReopenLogEntity): Long
 
+    @Query("SELECT * FROM reopen_logs ORDER BY id ASC")
+    suspend fun getAllReopenLogsForDebug(): List<ReopenLogEntity>
+
+    @Query("SELECT COUNT(*) FROM reopen_logs")
+    suspend fun countReopenLogsForDebug(): Int
+
+    @Query("DELETE FROM reopen_logs")
+    suspend fun deleteAllReopenLogsForDebug()
+
     @Query(
         """
         SELECT reopen_logs.*
