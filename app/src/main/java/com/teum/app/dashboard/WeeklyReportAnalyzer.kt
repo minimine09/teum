@@ -14,7 +14,7 @@ object WeeklyReportAnalyzer {
         openEvents: List<AppOpenEventEntity> = emptyList()
     ): WeeklyReportStats {
         val totalSessionCount = sessions.size
-        val overrunCount = sessions.count { it.overrun }
+        val overrunCount = sessions.count(SessionGoalPolicy::exceededInitialGoal)
         val clearPurposeSessions = sessions.filter { session ->
             session.intentChoice == CLEAR_PURPOSE
         }
@@ -88,7 +88,7 @@ object WeeklyReportAnalyzer {
                 dayOfWeek = dayOfWeek,
                 label = label,
                 sessionCount = daySessions.size,
-                overrunCount = daySessions.count { it.overrun },
+                overrunCount = daySessions.count(SessionGoalPolicy::exceededInitialGoal),
                 openCount = openEventsByDay[dayOfWeek].orEmpty().size,
                 extensionCount = daySessions.sumOf { it.extensionCount },
                 usageMillis = daySessions.sumOf { SessionMetricsResolver.resolve(it).usageMillis }

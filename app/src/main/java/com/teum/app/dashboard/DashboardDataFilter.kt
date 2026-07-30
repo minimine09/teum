@@ -53,11 +53,9 @@ object DashboardDataFilter {
 
         return DashboardStats(
             todaySessionCount = todaySessions.size,
-            todayOverrunCount = todaySessions.count { it.overrun },
+            todayOverrunCount = todaySessions.count(SessionGoalPolicy::exceededInitialGoal),
             todayFastReopenCount = todaySessions.count { it.isFastReopen },
-            todayTargetKeptCount = todaySessions.count { session ->
-                todaySessionMetrics.getValue(session).isOverrun.not()
-            },
+            todayTargetKeptCount = todaySessions.count(SessionGoalPolicy::keptInitialGoal),
             todayExtensionCount = todaySessions.sumOf { it.extensionCount },
             todayUsageMillis = todaySessionMetrics.values.sumOf { it.usageMillis },
             todayAppUsageStats = todayAppUsageStats,

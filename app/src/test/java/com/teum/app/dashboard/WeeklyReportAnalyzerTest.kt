@@ -20,10 +20,10 @@ class WeeklyReportAnalyzerTest {
         val report = report(listOf(
             session(Calendar.MONDAY, 9, overrun=true, extensions=2, gap=20_000),
             session(Calendar.MONDAY, 9, gap=40_000),
-            session(Calendar.SATURDAY, 21, overrun=true, fast=true, gap=30_000)
+            session(Calendar.SATURDAY, 21, overrun=true, extensions=1, fast=true, gap=30_000)
         ))
         assertEquals(3, report.totalSessionCount); assertEquals(2, report.overrunCount)
-        assertEquals(2.0/3, report.overrunRate, 1e-6); assertEquals(2, report.extensionCount)
+        assertEquals(2.0/3, report.overrunRate, 1e-6); assertEquals(3, report.extensionCount)
         assertEquals(1, report.fastReopenCount); assertEquals(30_000L, report.averageReopenGapMillis)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.MONDAY }.overrunCount)
         assertEquals(1, report.dailyOverrunStats.first { it.dayOfWeek==Calendar.SATURDAY }.overrunCount)
@@ -60,9 +60,9 @@ class WeeklyReportAnalyzerTest {
 
     @Test fun vulnerableHourUsesPolicyEligibilityAndKeepsSelectedSlotMetrics() {
         val report = report(listOf(
-            session(Calendar.WEDNESDAY, 8, overrun = true),
-            session(Calendar.WEDNESDAY, 20, overrun = true, fast = true),
-            session(Calendar.THURSDAY, 20, overrun = true)
+            session(Calendar.WEDNESDAY, 8, overrun = true, extensions = 1),
+            session(Calendar.WEDNESDAY, 20, overrun = true, extensions = 1, fast = true),
+            session(Calendar.THURSDAY, 20, overrun = true, extensions = 1)
         ))
 
         assertEquals(20, report.mostVulnerableHourSlot)
@@ -73,7 +73,7 @@ class WeeklyReportAnalyzerTest {
 
     @Test fun vulnerableHourRequiresTwoSessionsAndPositiveScore() {
         val oneSession = report(listOf(
-            session(Calendar.WEDNESDAY, 8, overrun = true)
+            session(Calendar.WEDNESDAY, 8, overrun = true, extensions = 1)
         ))
         assertNull(oneSession.mostVulnerableHourSlot)
         assertNull(oneSession.mostVulnerableTimeSlotStat)
@@ -88,7 +88,7 @@ class WeeklyReportAnalyzerTest {
         assertTrue(noRisk.hasEnoughVulnerableTimeData)
 
         val belowThreshold = report(listOf(
-            session(Calendar.WEDNESDAY, 10, overrun = true),
+            session(Calendar.WEDNESDAY, 10, overrun = true, extensions = 1),
             session(Calendar.THURSDAY, 10)
         ))
         assertNull(belowThreshold.mostVulnerableTimeSlotStat)
@@ -114,6 +114,24 @@ class WeeklyReportAnalyzerTest {
         ))
         assertEquals(1, report.necessaryUseCount)
         assertEquals(30_000L, report.necessaryUseExcessMillis)
+    }
+
+    @Test fun overrunRateUsesInitialGoalExtensionChoiceInsteadOfFinalAllowanceOverrun() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9, overrun = true, extensions = 0),
+            session(Calendar.TUESDAY, 10, overrun = false, extensions = 1)
+        ))
+
+        assertEquals(1, report.overrunCount)
+        assertEquals(0.5, report.overrunRate, 0.0)
+        assertEquals(
+            0,
+            report.dailyOverrunStats.first { it.dayOfWeek == Calendar.MONDAY }.overrunCount
+        )
+        assertEquals(
+            1,
+            report.dailyOverrunStats.first { it.dayOfWeek == Calendar.TUESDAY }.overrunCount
+        )
     }
 
     @Test fun calculatesWeeklyChartBreakdowns() {

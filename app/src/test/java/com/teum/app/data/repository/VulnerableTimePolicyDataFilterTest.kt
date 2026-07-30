@@ -60,23 +60,27 @@ class VulnerableTimePolicyDataFilterTest {
                 packageName = "managed.youtube",
                 startedAtMillis = time(hour = 9, utc),
                 overrun = true,
+                extensionCount = 1,
                 fastReopen = true
             ),
             session(
                 packageName = "managed.youtube",
                 startedAtMillis = time(hour = 9, utc),
-                overrun = true
+                overrun = true,
+                extensionCount = 1
             ),
             session(
                 packageName = "removed.app",
                 startedAtMillis = time(hour = 22, utc),
                 overrun = true,
+                extensionCount = 1,
                 fastReopen = true
             ),
             session(
                 packageName = "removed.app",
                 startedAtMillis = time(hour = 22, utc),
                 overrun = true,
+                extensionCount = 1,
                 fastReopen = true
             )
         )
@@ -98,6 +102,7 @@ class VulnerableTimePolicyDataFilterTest {
         packageName: String,
         startedAtMillis: Long = 1L,
         overrun: Boolean = false,
+        extensionCount: Int = 0,
         fastReopen: Boolean = false
     ) = SessionLogEntity(
         packageName = packageName,
@@ -109,7 +114,7 @@ class VulnerableTimePolicyDataFilterTest {
         intentChoice = "CLEAR_PURPOSE",
         outcomeType = null,
         overrun = overrun,
-        extensionCount = 0,
+        extensionCount = extensionCount,
         isFastReopen = fastReopen,
         reopenGapMillis = if (fastReopen) 30_000L else null,
         createdAtMillis = startedAtMillis + 1L

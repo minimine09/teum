@@ -38,6 +38,7 @@ class DashboardDataFilterTest {
                 "youtube",
                 200,
                 overrun = true,
+                extensionCount = 1,
                 fast = true,
                 drifted = true,
                 outcomeType = "PURPOSE_DRIFT"
@@ -50,7 +51,7 @@ class DashboardDataFilterTest {
         assertEquals(1, stats.todayOverrunCount)
         assertEquals(1, stats.todayFastReopenCount)
         assertEquals(1, stats.todayTargetKeptCount)
-        assertEquals(0, stats.todayExtensionCount)
+        assertEquals(1, stats.todayExtensionCount)
         assertEquals(2L, stats.todayUsageMillis)
         assertEquals(1, stats.todayPurposeKeptCount)
         assertEquals(1, stats.todayPurposeDriftCount)
@@ -127,6 +128,30 @@ class DashboardDataFilterTest {
         assertEquals(listOf("youtube", "instagram"), stats.todayAppUsageStats.map { it.packageName })
         assertEquals(30_000L, stats.todayAppUsageStats[0].usageMillis)
         assertEquals("YouTube", stats.todayAppUsageStats[0].appDisplayName)
+    }
+
+    @Test
+    fun todayGoalComplianceUsesExtensionChoiceInsteadOfFinalAllowanceOverrun() {
+        val sessions = listOf(
+            session(
+                "tiny-final-overrun",
+                100,
+                overrun = true,
+                extensionCount = 0
+            ),
+            session(
+                "extended-within-final-limit",
+                101,
+                overrun = false,
+                extensionCount = 1
+            )
+        )
+
+        val stats = DashboardDataFilter.todayStats(sessions, startOfTodayMillis = 100)
+
+        assertEquals(1, stats.todayOverrunCount)
+        assertEquals(1, stats.todayTargetKeptCount)
+        assertEquals(1, stats.todayExtensionCount)
     }
 
     @Test

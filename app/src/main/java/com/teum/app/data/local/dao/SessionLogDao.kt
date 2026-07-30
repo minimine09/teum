@@ -17,7 +17,14 @@ interface SessionLogDao {
     @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis")
     fun observeTodaySessionCount(startOfDayMillis: Long): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis AND overrun = 1")
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM session_logs
+        WHERE startedAtMillis >= :startOfDayMillis
+            AND extensionCount > 0
+        """
+    )
     fun observeTodayOverrunCount(startOfDayMillis: Long): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM session_logs WHERE startedAtMillis >= :startOfDayMillis AND isFastReopen = 1")
