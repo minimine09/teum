@@ -560,21 +560,22 @@ class TeumAccessibilityService : AccessibilityService() {
         val elapsedMillis = SessionManager.getElapsedMillis(brakeShownAtMillis)
         val effectiveUsageMillis =
             (elapsedMillis - session.interventionVisibleMillis).coerceAtLeast(0L)
-        val finalTargetDurationMillis =
-            (session.targetDurationMillis + session.totalExtensionDurationMillis)
-                .coerceAtLeast(0L)
+        val currentLimitDurationMillis = session.currentLimitDurationMillis.coerceAtLeast(0L)
         SessionManager.recordCurrentOverrunCandidate(
             effectiveUsageMillis = effectiveUsageMillis,
-            finalTargetDurationMillis = finalTargetDurationMillis,
+            finalTargetDurationMillis = currentLimitDurationMillis,
             nowMillis = brakeShownAtMillis
         )
 
         overlayController.showSessionBrake(
             packageName = session.packageName,
             elapsedMillis = effectiveUsageMillis,
-            targetDurationMillis = finalTargetDurationMillis,
+            targetDurationMillis = session.targetDurationMillis,
+            currentLimitDurationMillis = currentLimitDurationMillis,
             interventionActive = session.currentInterventionActive,
             extensionLimitReached = isExtensionLimitReached(session),
+            cautionExtensionCount = session.cautionExtensionCount,
+            cautionExtensionLimit = RuntimeInterventionPolicy.MAX_CAUTION_EXTENSION_COUNT,
             availableExtensionDurations = availableExtensionDurations,
             debugSessionId = session.debugSessionId,
             source = "session_brake",
@@ -592,8 +593,8 @@ class TeumAccessibilityService : AccessibilityService() {
             debugSessionId = session.debugSessionId,
             event = "BRAKE_SHOWN",
             detail = "elapsed=$elapsedMillis effective=$effectiveUsageMillis " +
-                "target=$finalTargetDurationMillis scheduleLimit=${session.currentLimitDurationMillis} " +
-                "overrun=${effectiveUsageMillis >= finalTargetDurationMillis}"
+                "initialTarget=${session.targetDurationMillis} scheduleLimit=$currentLimitDurationMillis " +
+                "overrun=${effectiveUsageMillis >= currentLimitDurationMillis}"
         )
     }
 
@@ -850,8 +851,7 @@ class TeumAccessibilityService : AccessibilityService() {
             debugSessionId = endedSession.debugSessionId,
             durationMillis = effectiveUsageMillis,
             intentChoice = endedSession.intentChoice,
-            targetDurationMillis = endedSession.targetDurationMillis +
-                endedSession.totalExtensionDurationMillis,
+            targetDurationMillis = endedSession.targetDurationMillis,
             extensionCount = endedSession.extensionCount,
             interventionActive = endedSession.interventionEverApplied,
             source = source,
