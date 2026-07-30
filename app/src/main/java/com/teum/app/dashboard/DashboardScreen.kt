@@ -874,7 +874,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
     val targetKeptPercent = (targetKeptRate * 100).roundToInt()
     val valueText = if (hasSessions) "${targetKeptPercent}%" else "—"
     val descriptionText = if (hasSessions) {
-        "${stats.todaySessionCount}개 세션 중 ${stats.todayTargetKeptCount}개를 목표 안에서 마쳤어요"
+        "앱 사용 ${stats.todaySessionCount}번 중 ${stats.todayTargetKeptCount}번을 정한 시간 안에 마쳤어요"
     } else {
         "첫 사용이 기록되면\n목표 준수율을 보여드려요"
     }
@@ -888,7 +888,7 @@ private fun HomeMainStatCard(stats: DashboardStats) {
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "오늘 목표 준수",
+                text = "오늘 목표 시간 준수",
                 color = Color(0xFFAAB1C3),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold

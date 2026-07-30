@@ -263,6 +263,8 @@ fun SessionBrakeContent(
     val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
     val remainingCautionExtensions =
         (cautionExtensionLimit - cautionExtensionCount).coerceAtLeast(0)
+    val sessionBrakeTitle =
+        if (cautionExtensionCount > 0) "연장한 시간에 도달했어요" else "목표 시간에 도달했어요"
 
     Column(
         modifier = modifier
@@ -290,7 +292,7 @@ fun SessionBrakeContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "목표 시간에 도달했어요",
+            text = sessionBrakeTitle,
             color = TextPrimary,
             fontSize = 19.sp,
             fontWeight = FontWeight.Bold
