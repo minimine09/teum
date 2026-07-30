@@ -191,8 +191,11 @@ fun SessionBrakeScreen(
     appName: String = "YouTube",
     elapsedMillis: Long? = null,
     targetDurationMillis: Long? = null,
+    currentLimitDurationMillis: Long? = targetDurationMillis,
     interventionActive: Boolean = false,
     extensionLimitReached: Boolean = false,
+    cautionExtensionCount: Int = 0,
+    cautionExtensionLimit: Int = 0,
     availableExtensionDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
@@ -212,8 +215,11 @@ fun SessionBrakeScreen(
             appName = appName,
             elapsedMillis = elapsedMillis,
             targetDurationMillis = targetDurationMillis,
+            currentLimitDurationMillis = currentLimitDurationMillis,
             interventionActive = interventionActive,
             extensionLimitReached = extensionLimitReached,
+            cautionExtensionCount = cautionExtensionCount,
+            cautionExtensionLimit = cautionExtensionLimit,
             availableExtensionDurations = availableExtensionDurations,
             onEndClick = onEndClick,
             onExtendClick = onExtendClick,
@@ -230,8 +236,11 @@ fun SessionBrakeContent(
     appName: String = "YouTube",
     elapsedMillis: Long? = null,
     targetDurationMillis: Long? = null,
+    currentLimitDurationMillis: Long? = targetDurationMillis,
     interventionActive: Boolean = false,
     extensionLimitReached: Boolean = false,
+    cautionExtensionCount: Int = 0,
+    cautionExtensionLimit: Int = 0,
     availableExtensionDurations: List<TargetDurationChoice> = DefaultDurationOptions,
     onEndClick: () -> Unit,
     onExtendClick: (TargetDurationChoice) -> Unit,
@@ -246,20 +255,14 @@ fun SessionBrakeContent(
             ?: TargetDurationChoice.TEST_FIVE_SECONDS
         )
     }
-    val overrunMillis = if (elapsedMillis != null && targetDurationMillis != null) {
-        (elapsedMillis - targetDurationMillis).coerceAtLeast(0L)
+    val overrunMillis = if (elapsedMillis != null && currentLimitDurationMillis != null) {
+        (elapsedMillis - currentLimitDurationMillis).coerceAtLeast(0L)
     } else {
         null
     }
     val accentColor = if (interventionActive) CareAccent else MaterialTheme.colorScheme.primary
-    val brakeGuidanceText = when {
-        interventionActive && extensionLimitReached ->
-            "오늘 이 시간대의 연장은 여기까지예요.\n처음 목적을 마무리했다면 나와볼까요?"
-        interventionActive ->
-            "조심 모드가 켜져 있어요.\n취약 시간대에는 연장이 3회까지만 가능해요."
-        else ->
-            "조금 더 사용할지, 여기서 멈출지 짧게 확인해요."
-    }
+    val remainingCautionExtensions =
+        (cautionExtensionLimit - cautionExtensionCount).coerceAtLeast(0)
 
     Column(
         modifier = modifier
@@ -294,7 +297,7 @@ fun SessionBrakeContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "잠시 쉬어가거나 목적을 확인해 주세요.",
+            text = "잠시 쉬어가거나 처음 목적을 다시 확인해 보세요.",
             color = TextSecondary,
             fontSize = 13.sp,
             textAlign = TextAlign.Center
@@ -329,7 +332,7 @@ fun SessionBrakeContent(
                     .background(BorderSoft)
             )
             BrakeTimeMetric(
-                label = "목표",
+                label = "처음 목표",
                 value = targetDurationMillis?.let(::formatDurationMillis) ?: "-"
             )
         }
@@ -341,12 +344,21 @@ fun SessionBrakeContent(
                 .background(BorderSoft)
         )
         Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = brakeGuidanceText,
-            color = TextSecondary,
-            fontSize = 11.sp,
-            textAlign = TextAlign.Center
-        )
+        if (interventionActive && cautionExtensionLimit > 0) {
+            CautionExtensionStatus(
+                extensionCount = cautionExtensionCount.coerceIn(0, cautionExtensionLimit),
+                extensionLimit = cautionExtensionLimit,
+                remainingCount = remainingCautionExtensions,
+                limitReached = extensionLimitReached
+            )
+        } else {
+            Text(
+                text = "조금 더 사용할지, 여기서 멈출지 짧게 확인해요.",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
+        }
         Spacer(modifier = Modifier.height(20.dp))
         if (isExtensionExpanded) {
             DurationChoiceSlider(
@@ -390,6 +402,54 @@ private fun BrakeTimeMetric(
     ) {
         Text(text = label, color = TextSecondary, fontSize = 11.sp)
         Text(text = value, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun CautionExtensionStatus(
+    extensionCount: Int,
+    extensionLimit: Int,
+    remainingCount: Int,
+    limitReached: Boolean
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (limitReached) {
+            Text(
+                text = "이번 사용의 연장 한도 ${extensionLimit}회에 도달했어요.",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "처음 목적을 마무리했다면 여기서 나와볼까요?",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                textAlign = TextAlign.Center
+            )
+        } else {
+            Text(
+                text = "연장 ${extensionCount}/${extensionLimit}회",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "${remainingCount}회 남았어요",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -454,7 +514,7 @@ private fun InterventionLayout(
 @Composable
 private fun CautionModeBadge(modifier: Modifier = Modifier) {
     Text(
-        text = "⚠ 조심 모드 활성",
+        text = "조심 모드 · 취약 시간대",
         modifier = modifier
             .background(Color(0xFFFFF1D8), RoundedCornerShape(50.dp))
             .padding(horizontal = 10.dp, vertical = 5.dp),
@@ -1169,7 +1229,7 @@ private fun OutcomeSessionSummaryCard(
             OutcomeSummaryLine(label = "앱", value = sessionData.appName)
             OutcomeSummaryLine(label = "처음 목적", value = sessionData.intentText)
             OutcomeSummaryLine(label = "실제 사용", value = formatKoreanDuration(sessionData.actualUsageMillis))
-            OutcomeSummaryLine(label = "목표 시간", value = formatKoreanDuration(sessionData.targetDurationMillis))
+            OutcomeSummaryLine(label = "처음 목표", value = formatKoreanDuration(sessionData.targetDurationMillis))
             OutcomeSummaryLine(label = "연장 횟수", value = "${sessionData.extensionCount}회")
         }
     }
@@ -1292,7 +1352,7 @@ private fun buildSessionBrakeSummary(
         return "감지된 앱: $appName"
     }
 
-    val base = "감지된 앱: $appName\n사용 시간: ${formatDurationMillis(elapsedMillis)} / 목표 시간: ${formatDurationMillis(targetDurationMillis)}"
+    val base = "감지된 앱: $appName\n사용 시간: ${formatDurationMillis(elapsedMillis)} / 처음 목표: ${formatDurationMillis(targetDurationMillis)}"
     return if (overrunMillis != null && overrunMillis > 0L) {
         "$base\n점검까지 지난 시간: ${formatDurationMillis(overrunMillis)}"
     } else {
