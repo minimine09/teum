@@ -17,6 +17,31 @@
 
 ---
 
+## 앱 화면
+
+<table>
+  <tr>
+    <td align="center"><strong>시작</strong></td>
+    <td align="center"><strong>관리 앱 선택</strong></td>
+    <td align="center"><strong>사용 모드 선택</strong></td>
+  </tr>
+  <tr>
+    <td><img src="./docs/images/screenshots/01-welcome.png" alt="Teum 시작 화면" /></td>
+    <td><img src="./docs/images/screenshots/02-managed-apps.png" alt="관리 앱 선택 화면" /></td>
+    <td><img src="./docs/images/screenshots/03-mode-selection.png" alt="보통 모드와 조심 모드 선택 화면" /></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>오늘의 사용</strong></td>
+    <td align="center"><strong>최근 사용 기록</strong></td>
+    <td align="center"><strong>최근 7일 리포트</strong></td>
+  </tr>
+  <tr>
+    <td><img src="./docs/images/screenshots/04-home-dashboard.png" alt="오늘의 사용 대시보드" /></td>
+    <td><img src="./docs/images/screenshots/05-recent-sessions.png" alt="최근 사용 기록" /></td>
+    <td><img src="./docs/images/screenshots/06-weekly-report.png" alt="최근 7일 리포트" /></td>
+  </tr>
+</table>
+
 ## 틈은 무엇이 다른가요?
 
 SNS와 숏폼 앱을 습관적으로 열었을 때, 사용자는 종종 자신이 왜 앱을 켰는지조차 인식하지 못합니다. 틈은 앱 실행과 콘텐츠 소비 사이에 짧은 확인 과정을 넣어 사용자가 스스로 선택할 수 있도록 돕습니다.
@@ -40,13 +65,15 @@ flowchart LR
     C --> E["목적과 목표 시간 선택"]
     D --> E
     E --> F["콘텐츠 사용"]
-    F --> G["Session Brake"]
-    G -- "종료" --> H{"명확한 목적 세션?"}
-    G -- "연장" --> F
-    H -- "예" --> I["Outcome Check"]
-    H -- "아니요" --> J["세션 저장"]
-    I --> J
-    J --> K["홈 · 기록 · 최근 7일 리포트"]
+    F --> G{"목표 도달 또는 앱 이탈"}
+    G -- "목표 도달" --> H["Session Brake"]
+    H -- "연장" --> F
+    H -- "종료" --> I{"명확한 목적 세션?"}
+    G -- "앱 직접 이탈" --> I
+    I -- "예" --> J["Outcome Check"]
+    I -- "아니요" --> K["세션 저장"]
+    J --> K
+    K --> L["홈 · 기록 · 최근 7일 리포트"]
 ```
 
 ## 보통 모드와 조심 모드
@@ -81,7 +108,7 @@ flowchart LR
 | 연장 점수 | 시간대별 연장 횟수를 활성 세션 수로 정규화 |
 | 실행 점수 | 시간대별 앱 실행 횟수를 5회 기준으로 정규화 |
 
-첫 연장, 빠른 재진입, Outcome 응답은 세션 시작 시간이 아니라 **이벤트가 실제 발생한 시간대**에 반영합니다.
+첫 연장, 빠른 재진입, Outcome 응답은 세션 시작 시간이 아니라 **이벤트가 실제 발생한 시간대**에 반영합니다. 이전 데이터처럼 이벤트 시각이 없으면 목표 도달 추정 시각 또는 세션 종료 시각을 대체값으로 사용합니다.
 
 ## 대시보드
 
@@ -115,8 +142,8 @@ flowchart LR
 ```mermaid
 flowchart TD
     A["AccessibilityService"] --> B["SessionManager"]
-    B --> C["Overlay Controller"]
-    B --> D["SessionLogRepository"]
+    A --> C["Overlay Controller"]
+    A --> D["SessionLogRepository"]
     D --> E[("Room DB")]
     E --> F["Dashboard Analyzer"]
     E --> G["Vulnerability Analyzer"]
