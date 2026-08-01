@@ -233,25 +233,6 @@ Android Studio에서 프로젝트를 연 뒤 `app` 구성을 실행합니다. �
 
 Windows PowerShell에서는 `./gradlew` 대신 `./gradlew.bat`을 사용할 수 있습니다.
 
-## 데모 데이터 도구
-
-Debug 빌드에는 최근 7일의 시연용 Room 데이터를 생성하고 결과를 검증하는 도구가 포함되어 있습니다.
-
-1. 설정 탭으로 이동합니다.
-2. 상단 `설정` 제목을 5번 누릅니다.
-3. 시연 데이터 생성 또는 현재 Seed 검증을 실행합니다.
-4. 필요한 경우 현재 시간을 취약 시간대로 강제할 수 있습니다.
-
-> 시연 데이터 생성은 기존 사용 기록을 삭제하고 데모 데이터로 교체합니다. Release 빌드에는 이 도구가 포함되지 않습니다.
-
-## 협업 영역
-
-| 영역 | 담당 범위 |
-| --- | --- |
-| **A · Intervention Engine** | AccessibilityService, Overlay, SessionManager |
-| **B · Data & Analytics** | Room DB, Repository, 취약도 분석, Dashboard 데이터 |
-| **C · UX & Presentation** | 온보딩, 권한 흐름, 화면 구성과 사용자 문구 |
-
 ---
 
 <p align="center">
