@@ -22,10 +22,23 @@ object WeeklyReportAnalyzer {
             session.outcomeRespondedAtMillis != null
         }
         val purposeDriftCount = clearPurposeSessions.count { it.purposeDrifted == true }
+        val purposeAchievedOutcomeCount = sessions.count { session ->
+            session.outcomeType == PURPOSE_ACHIEVED
+        }
         val necessaryUseSessions = clearPurposeSessions.filter { session ->
             session.outcomeType == NECESSARY_USE
         }
+        val necessaryUseOutcomeCount = sessions.count { session ->
+            session.outcomeType == NECESSARY_USE
+        }
+        val purposeDriftOutcomeCount = sessions.count { session ->
+            session.outcomeType == PURPOSE_DRIFT
+        }
+        val unconsciousUseOutcomeCount = sessions.count { session ->
+            session.outcomeType == CONTINUED_SCROLLING
+        }
         val totalReopenGapMillis = reopenLogs.sumOf { it.gapTimeMillis }
+        val intentChoiceStats = calculateIntentChoiceStats(sessions, totalSessionCount)
         val mostVulnerableTimeSlotStat = VulnerableTimeSelector.rankVulnerableSlots(
             timeSlotStats = timeSlotStats
         ).firstOrNull()
@@ -38,7 +51,11 @@ object WeeklyReportAnalyzer {
             fastReopenCount = reopenLogs.count { it.isFastReopen },
             outcomeResponseCount = purposeOutcomeSessions.size,
             purposeDriftRate = rate(purposeDriftCount, clearPurposeSessions.size),
+            purposeAchievedOutcomeCount = purposeAchievedOutcomeCount,
             necessaryUseCount = necessaryUseSessions.size,
+            necessaryUseOutcomeCount = necessaryUseOutcomeCount,
+            purposeDriftOutcomeCount = purposeDriftOutcomeCount,
+            unconsciousUseOutcomeCount = unconsciousUseOutcomeCount,
             necessaryUseExcessMillis = necessaryUseSessions.sumOf {
                 it.necessaryUseExcessMillis
             },
@@ -59,6 +76,9 @@ object WeeklyReportAnalyzer {
             interventionAppliedSessionCount = sessions.count {
                 it.interventionEverApplied || it.interventionAppliedAtStart
             },
+            clearPurposeIntentStat = intentChoiceStats.clearPurpose,
+            mindfulRestIntentStat = intentChoiceStats.mindfulRest,
+            unconsciousOpenIntentStat = intentChoiceStats.unconsciousOpen,
             dailyOverrunStats = calculateDailyOverrunStats(
                 sessions = sessions,
                 openEvents = openEvents
@@ -118,12 +138,56 @@ object WeeklyReportAnalyzer {
             .sortedByDescending { it.usageMillis }
     }
 
+    private fun calculateIntentChoiceStats(
+        sessions: List<SessionLogEntity>,
+        totalSessionCount: Int
+    ): IntentChoiceStats {
+        var clearPurposeCount = 0
+        var mindfulRestCount = 0
+        var unconsciousOpenCount = 0
+
+        sessions.forEach { session ->
+            when (session.intentChoice) {
+                CLEAR_PURPOSE -> clearPurposeCount++
+                MINDFUL_REST, LEGACY_RECOGNIZED_BREAK -> mindfulRestCount++
+                UNCONSCIOUS_OPEN -> unconsciousOpenCount++
+            }
+        }
+
+        return IntentChoiceStats(
+            clearPurpose = IntentChoiceReportStat(
+                count = clearPurposeCount,
+                rate = rate(clearPurposeCount, totalSessionCount)
+            ),
+            mindfulRest = IntentChoiceReportStat(
+                count = mindfulRestCount,
+                rate = rate(mindfulRestCount, totalSessionCount)
+            ),
+            unconsciousOpen = IntentChoiceReportStat(
+                count = unconsciousOpenCount,
+                rate = rate(unconsciousOpenCount, totalSessionCount)
+            )
+        )
+    }
+
     private fun rate(count: Int, total: Int): Double {
         return if (total == 0) 0.0 else count.toDouble() / total.toDouble()
     }
 
+    private data class IntentChoiceStats(
+        val clearPurpose: IntentChoiceReportStat,
+        val mindfulRest: IntentChoiceReportStat,
+        val unconsciousOpen: IntentChoiceReportStat
+    )
+
     private const val CLEAR_PURPOSE = "CLEAR_PURPOSE"
+    private const val MINDFUL_REST = "MINDFUL_REST"
+    private const val UNCONSCIOUS_OPEN = "UNCONSCIOUS_OPEN"
+    private const val LEGACY_RECOGNIZED_BREAK = "RECOGNIZED_BREAK"
+    private const val PURPOSE_ACHIEVED = "PURPOSE_ACHIEVED"
     private const val NECESSARY_USE = "NECESSARY_USE"
+    private const val PURPOSE_DRIFT = "PURPOSE_DRIFT"
+    private const val CONTINUED_SCROLLING = "CONTINUED_SCROLLING"
     private val DAYS = listOf(
         Calendar.MONDAY to "월",
         Calendar.TUESDAY to "화",

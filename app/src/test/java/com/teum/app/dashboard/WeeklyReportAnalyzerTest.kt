@@ -14,6 +14,77 @@ class WeeklyReportAnalyzerTest {
         assertEquals(0, report.totalSessionCount); assertEquals(0.0, report.overrunRate, 0.0)
         assertEquals(0.0, report.purposeDriftRate, 0.0); assertNull(report.averageReopenGapMillis)
         assertNull(report.mostVulnerableHourSlot); assertEquals(7, report.dailyOverrunStats.size)
+        assertEquals(0, report.clearPurposeIntentStat.count)
+        assertEquals(0, report.mindfulRestIntentStat.count)
+        assertEquals(0, report.unconsciousOpenIntentStat.count)
+        assertEquals(0.0, report.clearPurposeIntentStat.rate, 0.0)
+        assertEquals(0.0, report.mindfulRestIntentStat.rate, 0.0)
+        assertEquals(0.0, report.unconsciousOpenIntentStat.rate, 0.0)
+        assertEquals(0, report.purposeAchievedOutcomeCount)
+        assertEquals(0, report.necessaryUseOutcomeCount)
+        assertEquals(0, report.purposeDriftOutcomeCount)
+        assertEquals(0, report.unconsciousUseOutcomeCount)
+    }
+
+    @Test fun calculatesIntentChoiceDistributionFromSavedSessions() {
+        val sessions = List(13) {
+            session(Calendar.MONDAY, 9, intent = "CLEAR_PURPOSE")
+        } + List(3) {
+            session(Calendar.TUESDAY, 10, intent = "MINDFUL_REST")
+        } + listOf(
+            session(Calendar.WEDNESDAY, 11, intent = "UNCONSCIOUS_OPEN")
+        )
+        val report = report(sessions)
+
+        assertEquals(17, report.totalSessionCount)
+        assertEquals(13, report.clearPurposeIntentStat.count)
+        assertEquals(3, report.mindfulRestIntentStat.count)
+        assertEquals(1, report.unconsciousOpenIntentStat.count)
+        assertEquals(
+            report.totalSessionCount,
+            report.clearPurposeIntentStat.count +
+                report.mindfulRestIntentStat.count +
+                report.unconsciousOpenIntentStat.count
+        )
+        assertEquals(13.0 / 17.0, report.clearPurposeIntentStat.rate, 1e-6)
+        assertEquals(3.0 / 17.0, report.mindfulRestIntentStat.rate, 1e-6)
+        assertEquals(1.0 / 17.0, report.unconsciousOpenIntentStat.rate, 1e-6)
+    }
+
+    @Test fun legacyRecognizedBreakCountsAsMindfulRestForReportDistribution() {
+        val report = report(listOf(
+            session(Calendar.MONDAY, 9, intent = "RECOGNIZED_BREAK")
+        ))
+
+        assertEquals(1, report.mindfulRestIntentStat.count)
+        assertEquals(1.0, report.mindfulRestIntentStat.rate, 0.0)
+    }
+
+    @Test fun calculatesOutcomeDistributionFromSavedOutcomeTypesOnly() {
+        val sessions = List(4) {
+            session(Calendar.MONDAY, 9, outcome = "PURPOSE_ACHIEVED")
+        } + List(3) {
+            session(Calendar.TUESDAY, 10, outcome = "NECESSARY_USE")
+        } + List(4) {
+            session(Calendar.WEDNESDAY, 11, outcome = "PURPOSE_DRIFT")
+        } + listOf(
+            session(Calendar.THURSDAY, 12, outcome = "CONTINUED_SCROLLING"),
+            session(Calendar.FRIDAY, 13, outcome = null)
+        )
+        val report = report(sessions)
+
+        assertEquals(4, report.purposeAchievedOutcomeCount)
+        assertEquals(3, report.necessaryUseOutcomeCount)
+        assertEquals(4, report.purposeDriftOutcomeCount)
+        assertEquals(1, report.unconsciousUseOutcomeCount)
+        assertEquals(
+            12,
+            report.purposeAchievedOutcomeCount +
+                report.necessaryUseOutcomeCount +
+                report.purposeDriftOutcomeCount +
+                report.unconsciousUseOutcomeCount
+        )
+        assertEquals(3, report.necessaryUseCount)
     }
 
     @Test fun calculatesTotalsAverageGapAndWeekdayOverruns() {
@@ -113,6 +184,7 @@ class WeeklyReportAnalyzerTest {
             session(Calendar.THURSDAY, 15, outcome = "PURPOSE_DRIFT")
         ))
         assertEquals(1, report.necessaryUseCount)
+        assertEquals(2, report.necessaryUseOutcomeCount)
         assertEquals(30_000L, report.necessaryUseExcessMillis)
     }
 
