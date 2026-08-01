@@ -21,10 +21,8 @@
 
   <g filter="url(#shadow)">
     <rect x="112" y="70" width="236" height="220" rx="54" fill="white"/>
-    <path d="M162 129C162 116.85 171.85 107 184 107H276C288.15 107 298 116.85 298 129V148H162V129Z" fill="url(#mark)"/>
-    <path d="M162 170H221V253H184C171.85 253 162 243.15 162 231V170Z" fill="url(#mark)"/>
-    <rect x="243" y="170" width="55" height="83" rx="18" fill="#F2A02D"/>
-    <circle cx="270.5" cy="197.5" r="8.5" fill="white" fill-opacity="0.88"/>
+    <rect x="174" y="94" width="46" height="172" rx="11" fill="#5B5FEA"/>
+    <rect x="240" y="94" width="46" height="172" rx="11" fill="#2EC4A6"/>
   </g>
 
   <text x="424" y="139" fill="#1F2430" font-family="Arial, Pretendard, sans-serif" font-size="72" font-weight="800" letter-spacing="-2">틈</text>
