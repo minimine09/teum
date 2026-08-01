@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/images/teum-banner.svg" width="100%" alt="틈 Teum — 무의식적인 앱 사용 사이에 선택의 틈을 만들다" />
+  <img src="./docs/images/teum-banner-v2.svg" width="100%" alt="틈 Teum — 무의식적인 앱 사용 사이에 선택의 틈을 만들다" />
 </p>
 
 <p align="center">
