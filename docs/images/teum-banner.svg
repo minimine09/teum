@@ -1,0 +1,41 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="70" y1="28" x2="1120" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8F9FC"/>
+      <stop offset="1" stop-color="#ECEEFF"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="138" y1="86" x2="326" y2="278" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7F5BEA"/>
+      <stop offset="1" stop-color="#5B5FEA"/>
+    </linearGradient>
+    <filter id="shadow" x="84" y="42" width="308" height="308" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#5B5FEA" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="360" rx="38" fill="url(#background)"/>
+  <circle cx="1081" cy="72" r="132" fill="#5B5FEA" fill-opacity="0.05"/>
+  <circle cx="1138" cy="316" r="178" fill="#F2A02D" fill-opacity="0.07"/>
+  <path d="M820 51H1095" stroke="#5B5FEA" stroke-opacity="0.10" stroke-width="2" stroke-linecap="round"/>
+  <path d="M905 309H1122" stroke="#F2A02D" stroke-opacity="0.16" stroke-width="2" stroke-linecap="round"/>
+
+  <g filter="url(#shadow)">
+    <rect x="112" y="70" width="236" height="220" rx="54" fill="white"/>
+    <path d="M162 129C162 116.85 171.85 107 184 107H276C288.15 107 298 116.85 298 129V148H162V129Z" fill="url(#mark)"/>
+    <path d="M162 170H221V253H184C171.85 253 162 243.15 162 231V170Z" fill="url(#mark)"/>
+    <rect x="243" y="170" width="55" height="83" rx="18" fill="#F2A02D"/>
+    <circle cx="270.5" cy="197.5" r="8.5" fill="white" fill-opacity="0.88"/>
+  </g>
+
+  <text x="424" y="139" fill="#1F2430" font-family="Arial, Pretendard, sans-serif" font-size="72" font-weight="800" letter-spacing="-2">틈</text>
+  <text x="548" y="139" fill="#5B5FEA" font-family="Arial, sans-serif" font-size="36" font-weight="700" letter-spacing="4">TEUM</text>
+  <text x="428" y="204" fill="#1F2430" font-family="Arial, Pretendard, sans-serif" font-size="27" font-weight="700">무의식적인 앱 사용 사이에, 선택의 틈을 만들다</text>
+  <text x="428" y="251" fill="#778092" font-family="Arial, Pretendard, sans-serif" font-size="20" font-weight="500">Intent-aware · Adaptive intervention · Local-first analytics</text>
+
+  <rect x="428" y="281" width="112" height="34" rx="17" fill="#5B5FEA" fill-opacity="0.10"/>
+  <text x="449" y="304" fill="#5B5FEA" font-family="Arial, sans-serif" font-size="15" font-weight="700">ANDROID</text>
+  <rect x="552" y="281" width="102" height="34" rx="17" fill="#2EC4A6" fill-opacity="0.12"/>
+  <text x="577" y="304" fill="#168A75" font-family="Arial, sans-serif" font-size="15" font-weight="700">LOCAL</text>
+  <rect x="666" y="281" width="126" height="34" rx="17" fill="#F2A02D" fill-opacity="0.13"/>
+  <text x="687" y="304" fill="#C47608" font-family="Arial, sans-serif" font-size="15" font-weight="700">MINDFUL</text>
+</svg>
