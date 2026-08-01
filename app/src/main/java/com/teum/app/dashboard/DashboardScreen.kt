@@ -1571,7 +1571,14 @@ private fun WeeklyReportCharts(
     stats: WeeklyReportStats,
     appDisplayNames: Map<String, String>
 ) {
-    val dayStats = stats.dailyOverrunStats
+    val chartItems = remember(stats.dailyOverrunStats) {
+        RecentSevenDayChart.buildItems(stats.dailyOverrunStats)
+    }
+    val dayStats = chartItems.map { it.stat }
+    val dayLabels = chartItems.map { it.label }
+    val todayIndices = chartItems.mapIndexedNotNull { index, item ->
+        index.takeIf { item.isToday }
+    }.toSet()
     val maxOpenCount = dayStats.maxOfOrNull { it.openCount }?.takeIf { it > 0 } ?: 1
     val maxExtensionCount = dayStats.maxOfOrNull { it.extensionCount }?.takeIf { it > 0 } ?: 1
     val maxUsageMillis = dayStats.maxOfOrNull { it.usageMillis }?.takeIf { it > 0L } ?: 1L
@@ -1589,36 +1596,39 @@ private fun WeeklyReportCharts(
             when (page) {
                 0 -> WeeklyBarChartCard(
                     title = "요일별 앱 사용 횟수",
-                    labels = dayStats.map { it.label },
+                    labels = dayLabels,
                     values = dayStats.map { it.openCount.toDouble() / maxOpenCount },
                     valueLabels = dayStats.map { stat ->
                         stat.openCount.takeIf { it > 0 }?.let(::formatCompactCount).orEmpty()
                     },
                     highlightedIndices = dayStats.indicesOfMaxInt { it.openCount },
+                    todayIndices = todayIndices,
                     barColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 1 -> WeeklyBarChartCard(
                     title = "요일별 연장 횟수",
-                    labels = dayStats.map { it.label },
+                    labels = dayLabels,
                     values = dayStats.map { it.extensionCount.toDouble() / maxExtensionCount },
                     valueLabels = dayStats.map { stat ->
                         stat.extensionCount.takeIf { it > 0 }?.let(::formatCompactCount).orEmpty()
                     },
                     highlightedIndices = dayStats.indicesOfMaxInt { it.extensionCount },
+                    todayIndices = todayIndices,
                     barColor = DashboardWarning,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 2 -> WeeklyBarChartCard(
                     title = "요일별 사용 시간",
-                    labels = dayStats.map { it.label },
+                    labels = dayLabels,
                     values = dayStats.map { it.usageMillis.toDouble() / maxUsageMillis.toDouble() },
                     valueLabels = dayStats.map { stat ->
                         stat.usageMillis.takeIf { it > 0L }?.let(::formatCompactChartDuration).orEmpty()
                     },
                     highlightedIndices = dayStats.indicesOfMaxLong { it.usageMillis },
+                    todayIndices = todayIndices,
                     barColor = DashboardSuccess,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1645,6 +1655,7 @@ private fun WeeklyBarChartCard(
     values: List<Double>,
     valueLabels: List<String> = emptyList(),
     highlightedIndices: Set<Int>,
+    todayIndices: Set<Int> = emptySet(),
     barColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -1669,6 +1680,7 @@ private fun WeeklyBarChartCard(
                 values = values,
                 valueLabels = valueLabels,
                 highlightedIndices = highlightedIndices,
+                todayIndices = todayIndices,
                 barWidth = 28,
                 highlightedColor = barColor
             )
@@ -1895,6 +1907,7 @@ private fun SimpleBarChart(
     values: List<Double>,
     valueLabels: List<String> = emptyList(),
     highlightedIndices: Set<Int>,
+    todayIndices: Set<Int> = emptySet(),
     barWidth: Int,
     highlightedColor: Color = MaterialTheme.colorScheme.primary
 ) {
@@ -1911,6 +1924,7 @@ private fun SimpleBarChart(
             val normalizedValue = values.getOrNull(index)?.coerceIn(0.0, 1.0) ?: 0.0
             val barHeight = if (normalizedValue <= 0.0) 0.dp else (8 + normalizedValue * 72).dp
             val isHighlighted = index in highlightedIndices
+            val isToday = index in todayIndices
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -1941,14 +1955,36 @@ private fun SimpleBarChart(
                         )
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = label,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 9.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.height(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = label,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    if (isToday) {
+                        Text(
+                            text = "오늘",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 8.sp,
+                            lineHeight = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Clip
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                }
             }
         }
     }
@@ -2068,9 +2104,9 @@ private fun ReportHighlightMetricGrid(stats: WeeklyReportStats) {
                 modifier = Modifier.weight(1f)
             )
             ReportHighlightMetricCard(
-                title = "개입 후 종료",
+                title = "브레이크에서 종료",
                 value = "${stats.closedAfterInterventionCount}회",
-                description = "개입 뒤 앱 종료가\n확인된 횟수",
+                description = "사용 시간 알림에서\n종료가 확인된 횟수",
                 color = DashboardSuccess,
                 modifier = Modifier.weight(1f)
             )
@@ -2199,36 +2235,71 @@ private fun ReportDetailToggleButton(
 
 @Composable
 private fun ReportDetailMetricsCard(stats: WeeklyReportStats) {
-    val metrics = listOf(
-        ReportDetailMetricUi(
-            label = "최근 7일 사용 시간",
-            value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
-            description = "최근 7일 동안 관리 앱을 사용한 시간"
+    val sections = listOf(
+        ReportDetailMetricSectionUi(
+            title = "목적",
+            metrics = listOf(
+                ReportDetailMetricUi(
+                    label = "명확한 목적",
+                    value = formatIntentChoiceStat(stats.clearPurposeIntentStat),
+                    description = "사용 목적이 분명하다고 선택한 세션"
+                ),
+                ReportDetailMetricUi(
+                    label = "인지된 휴식",
+                    value = formatIntentChoiceStat(stats.mindfulRestIntentStat),
+                    description = "휴식을 위해 열었다고 선택한 세션"
+                ),
+                ReportDetailMetricUi(
+                    label = "무의식 실행",
+                    value = formatIntentChoiceStat(stats.unconsciousOpenIntentStat),
+                    description = "뚜렷한 목적 없이 열었다고 선택한 세션"
+                )
+            )
         ),
-        ReportDetailMetricUi(
-            label = "사용 세션",
-            value = "${stats.totalSessionCount}회",
-            description = "최근 7일 동안 완료된 사용 세션 수"
+        ReportDetailMetricSectionUi(
+            title = "사용",
+            metrics = listOf(
+                ReportDetailMetricUi(
+                    label = "최근 7일 사용 시간",
+                    value = formatDuration(stats.dailyOverrunStats.sumOf { it.usageMillis }),
+                    description = "최근 7일 동안 관리 앱을 사용한 시간"
+                ),
+                ReportDetailMetricUi(
+                    label = "사용 세션",
+                    value = "${stats.totalSessionCount}회",
+                    description = "최근 7일 동안 완료된 사용 세션 수"
+                ),
+                ReportDetailMetricUi(
+                    label = "목표 시간 초과",
+                    value = "${stats.overrunCount}회 · ${formatPercent(stats.overrunRate)}",
+                    description = "정한 시간을 넘긴 세션의 횟수와 비율"
+                )
+            )
         ),
-        ReportDetailMetricUi(
-            label = "목표 시간 초과",
-            value = "${stats.overrunCount}회 · ${formatPercent(stats.overrunRate)}",
-            description = "정한 시간을 넘긴 세션의 횟수와 비율"
-        ),
-        ReportDetailMetricUi(
-            label = "필요한 사용",
-            value = "${stats.necessaryUseCount}회",
-            description = "처음 목적과 달라졌지만 필요하다고 판단한 횟수"
-        ),
-        ReportDetailMetricUi(
-            label = "사용 결과 확인",
-            value = "${stats.outcomeResponseCount}회",
-            description = "앱 사용 후 결과 확인 화면에 답한 횟수"
-        ),
-        ReportDetailMetricUi(
-            label = "조심 모드 적용",
-            value = "${stats.interventionAppliedSessionCount}회",
-            description = "취약 시간대에 강화된 확인이 적용된 횟수"
+        ReportDetailMetricSectionUi(
+            title = "결과",
+            metrics = listOf(
+                ReportDetailMetricUi(
+                    label = "목적 달성",
+                    value = "${stats.purposeAchievedOutcomeCount}회",
+                    description = "처음 정한 목적을 달성했다고 답한 횟수"
+                ),
+                ReportDetailMetricUi(
+                    label = "필요한 사용",
+                    value = "${stats.necessaryUseOutcomeCount}회",
+                    description = "처음 목적과 달라졌지만 필요했다고 답한 횟수"
+                ),
+                ReportDetailMetricUi(
+                    label = "목적 이탈",
+                    value = "${stats.purposeDriftOutcomeCount}회",
+                    description = "처음 목적과 다른 사용으로 이어졌다고 답한 횟수"
+                ),
+                ReportDetailMetricUi(
+                    label = "무의식 사용",
+                    value = "${stats.unconsciousUseOutcomeCount}회",
+                    description = "뚜렷한 목적 없이 계속 사용했다고 답한 횟수"
+                )
+            )
         )
     )
 
@@ -2240,20 +2311,40 @@ private fun ReportDetailMetricsCard(stats: WeeklyReportStats) {
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
-            metrics.forEachIndexed { index, metric ->
-                ReportDetailMetricRow(
-                    label = metric.label,
-                    value = metric.value,
-                    description = metric.description
+            sections.forEach { section ->
+                ReportDetailMetricSection(section)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailMetricSection(section: ReportDetailMetricSectionUi) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = section.title,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        HorizontalDivider(
+            color = DashboardBorder.copy(alpha = 0.65f),
+            thickness = 0.8.dp
+        )
+        section.metrics.forEachIndexed { index, metric ->
+            ReportDetailMetricRow(
+                label = metric.label,
+                value = metric.value,
+                description = metric.description
+            )
+            if (index != section.metrics.lastIndex) {
+                HorizontalDivider(
+                    color = DashboardBorder.copy(alpha = 0.45f),
+                    thickness = 0.6.dp
                 )
-                if (index != metrics.lastIndex) {
-                    HorizontalDivider(
-                        color = DashboardBorder.copy(alpha = 0.55f),
-                        thickness = 0.6.dp
-                    )
-                }
             }
         }
     }
@@ -2277,8 +2368,6 @@ private fun ReportDetailMetricRow(
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.width(14.dp))
             Text(
@@ -2287,8 +2376,6 @@ private fun ReportDetailMetricRow(
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End
             )
         }
@@ -2297,11 +2384,14 @@ private fun ReportDetailMetricRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
             fontSize = 11.sp,
             lineHeight = 15.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
         )
     }
 }
+
+private data class ReportDetailMetricSectionUi(
+    val title: String,
+    val metrics: List<ReportDetailMetricUi>
+)
 
 private data class ReportDetailMetricUi(
     val label: String,
@@ -2477,6 +2567,10 @@ private fun Calendar.isSameDay(other: Calendar): Boolean {
 
 private fun formatPercent(rate: Double): String {
     return "${(rate * 100.0).roundToInt()}%"
+}
+
+private fun formatIntentChoiceStat(stat: IntentChoiceReportStat): String {
+    return "${stat.count}회 · ${formatPercent(stat.rate)}"
 }
 
 private fun Drawable.toBitmapOrNull(): Bitmap? {
